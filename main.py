@@ -7,6 +7,7 @@ import pdb
 import re
 
 # import graph_tool.all as gt
+import networkx as nx
 import numpy as np
 import pandas as pd
 import pymysql
@@ -19,7 +20,7 @@ class DbConnector:
         self.db_connection = pymysql.connect(host=self.db_host,
                                              port=3306,
                                              user='root',
-                                             passwd='master',
+                                             passwd='',
                                              db='wikigame',
                                              charset='utf8')
         self.db_cursor = self.db_connection.cursor(pymysql.cursors.DictCursor)
@@ -53,7 +54,7 @@ class DbConnector:
         return self.db_cursor_nobuff
 
 
-# def read_edge_list(filename, directed=False, parallel_edges=False):
+# def read_edge_list_gt(filename, directed=False, parallel_edges=False):
 #     graph = gt.Graph(directed=directed)
 #     id_mapping = defaultdict(lambda: graph.add_vertex())
 #     graph.vertex_properties['NodeId'] = graph.new_vertex_property('string')
@@ -73,23 +74,49 @@ class DbConnector:
 #         gt.remove_parallel_edges(graph)
 #     return graph
 
+def read_edge_list_nx(filename, directed=False, parallel_edges=False):
+    if directed:
+        if parallel_edges:
+            graph = nx.MultiDiGraph()
+        else:
+            graph = nx.DiGraph()
+    else:
+        graph = nx.Graph()
+    with io.open(filename, encoding='utf-8') as infile:
+        for line in infile:
+            line = line.strip().split()
+            if len(line) == 2:
+                src, dest = line
+                graph.add_edge(src, dest)
+            elif len(line) == 1:
+                graph.add_node(line)
+    return graph
+
 
 def main():
-    # build the network from Patrick's links.txt file
-    # graph = read_edge_list('data/links.txt', directed=True)
+    # build the network from Patrick's links.txt file (graph_tool variant)
+    # graph = read_edge_list_gt('data/links.txt', directed=True,
+    #                           parallel_edges=True)
     # graph.save('data/links.gt')
     # graph = gt.load_graph('data/links.gt')
-    # db_connector = DbConnector()
+    # build the network from Patrick's links.txt file (networkx variant)
+    graph = read_edge_list_nx('data/links.txt', directed=True,
+                              parallel_edges=True)
+    db_connector = DbConnector()
     # games = db_connector.execute('SELECT * FROM games')
     # game2st = {g['game_name']: (g['start_page_id'], g['goal_page_id'])
     #            for g in games}
-    # pages = db_connector.execute('SELECT * FROM pages')
-    # id2title = {p['id']: p['name'] for p in pages}
-    # id2file = {p['id']: p['link'] for p in pages}
+    pages = db_connector.execute('SELECT * FROM pages')
+    id2title = {p['id']: p['name'] for p in pages}
+    id2name = {p['id']: re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
+    name2id = {v: k for k, v in id2name.items()}
+    nodes = pages = db_connector.execute('SELECT * FROM node_data')
+    id2deg = {p['id']: p['degree'] for p in nodes}
+    id2pr = {p['id']: p['pagerank'] for p in nodes}
 
     def parse_node(node_string):
         match = re.findall(r'/([^/]*?)\.htm', node_string)
-        return match[0] if match else ''
+        return match[0].replace('%25', '%') if match else ''
 
     results = []
     for folder in sorted(os.listdir('data/logfiles')):
@@ -100,8 +127,7 @@ def main():
                              infer_datetime_format=True, sep='\t',
                              converters={'node': parse_node})
             if df['action'].value_counts()['GAME_STARTED'] > 1:
-                print 'Error: duplicated game start'
-                print 'dropping game', folder, fname
+                print 'Error: duplicated game start, dropping', folder, fname
                 continue
             success = df.iloc[-1]['action'] == 'GAME_COMPLETED'
             if success:
@@ -118,6 +144,13 @@ def main():
                 df['success'] = pd.Series(np.zeros(df.shape[0]), index=df.index)
             df = df[df['action'] == 'load']
             df.index = np.arange(len(df))
+            try:
+                df['node_id'] = [name2id[n] for n in df['node']]
+                df['degree'] = [id2deg[i] for i in df['node_id']]
+                df['pagerank'] = [id2pr[i] for i in df['node_id']]
+            except KeyError, e:
+                print 'Error: key not found', folder, fname, e
+                continue
 
             df.iloc[:, 0] = df.iloc[:, 0] - df.iloc[:, 0].min()
             if df['time'].min() < 0:
@@ -131,7 +164,7 @@ def main():
 
     clicks = pd.concat(results, ignore_index=True)
     clicks['intercept'] = 1.0
-    train_cols = ['time', 'intercept']
+    train_cols = ['time', 'degree', 'pagerank', 'intercept']
     logit = sm.Logit(clicks['success'], clicks[train_cols])
     result = logit.fit()
     print result.summary()
