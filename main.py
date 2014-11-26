@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division
+from collections import defaultdict
 import io
 import os
 import pdb
 import re
+import urllib
+import urllib2
 
 # import graph_tool.all as gt
 import networkx as nx
@@ -14,7 +17,7 @@ import pymysql
 import statsmodels.api as sm
 
 
-class DbConnector:
+class DbConnector(object):
     def __init__(self):
         self.db_host = '127.0.0.1'
         self.db_connection = pymysql.connect(host=self.db_host,
@@ -34,7 +37,7 @@ class DbConnector:
     def execute(self, _statement, _args=None):
         self.db_cursor.execute(_statement, _args)
 
-        if _statement.startswith("SELECT"):
+        if _statement.lower().startswith("select"):
             return self.db_cursor.fetchall()
 
     def commit(self):
@@ -54,25 +57,38 @@ class DbConnector:
         return self.db_cursor_nobuff
 
 
-# def read_edge_list_gt(filename, directed=False, parallel_edges=False):
-#     graph = gt.Graph(directed=directed)
-#     id_mapping = defaultdict(lambda: graph.add_vertex())
-#     graph.vertex_properties['NodeId'] = graph.new_vertex_property('string')
-#     with io.open(filename, encoding='utf-8') as infile:
-#         for line in infile:
-#             line = line.strip().split()
-#             if len(line) == 2:
-#                 src, dest = line
-#                 src_v, dest_v = id_mapping[src], id_mapping[dest]
-#                 graph.add_edge(src_v, dest_v)
-#             elif len(line) == 1:
-#                 node = line[0]
-#                 _ = id_mapping[node]
-#     for orig_id, v in id_mapping.iteritems():
-#         graph.vertex_properties['NodeId'][v] = orig_id
-#     if not parallel_edges:
-#         gt.remove_parallel_edges(graph)
-#     return graph
+class NgramConnector(object):
+    def __init__(self):
+        token = 'bec1748d-5665-4266-83fb-e657ef4070ea'
+        corpus = 'bing-body/2013-12/5/'
+        base_url = 'http://weblm.research.microsoft.com/weblm/rest.svc/'
+        self.base_url = base_url + corpus + 'jp?u=' + token + '&p='
+
+    def get(self, word):
+        word = word.replace(' ', '+').replace('_', '+')
+        return float(urllib2.urlopen(self.base_url + word).read())
+
+
+def read_edge_list_gt(filename, directed=False, parallel_edges=False):
+    graph = gt.Graph(directed=directed)
+    id_mapping = defaultdict(lambda: graph.add_vertex())
+    graph.vertex_properties['NodeId'] = graph.new_vertex_property('string')
+    with io.open(filename, encoding='utf-8') as infile:
+        for line in infile:
+            line = line.strip().split()
+            if len(line) == 2:
+                src, dest = line
+                src_v, dest_v = id_mapping[src], id_mapping[dest]
+                graph.add_edge(src_v, dest_v)
+            elif len(line) == 1:
+                node = line[0]
+                _ = id_mapping[node]
+    for orig_id, v in id_mapping.iteritems():
+        graph.vertex_properties['NodeId'][v] = orig_id
+    if not parallel_edges:
+        gt.remove_parallel_edges(graph)
+    return graph
+
 
 def read_edge_list_nx(filename, directed=False, parallel_edges=False):
     if directed:
@@ -182,5 +198,32 @@ def main():
     pdb.set_trace()
 
 
+def get_ngrams():
+    db_connector = DbConnector()
+    query = '''CREATE TABLE IF NOT EXISTS `ngrams` (
+                   `node_id` int(11) NOT NULL,
+                   `probability` float NOT NULL,
+                    PRIMARY KEY (`node_id`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
+                   '''
+    db_connector.execute(query)
+    db_connector.commit()
+    pages = db_connector.execute('SELECT * FROM pages')
+    page_ids = set(p['id'] for p in pages)
+    id2name = {p['id']:
+               re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
+    ids = db_connector.execute('SELECT id FROM ngrams')
+    ngram_ids = set(p['id'] for p in ids)
+    ids = sorted(page_ids - ngram_ids)
+    ngram_connector = NgramConnector()
+    for i in ids:
+        print i, '/', len(ids)
+        probability = ngram_connector.get(id2name[i])
+        stmt = 'INSERT INTO `ngrams` (node_id, probability) values (%s, %s)'\
+               % (i, probability)
+        db_connector.execute(stmt)
+        db_connector.commit()
+
 if __name__ == '__main__':
-    main()
+    # main()
+    get_ngrams()
