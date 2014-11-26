@@ -124,11 +124,14 @@ def main():
     #            for g in games}
     pages = db_connector.execute('SELECT * FROM pages')
     id2title = {p['id']: p['name'] for p in pages}
-    id2name = {p['id']: re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
+    id2name = {p['id']:
+               re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
     name2id = {v: k for k, v in id2name.items()}
     nodes = pages = db_connector.execute('SELECT * FROM node_data')
     id2deg = {p['id']: p['degree'] for p in nodes}
     id2pr = {p['id']: p['pagerank'] for p in nodes}
+    ngrams = pages = db_connector.execute('SELECT * FROM ngrams')
+    id2ngram = {p['id']: p['probability'] for p in ngrams}
 
     def parse_node(node_string):
         match = re.findall(r'/([^/]*?)\.htm', node_string)
@@ -136,6 +139,7 @@ def main():
 
     results = []
     for folder in sorted(os.listdir('data/logfiles')):
+        print folder
         for filename in sorted(os.listdir('data/logfiles/' + folder)):
             fname = 'data/logfiles/' + folder + '/' + filename
             df = pd.read_csv(fname, header=None, usecols=[1, 2, 3],
@@ -164,6 +168,7 @@ def main():
                 df['node_id'] = [name2id[n] for n in df['node']]
                 df['degree'] = [id2deg[i] for i in df['node_id']]
                 df['pagerank'] = [id2pr[i] for i in df['node_id']]
+                df['ngram'] = [id2ngram[i] for i in df['node_id']]
             except KeyError, e:
                 print 'Error: key not found', folder, fname, e
                 continue
@@ -180,7 +185,7 @@ def main():
 
     clicks = pd.concat(results, ignore_index=True)
     clicks['intercept'] = 1.0
-    train_cols = ['time', 'degree', 'pagerank', 'intercept']
+    train_cols = ['time', 'degree', 'pagerank', 'ngram', 'intercept']
     logit = sm.Logit(clicks['success'], clicks[train_cols])
     result = logit.fit()
     print result.summary()
@@ -225,5 +230,5 @@ def get_ngrams():
         db_connector.commit()
 
 if __name__ == '__main__':
-    # main()
-    get_ngrams()
+    # get_ngrams()
+    main()
