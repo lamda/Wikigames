@@ -69,6 +69,28 @@ class NgramConnector(object):
         return float(urllib2.urlopen(self.base_url + word).read())
 
 
+class LogisticRegressor(object):
+    def __init__(self):
+        pass
+
+    def regress(self, dependent, independent):
+        logit = sm.Logit(dependent, independent)
+        result = logit.fit()
+        print result.summary()
+        print 'Baseline:', sum(dependent) / dependent.shape[0]
+
+        # import matplotlib.pyplot as plt
+        # plt.scatter(clicks['time'], clicks['success'])
+        # plt.xlabel('duration')
+        # plt.ylabel('success')
+        # x = np.arange(0, 1000000, 100)
+        # b1, b0 = result.params.values
+        # p = [(np.exp(b0 + i*b1))/(1+np.exp(b0 + i*b1)) for i in x]
+        # plt.plot(x, p)
+        # plt.show()
+        # pdb.set_trace()
+
+
 def read_edge_list_gt(filename, directed=False, parallel_edges=False):
     graph = gt.Graph(directed=directed)
     id_mapping = defaultdict(lambda: graph.add_vertex())
@@ -186,21 +208,8 @@ def main():
     clicks = pd.concat(results, ignore_index=True)
     clicks['intercept'] = 1.0
     train_cols = ['time', 'degree', 'pagerank', 'ngram', 'intercept']
-    logit = sm.Logit(clicks['success'], clicks[train_cols])
-    result = logit.fit()
-    print result.summary()
-    print 'Baseline:', clicks[clicks['success'] == 1].shape[0] / clicks.shape[0]
-
-    import matplotlib.pyplot as plt
-    plt.scatter(clicks['time'], clicks['success'])
-    plt.xlabel('duration')
-    plt.ylabel('success')
-    x = np.arange(0, 1000000, 100)
-    b1, b0 = result.params.values
-    p = [(np.exp(b0 + i*b1))/(1+np.exp(b0 + i*b1)) for i in x]
-    plt.plot(x, p)
-    plt.show()
-    pdb.set_trace()
+    regressor = LogisticRegressor()
+    regressor.regress(clicks['success'], clicks[train_cols])
 
 
 def get_ngrams():
@@ -228,6 +237,23 @@ def get_ngrams():
                % (i, probability)
         db_connector.execute(stmt)
         db_connector.commit()
+
+
+def test_regression():
+    fname = 'data/SAheart.txt'
+    df = pd.read_csv(fname, index_col=0, usecols=[0, 1, 2, 3, 5, 7, 8, 9, 10])
+    dummies = pd.get_dummies(df['famhist'], prefix='famhist')
+    cols_to_keep = ['sbp', 'tobacco', 'ldl', 'obesity', 'alcohol', 'age',
+                    'chd']
+    df = df[cols_to_keep].join(dummies.ix[:, 1:])
+    df['intercept'] = 1.0
+    regressor = LogisticRegressor()
+    regressor.regress(df['chd'],
+                      df[['intercept', 'sbp', 'tobacco', 'ldl', 'obesity',
+                          'famhist_Present', 'alcohol', 'age']])
+    regressor.regress(df['chd'],
+                      df[['intercept', 'tobacco', 'ldl', 'famhist_Present',
+                          'age']])
 
 if __name__ == '__main__':
     # get_ngrams()
