@@ -77,7 +77,6 @@ class LogisticRegressor(object):
         logit = sm.Logit(dependent, independent)
         result = logit.fit()
         print result.summary()
-        print 'Baseline:', sum(dependent) / dependent.shape[0]
 
         # import matplotlib.pyplot as plt
         # plt.scatter(clicks['time'], clicks['success'])
@@ -89,6 +88,16 @@ class LogisticRegressor(object):
         # plt.plot(x, p)
         # plt.show()
         # pdb.set_trace()
+
+        pred = result.predict(independent)
+        correct = 0
+        for t, p in zip(dependent, pred):
+            if t == 0 and p < 0.5:
+                correct += 1
+            elif t == 1 and p > 0.5:
+                correct += 1
+        print correct, 'correct out of', len(pred), '(', correct / len(pred), ')'
+        print 'Baseline:', sum(dependent) / dependent.shape[0]
 
 
 def read_edge_list_gt(filename, directed=False, parallel_edges=False):
@@ -144,72 +153,94 @@ def main():
     # games = db_connector.execute('SELECT * FROM games')
     # game2st = {g['game_name']: (g['start_page_id'], g['goal_page_id'])
     #            for g in games}
+
     pages = db_connector.execute('SELECT * FROM pages')
     id2title = {p['id']: p['name'] for p in pages}
     id2name = {p['id']:
                re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
     name2id = {v: k for k, v in id2name.items()}
+
     nodes = pages = db_connector.execute('SELECT * FROM node_data')
     id2deg = {p['id']: p['degree'] for p in nodes}
     id2pr = {p['id']: p['pagerank'] for p in nodes}
-    ngrams = pages = db_connector.execute('SELECT * FROM ngrams')
+
+    ngrams = db_connector.execute('SELECT * FROM ngrams')
     id2ngram = {p['id']: p['probability'] for p in ngrams}
 
-    def parse_node(node_string):
-        match = re.findall(r'/([^/]*?)\.htm', node_string)
-        return match[0].replace('%25', '%') if match else ''
+    links = db_connector.execute('''SELECT page_id, SUM(amount) as links
+                                 FROM links GROUP BY page_id;''')
+    id2links = {p['page_id']: int(p['links']) for p in links}
 
-    results = []
-    for folder in sorted(os.listdir('data/logfiles')):
-        print folder
-        for filename in sorted(os.listdir('data/logfiles/' + folder)):
-            fname = 'data/logfiles/' + folder + '/' + filename
-            df = pd.read_csv(fname, header=None, usecols=[1, 2, 3],
-                             names=['time', 'action', 'node'],
-                             infer_datetime_format=True, sep='\t',
-                             converters={'node': parse_node})
-            if df['action'].value_counts()['GAME_STARTED'] > 1:
-                print 'Error: duplicated game start, dropping', folder, fname
-                continue
-            success = df.iloc[-1]['action'] == 'GAME_COMPLETED'
-            if success:
-                idx = -1
-                while df.iloc[idx]['action'] != 'link_data':
-                    idx -= 1
-                    if idx < -df.shape[0]:
-                        print 'Error: no link_data entry found'
-                        pdb.set_trace()
-                df.loc[df.index[-1] + 1] = [df['time'].max(), 'load',
-                                            df.iloc[idx]['node']]
-                df['success'] = pd.Series(np.ones(df.shape[0]), index=df.index)
-            else:
-                df['success'] = pd.Series(np.zeros(df.shape[0]), index=df.index)
-            df = df[df['action'] == 'load']
-            df.index = np.arange(len(df))
-            try:
-                df['node_id'] = [name2id[n] for n in df['node']]
-                df['degree'] = [id2deg[i] for i in df['node_id']]
-                df['pagerank'] = [id2pr[i] for i in df['node_id']]
-                df['ngram'] = [id2ngram[i] for i in df['node_id']]
-            except KeyError, e:
-                print 'Error: key not found', folder, fname, e
-                continue
+    if False:
 
-            df.iloc[:, 0] = df.iloc[:, 0] - df.iloc[:, 0].min()
-            if df['time'].min() < 0:
-                print folder, fname
-                pdb.set_trace()
-            time_diff = df.iloc[:, 0].diff()[1:]
-            time_diff.index = np.arange(time_diff.shape[0])
-            df = df.iloc[:-1]
-            df.iloc[:, 0] = time_diff
-            results.append(df)
+        def parse_node(node_string):
+            match = re.findall(r'/([^/]*?)\.htm', node_string)
+            return match[0].replace('%25', '%') if match else ''
 
-    clicks = pd.concat(results, ignore_index=True)
-    clicks['intercept'] = 1.0
-    train_cols = ['time', 'degree', 'pagerank', 'ngram', 'intercept']
+        results = []
+        for folder in sorted(os.listdir('data/logfiles')):
+            print folder
+            files = sorted([f for f in os.listdir('data/logfiles/' + folder)
+                            if f.startswith('PLAIN')])
+            for filename in files:
+                fname = 'data/logfiles/' + folder + '/' + filename
+                df = pd.read_csv(fname, header=None, usecols=[1, 2, 3],
+                                 names=['time', 'action', 'node'],
+                                 infer_datetime_format=True, sep='\t')
+                if df['action'].value_counts()['GAME_STARTED'] > 1:
+                    print 'Error: duplicated game start, dropping', folder, fname
+                    continue
+                # ld = df[df['action'] == 'link_data']
+                # ld['node'] = ld['node'].apply(lambda k: int(re.findall(r"link_nr': (\d+)", k)[0]))
+                success = df.iloc[-1]['action'] == 'GAME_COMPLETED'
+                if success:
+                    idx = -1
+                    while df.iloc[idx]['action'] != 'link_data':
+                        idx -= 1
+                        if idx < -df.shape[0]:
+                            print 'Error: no link_data entry found'
+                            pdb.set_trace()
+                    df.loc[df.index[-1] + 1] = [df['time'].max(), 'load',
+                                                df.iloc[idx]['node']]
+                    df['success'] = pd.Series(np.ones(df.shape[0]), index=df.index)
+                else:
+                    df['success'] = pd.Series(np.zeros(df.shape[0]), index=df.index)
+                df = df[df['action'] == 'load']
+                df['node'] = df['node'].apply(parse_node)
+                df.index = np.arange(len(df))
+                try:
+                    df['node_id'] = [name2id[n] for n in df['node']]
+                    df['degree'] = [id2deg[i] for i in df['node_id']]
+                    df['pagerank'] = [id2pr[i] for i in df['node_id']]
+                    df['ngram'] = [id2ngram[i] for i in df['node_id']]
+                except KeyError, e:
+                    print 'Error: key not found', folder, fname, e
+                    continue
+
+                df.iloc[:, 0] = df.iloc[:, 0] - df.iloc[:, 0].min()
+                if df['time'].min() < 0:
+                    print folder, fname
+                    pdb.set_trace()
+                time_diff = df.iloc[:, 0].diff()[1:]
+                time_diff.index = np.arange(time_diff.shape[0])
+                df = df.iloc[:-1]
+                df.iloc[:, 0] = time_diff
+                # if df.shape[0] != ld.shape[0]:
+                #     print 'Error: ld.shape != df.shape', folder, fname
+                #     continue
+                # linkpos = ld['node'] / [id2links[i] for i in df['node_id']]
+                # df['linkpos'] = [v for v in linkpos]
+                results.append(df)
+
+        clicks = pd.concat(results, ignore_index=True)
+        clicks['intercept'] = 1.0
+        clicks.to_pickle('clicks.pd')
+
+    clicks = pd.read_pickle('clicks.pd')
+    train_cols = ['time', 'degree', 'pagerank', 'ngram', 'intercept'] #, 'linkpos']
     regressor = LogisticRegressor()
     regressor.regress(clicks['success'], clicks[train_cols])
+    pdb.set_trace()
 
 
 def get_ngrams():
