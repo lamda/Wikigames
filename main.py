@@ -216,6 +216,58 @@ class Network(object):
                     graph.add_node(line)
         return graph
 
+    def extract_plaintext(self):
+        class MLStripper(HTMLParser.HTMLParser):
+            def __init__(self):
+                HTMLParser.HTMLParser.__init__(self)
+                self.reset()
+                self.fed = []
+
+            def handle_data(self, d):
+                self.fed.append(d)
+
+            def get_data(self):
+                return ''.join(self.fed)
+
+            def reset(self):
+                self.fed = []
+                HTMLParser.HTMLParser.reset(self)
+
+        parser = MLStripper()
+        folder = 'data/wiki-schools/wp/'
+        plaintext_dir = 'data/wiki-schools/plaintext/'
+        if not os.path.exists(plaintext_dir):
+            os.makedirs(plaintext_dir)
+        files = set(os.listdir(plaintext_dir))
+        file_last = sorted(files)[-1] if files else None
+        for i, a in enumerate(sorted(self.name2id.keys())):
+            ofname = plaintext_dir + a + '.txt'
+            if a + '.txt' in files:
+                if a + '.txt' != file_last:
+                    continue
+                else:
+                    print(a + '.txt', 'overwrite')
+            print(unicode(i+1) + '/' + unicode(len(self.name2id)) +
+                  ' ' + a + '.txt')
+            fname = folder + a[0].lower() + '/' + a + '.htm'
+            with io.open(fname, encoding='utf-8') as infile:
+                data = infile.read()
+            data = data.split('<!-- start content -->')[1]
+            data = data.split('<div class="printfooter">')[0]
+            data = [d.strip() for d in data.splitlines()]
+            data = [d for d in data if d]
+            data[0] = data[0].split('</p></div></div>')[1]
+            text = []
+            for d in data:
+                parser.reset()
+                parser.feed(parser.unescape(d))
+                stripped_d = parser.get_data()
+                if stripped_d:
+                    text.append(stripped_d)
+            text = '\n'.join(text)
+            with io.open(ofname, 'w', encoding='utf-8') as outfile:
+                outfile.write(text)
+
 
 def main():
     # build the network
@@ -319,58 +371,5 @@ def main():
     pdb.set_trace()
 
 
-def compute_link_positions():
-    nw = Network('data/links.txt')
-
-    class MLStripper(HTMLParser.HTMLParser):
-        def __init__(self):
-            HTMLParser.HTMLParser.__init__(self)
-            self.reset()
-            self.fed = []
-
-        def handle_data(self, d):
-            self.fed.append(d)
-
-        def get_data(self):
-            return ''.join(self.fed)
-
-        def reset(self):
-            self.fed = []
-            HTMLParser.HTMLParser.reset(self)
-
-    parser = MLStripper()
-    link_regex = re.compile('(<a href="../../wp/[^/]+/(.+?)\.htm" ' +
-                             'title="[^"]+">.+?</a>)' +
-                            '|' +
-                            '(<area.+?href=' +
-                            '"../../wp/[^/]+/(.+?)\.htm".+?/>)')
-    folder = 'data/wiki-schools/wp/'
-    plaintext_dir = 'data/wiki-schools/plaintext/'
-    if not os.path.exists(plaintext_dir):
-        os.makedirs(plaintext_dir)
-    for i, a in enumerate(nw.name2id.keys()):
-        print(unicode(i+1) + '/' + unicode(len(nw.name2id)))
-        fname = folder + a[0].lower() + '/' + a + '.htm'
-        with io.open(fname, encoding='utf-8') as infile:
-            data = infile.read()
-        data = data.split('<!-- start content -->')[1]
-        data = data.split('<div class="printfooter">')[0]
-        data = [d.strip() for d in data.splitlines()]
-        data = [d for d in data if d]
-        data = data[1:]  # skip background information about W4S
-        text = []
-        for d in data:
-            parser.reset()
-            parser.feed(parser.unescape(d))
-            stripped_d = parser.get_data()
-            if stripped_d:
-                text.append(stripped_d)
-        text = '\n'.join(text)
-        with io.open(plaintext_dir + a + '.txt', 'w', encoding='utf-8') as outfile:
-            outfile.write(text)
-
-
 if __name__ == '__main__':
-    # main()
-    compute_link_positions()
-    pdb.set_trace()
+    main()
