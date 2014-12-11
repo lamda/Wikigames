@@ -14,6 +14,7 @@ import urllib2
 import networkx as nx
 import numpy as np
 import pandas as pd
+pd.options.mode.chained_assignment = None
 import pymysql
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
@@ -157,31 +158,42 @@ class Network(object):
             self.graph = self.read_edge_list_nx(filename)
 
         # build some mappings from the database
-        db_connector = DbConnector()
-        pages = db_connector.execute('SELECT * FROM pages')
+        self.db_connector = DbConnector()
+        pages = self.db_connector.execute('SELECT * FROM pages')
         self.id2title = {p['id']: p['name'] for p in pages}
         self.id2name = {p['id']:
                         re.findall(r'\\([^\\]*?)\.htm', p['link'])[0]
                         for p in pages}
         self.name2id = {v: k for k, v in self.id2name.items()}
 
-        games = db_connector.execute("""SELECT * FROM games
+        games = self.db_connector.execute("""SELECT * FROM games
                                      WHERE `game_name` LIKE 'PLAIN%'""")
         self.game2start_target = {v['game_name']:
                                   (self.id2name[v['start_page_id']],
                                    self.id2name[v['goal_page_id']])
                                   for v in games}
 
-        nodes = pages = db_connector.execute('SELECT * FROM node_data')
+        nodes = pages = self.db_connector.execute('SELECT * FROM node_data')
         self.id2deg = {p['id']: p['degree'] for p in nodes}
         self.id2pr = {p['id']: p['pagerank'] for p in nodes}
 
-        ngrams = db_connector.execute('SELECT * FROM ngrams')
+        ngrams = self.db_connector.execute('SELECT * FROM ngrams')
         self.id2ngram = {p['id']: p['probability'] for p in ngrams}
 
-        links = db_connector.execute('''SELECT page_id, SUM(amount) as links
-                                     FROM links GROUP BY page_id;''')
+        links = self.db_connector.execute('''SELECT page_id,
+                                                    SUM(amount) as links
+                                             FROM links GROUP BY page_id;''')
         self.id2links = {p['page_id']: int(p['links']) for p in links}
+
+    def get_spl(self, start, target):
+        """ get the shortest path length for two nodes from the database
+        if this is too slow, add an index to the table as follows:
+        ALTER TABLE path_lengths ADD INDEX page_id (page_id);
+        """
+        query = '''SELECT path_length FROM path_lengths
+                   WHERE page_id=%d AND target_page_id=%d''' % (start, target)
+        length = self.db_connector.execute(query)
+        return length[0]['path_length']
 
     def read_edge_list_gt(self, filename, directed=True, parallel_edges=False):
         graph = gt.Graph(directed=directed)
@@ -272,11 +284,16 @@ class Network(object):
                 outfile.write(text)
 
     def compute_tfidf_similarity(self):
+        """compute the TF-IDF cosine similarity between articles
+
+        articles are sorted by their ID as in the MySQL database
+        """
+
         # read plaintext files
-        files = sorted(os.listdir(self.plaintext_folder))
         content = []
-        for f in files:
-            with io.open(self.plaintext_folder + f, encoding='utf-8') as infile:
+        for i, title in self.id2name.items():
+            with io.open(self.plaintext_folder + title + '.txt',
+                         encoding='utf-8') as infile:
                 data = infile.read()
             content.append(data)
 
@@ -304,11 +321,15 @@ def main():
 
     # load or compute the click data as a pandas frame
     try:  # load the precomputed click data
-        clicks = pd.read_pickle('data/clicks.pd')
+        data = pd.read_pickle('data/data.pd')
     except IOError:  # compute click data
+        # helper functions
         def parse_node(node_string):
-            match = re.findall(r'/([^/]*?)\.htm', node_string)
-            return match[0].replace('%25', '%') if match else ''
+            m = re.findall(r'/([^/]*?)\.htm', node_string)
+            return m[0].replace('%25', '%') if m else ''
+
+        def print_error(message):
+            print('        Error:', message, folder, filename)
 
         results = []
         folder_logs = 'data/logfiles/'
@@ -319,37 +340,36 @@ def main():
             for filename in files:
                 print('   ', filename)
                 fname = folder_logs + folder + '/' + filename
-                df = pd.read_csv(fname, header=None, usecols=[1, 2, 3],
-                                 names=['time', 'action', 'node'],
-                                 infer_datetime_format=True, sep='\t')
-                if df['action'].value_counts()['GAME_STARTED'] > 1:
-                    print('        Error: duplicated game start, dropping',
-                          folder, fname)
+                df = pd.read_csv(fname, sep='\t',
+                                 usecols=[2, 3],
+                                 names=['action', 'node'])
+
+                # perform sanity checks
+                action_counts = df['action'].value_counts()
+                if action_counts['GAME_STARTED'] > 1:
+                    print_error('duplicated_game_start, dropping')
+                    continue
+                elif action_counts['load'] < 2:
+                    print_error('game too short, dropping')
                     continue
 
-                # ld = df[df['action'] == 'link_data']
-                # ld['node'] = ld['node'].apply(lambda k: int(re.findall(r"link_nr': (\d+)", k)[0]))
+                # get additional mission attributes
+                successful = df.iloc[-1]['action'] == 'GAME_COMPLETED'
+                match = re.findall(r'(PLAIN_[\d]+_[a-z0-9_\-]+)\.', filename)[0]
+                start, target = nw.game2start_target[match]
+                df_filtered = df[df['action'] == 'load']
+                df_filtered['node'] = df_filtered['node'].apply(parse_node)
+                if not start == df_filtered.iloc[0]['node']:
+                    print_error('start node not present')
+                    pdb.set_trace()
+                if successful and not target == df_filtered.iloc[-1]['node']:
+                    last = df[df['action'] == 'link_data'].iloc[-1]['node']
+                    last = parse_node(last)
+                    df_filtered.loc[df_filtered.index[-1] + 1] = ['load', last]
+                spl = nw.get_spl(nw.name2id[start], nw.name2id[target])
 
-                if df.iloc[-1]['action'] == 'GAME_COMPLETED':
-                    idx = -1
-                    while df.iloc[idx]['action'] != 'link_data':
-                        idx -= 1
-                        if idx < -df.shape[0]:
-                            print('        Error: no link_data entry found')
-                            pdb.set_trace()
-                    df.loc[df.index[-1] + 1] = [df['time'].max(), 'load',
-                                                df.iloc[idx]['node']]
-                    df['success'] = pd.Series(np.ones(df.shape[0]),
-                                              index=df.index)
-                else:
-                    df['success'] = pd.Series(np.zeros(df.shape[0]),
-                                              index=df.index)
-                df = df[df['action'] == 'load']
-                if df.shape[0] < 2:
-                    print('        Error: game too short, dropping',
-                          folder, fname)
-                    continue
-                df['node'] = df['node'].apply(parse_node)
+                df = df_filtered
+                # df['node'] = df['node'].apply(parse_node)
                 df.index = np.arange(len(df))
                 try:
                     df['node_id'] = [nw.name2id[n] for n in df['node']]
@@ -357,49 +377,22 @@ def main():
                     df['pagerank'] = [nw.id2pr[i] for i in df['node_id']]
                     df['ngram'] = [nw.id2ngram[i] for i in df['node_id']]
                 except KeyError, e:
-                    print('        Error: key not found', folder, fname, e)
+                    print_error('key not found, dropping' + repr(e))
                     continue
 
-                df.iloc[:, 0] = df.iloc[:, 0] - df.iloc[:, 0].min()
-                if df['time'].min() < 0:
-                    print(folder, fname)
-                    pdb.set_trace()
-                time_diff = df.iloc[:, 0].diff()[1:]
-                time_diff.index = np.arange(time_diff.shape[0])
-                df = df.iloc[:-1]
-                df.iloc[:, 0] = time_diff
-                # if df.shape[0] != ld.shape[0]:
-                #     print('Error: ld.shape != df.shape', folder, fname)
-                #     continue
-                # linkpos = ld['node'] / [id2links[i] for i in df['node_id']]
-                # df['linkpos'] = [v for v in linkpos]
-                results.append(df)
-                match = re.findall(r'(PLAIN_[\d]+_[a-z0-9_\-]+)\.', filename)
-                if not match:
-                    print('        Error: game mission not matched')
-                    pdb.set_trace()
-                else:
-                    match = match[0]
-                start, target = nw.game2start_target[match]
+                df.drop('action', inplace=True, axis=1)
+                results.append({
+                    'data': df,
+                    'successful': successful,
+                    'spl': spl,
+                    'pl': len(df)
+                })
 
-                if not start == df['node'].iloc[0] and\
-                        target == df['node'].iloc[-1]:
-                    print('        Error: start or target not present')
-                    print(df)
-                # pdb.set_trace()
+        data = pd.DataFrame(results)
+        data.to_pickle('data/data.pd')
 
-        clicks = pd.concat(results, ignore_index=True)
-        clicks['intercept'] = 1.0
-        clicks.to_pickle('data/clicks.pd')
-
-    pdb.set_trace()
-    # run logistic regression
-    train_cols = ['time', 'degree', 'pagerank', 'ngram', 'intercept']  #, 'linkpos']
-    regressor = LogisticRegressor()
-    regressor.regress(clicks['success'], clicks[train_cols])
     pdb.set_trace()
 
 
 if __name__ == '__main__':
-    nw = Network()
-    nw.get_tfidf_similarity()
+    main()
