@@ -15,6 +15,7 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pymysql
+from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
 
@@ -145,7 +146,10 @@ class LogisticRegressor(object):
 
 
 class Network(object):
-    def __init__(self, filename, graph_tool=False):
+    def __init__(self, filename='data/links.txt', graph_tool=False):
+        self.html_base_folder = 'data/wiki-schools/wp/'
+        self.plaintext_folder = 'data/wiki-schools/plaintext/'
+
         # read the graph
         if graph_tool:
             self.graph = self.read_edge_list_gt(filename)
@@ -157,7 +161,8 @@ class Network(object):
         pages = db_connector.execute('SELECT * FROM pages')
         self.id2title = {p['id']: p['name'] for p in pages}
         self.id2name = {p['id']:
-                   re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
+                        re.findall(r'\\([^\\]*?)\.htm', p['link'])[0]
+                        for p in pages}
         self.name2id = {v: k for k, v in self.id2name.items()}
 
         games = db_connector.execute("""SELECT * FROM games
@@ -234,14 +239,12 @@ class Network(object):
                 HTMLParser.HTMLParser.reset(self)
 
         parser = MLStripper()
-        folder = 'data/wiki-schools/wp/'
-        plaintext_dir = 'data/wiki-schools/plaintext/'
-        if not os.path.exists(plaintext_dir):
-            os.makedirs(plaintext_dir)
-        files = set(os.listdir(plaintext_dir))
+        if not os.path.exists(self.plaintext_folder):
+            os.makedirs(self.plaintext_folder)
+        files = set(os.listdir(self.plaintext_folder))
         file_last = sorted(files)[-1] if files else None
         for i, a in enumerate(sorted(self.name2id.keys())):
-            ofname = plaintext_dir + a + '.txt'
+            ofname = self.plaintext_folder + a + '.txt'
             if a + '.txt' in files:
                 if a + '.txt' != file_last:
                     continue
@@ -249,7 +252,7 @@ class Network(object):
                     print(a + '.txt', 'overwrite')
             print(unicode(i+1) + '/' + unicode(len(self.name2id)) +
                   ' ' + a + '.txt')
-            fname = folder + a[0].lower() + '/' + a + '.htm'
+            fname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
             with io.open(fname, encoding='utf-8') as infile:
                 data = infile.read()
             data = data.split('<!-- start content -->')[1]
@@ -268,14 +271,40 @@ class Network(object):
             with io.open(ofname, 'w', encoding='utf-8') as outfile:
                 outfile.write(text)
 
+    def compute_tfidf_similarity(self):
+        # read plaintext files
+        files = sorted(os.listdir(self.plaintext_folder))
+        content = []
+        for f in files:
+            with io.open(self.plaintext_folder + f, encoding='utf-8') as infile:
+                data = infile.read()
+            content.append(data)
+
+        # compute cosine TF-IDF similarity
+        with io.open('data/stopwords.txt', encoding='utf-8') as infile:
+            stopwords = infile.read().splitlines()
+        tvec = TfidfVectorizer(stop_words=stopwords)
+        tfidf = tvec.fit_transform(content)
+        tfidf_similarity = tfidf * tfidf.T
+        with open('data/tfidf_similarity_sparse.obj', 'wb') as outfile:
+            pickle.dump(tfidf_similarity, outfile, -1)
+        tfidf_similarity = tfidf_similarity.todense()
+        with open('data/tfidf_similarity_dense.obj', 'wb') as outfile:
+            pickle.dump(tfidf_similarity, outfile, -1)
+
+    def get_tfidf_similarity(self):
+        with open('data/tfidf_similarity_dense.obj', 'rb') as infile:
+            tfidf_similarity = pickle.load(infile)
+        return tfidf_similarity
+
 
 def main():
     # build the network
-    nw = Network('data/links.txt')
+    nw = Network()
 
     # load or compute the click data as a pandas frame
     try:  # load the precomputed click data
-        clicks = pd.read_pickle('clicks.pd')
+        clicks = pd.read_pickle('data/clicks.pd')
     except IOError:  # compute click data
         def parse_node(node_string):
             match = re.findall(r'/([^/]*?)\.htm', node_string)
@@ -361,7 +390,7 @@ def main():
 
         clicks = pd.concat(results, ignore_index=True)
         clicks['intercept'] = 1.0
-        clicks.to_pickle('clicks.pd')
+        clicks.to_pickle('data/clicks.pd')
 
     pdb.set_trace()
     # run logistic regression
@@ -372,4 +401,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    nw = Network()
+    nw.get_tfidf_similarity()
