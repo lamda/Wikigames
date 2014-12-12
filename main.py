@@ -340,12 +340,12 @@ def main():
             for filename in files:
                 print('   ', filename)
                 fname = folder_logs + folder + '/' + filename
-                df = pd.read_csv(fname, sep='\t',
-                                 usecols=[2, 3],
-                                 names=['action', 'node'])
+                df_full = pd.read_csv(fname, sep='\t',
+                                      usecols=[2, 3],
+                                      names=['action', 'node'])
 
                 # perform sanity checks
-                action_counts = df['action'].value_counts()
+                action_counts = df_full['action'].value_counts()
                 if action_counts['GAME_STARTED'] > 1:
                     print_error('duplicated_game_start, dropping')
                     continue
@@ -354,22 +354,21 @@ def main():
                     continue
 
                 # get additional mission attributes
-                successful = df.iloc[-1]['action'] == 'GAME_COMPLETED'
+                successful = df_full.iloc[-1]['action'] == 'GAME_COMPLETED'
                 match = re.findall(r'(PLAIN_[\d]+_[a-z0-9_\-]+)\.', filename)[0]
                 start, target = nw.game2start_target[match]
-                df_filtered = df[df['action'] == 'load']
-                df_filtered['node'] = df_filtered['node'].apply(parse_node)
-                if not start == df_filtered.iloc[0]['node']:
+                df = df_full[df_full['action'] == 'load']
+                df.drop('action', inplace=True, axis=1)
+                df['node'] = df['node'].apply(parse_node)
+                if not df.iloc[0]['node'] == start:
                     print_error('start node not present')
                     pdb.set_trace()
-                if successful and not target == df_filtered.iloc[-1]['node']:
-                    last = df[df['action'] == 'link_data'].iloc[-1]['node']
-                    last = parse_node(last)
-                    df_filtered.loc[df_filtered.index[-1] + 1] = ['load', last]
+                if successful and not target == df.iloc[-1]['node']:
+                    last = df_full[df_full['action'] == 'link_data']
+                    last = parse_node(last.iloc[-1]['node'])
+                    df.loc[df.index[-1] + 1] = [last]
                 spl = nw.get_spl(nw.name2id[start], nw.name2id[target])
 
-                df = df_filtered
-                # df['node'] = df['node'].apply(parse_node)
                 df.index = np.arange(len(df))
                 try:
                     df['node_id'] = [nw.name2id[n] for n in df['node']]
@@ -380,7 +379,6 @@ def main():
                     print_error('key not found, dropping' + repr(e))
                     continue
 
-                df.drop('action', inplace=True, axis=1)
                 results.append({
                     'data': df,
                     'successful': successful,
