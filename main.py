@@ -153,6 +153,7 @@ class Network(object):
     def __init__(self, filename='data/links.txt', graph_tool=False):
         self.html_base_folder = 'data/wiki-schools/wp/'
         self.plaintext_folder = 'data/wiki-schools/plaintext/'
+        self.tfidf_similarity = None
 
         # read the graph
         if graph_tool:
@@ -177,7 +178,8 @@ class Network(object):
                                   for v in games}
 
         nodes = pages = self.db_connector.execute('SELECT * FROM node_data')
-        self.id2deg = {p['id']: p['out_degree'] for p in nodes}
+        self.id2deg_out = {p['id']: p['out_degree'] for p in nodes}
+        self.id2deg_in = {p['id']: p['in_degree'] for p in nodes}
         self.id2pr = {p['id']: p['pagerank'] for p in nodes}
 
         ngrams = self.db_connector.execute('SELECT * FROM ngrams')
@@ -313,10 +315,24 @@ class Network(object):
         with open('data/tfidf_similarity_dense.obj', 'wb') as outfile:
             pickle.dump(tfidf_similarity, outfile, -1)
 
-    def get_tfidf_similarity(self):
-        with open('data/tfidf_similarity_dense.obj', 'rb') as infile:
-            tfidf_similarity = pickle.load(infile)
-        return tfidf_similarity
+    def get_tfidf_similarity(self, start, target):
+        if self.tfidf_similarity is None:
+            with open('data/tfidf_similarity_dense.obj', 'rb') as infile:
+                self.tfidf_similarity = pickle.load(infile)
+        return self.tfidf_similarity[start, target]
+
+    def compute_category_depth(self):
+        pass
+
+    def get_category_depth(self, start, target):
+        pass
+
+    def compute_category_distance(self):
+        pass
+
+    def get_category_distance(self, start, target):
+        pass
+
 
 
 def main():
@@ -376,9 +392,15 @@ def main():
                 df.index = np.arange(len(df))
                 try:
                     df['node_id'] = [nw.name2id[n] for n in df['node']]
-                    df['degree'] = [nw.id2deg[i] for i in df['node_id']]
+                    df['degree_out'] = [nw.id2deg_out[i] for i in df['node_id']]
+                    df['degree_in'] = [nw.id2deg_in[i] for i in df['node_id']]
                     df['pagerank'] = [nw.id2pr[i] for i in df['node_id']]
                     df['ngram'] = [nw.id2ngram[i] for i in df['node_id']]
+                    tid = nw.name2id[target]
+                    df['spl_target'] = [nw.get_spl(i, tid)
+                                        for i in df['node_id']]
+                    df['tfidf_target'] = [1 - nw.get_tfidf_similarity(i, tid)
+                                          for i in df['node_id']]
                 except KeyError, e:
                     print_error('key not found, dropping' + repr(e))
                     continue
@@ -402,7 +424,14 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        for feature in ['degree', 'pagerank', 'ngram']:
+        for feature in [
+            'spl_target',
+            'tfidf_target',
+            'degree_out',
+            'degree_in',
+            'pagerank',
+            'ngram',
+        ]:
             print(feature)
             fig, ax = plt.subplots(1, figsize=(10, 5))
             for k in [4, 5, 6, 7, 8]:
@@ -425,6 +454,6 @@ class Plotter(object):
 
 
 if __name__ == '__main__':
-    # main()
+    main()
     p = Plotter()
     p.plot()
