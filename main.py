@@ -11,11 +11,14 @@ import re
 import urllib2
 
 # import graph_tool.all as gt
+import matplotlib
+import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None
 import pymysql
+import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
@@ -174,7 +177,7 @@ class Network(object):
                                   for v in games}
 
         nodes = pages = self.db_connector.execute('SELECT * FROM node_data')
-        self.id2deg = {p['id']: p['degree'] for p in nodes}
+        self.id2deg = {p['id']: p['out_degree'] for p in nodes}
         self.id2pr = {p['id']: p['pagerank'] for p in nodes}
 
         ngrams = self.db_connector.execute('SELECT * FROM ngrams')
@@ -191,7 +194,8 @@ class Network(object):
         ALTER TABLE path_lengths ADD INDEX page_id (page_id);
         """
         query = '''SELECT path_length FROM path_lengths
-                   WHERE page_id=%d AND target_page_id=%d''' % (start, target)
+                   WHERE page_id=%d AND target_page_id=%d'''\
+                % (start, target)
         length = self.db_connector.execute(query)
         return length[0]['path_length']
 
@@ -389,8 +393,38 @@ def main():
         data = pd.DataFrame(results)
         data.to_pickle('data/data.pd')
 
-    pdb.set_trace()
+
+class Plotter(object):
+    def __init__(self):
+        self.data = pd.read_pickle('data/data.pd')
+        self.plot_folder = 'plots/'
+        if not os.path.exists(self.plot_folder):
+            os.makedirs(self.plot_folder)
+
+    def plot(self):
+        for feature in ['degree', 'pagerank', 'ngram']:
+            print(feature)
+            fig, ax = plt.subplots(1, figsize=(10, 5))
+            for k in [4, 5, 6, 7, 8]:
+                df = self.data[(self.data.pl == k) & self.data.successful]
+                data = [[d[feature].iloc[i] for d in df['data']]
+                        for i in range(k)]
+                data = [np.mean(d) for d in data]
+                print(k, data)
+                data.reverse()
+                plt.plot(data, label=str(k))
+
+            plt.gca().invert_xaxis()
+            plt.legend()
+
+            # Beautification
+            plt.title(feature)
+            plt.xlabel('steps to target')
+            plt.ylabel(feature)
+            plt.savefig(self.plot_folder + feature + '.png')
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    p = Plotter()
+    p.plot()
