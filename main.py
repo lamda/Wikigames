@@ -154,6 +154,8 @@ class Network(object):
         self.html_base_folder = 'data/wiki-schools/wp/'
         self.plaintext_folder = 'data/wiki-schools/plaintext/'
         self.tfidf_similarity = None
+        self.category_depth = None
+        self.category_distance = None
 
         # read the graph
         if graph_tool:
@@ -321,18 +323,68 @@ class Network(object):
                 self.tfidf_similarity = pickle.load(infile)
         return self.tfidf_similarity[start, target]
 
-    def compute_category_depth(self):
-        pass
+    def compute_category_stats(self):
+        category = defaultdict(unicode)
+        category_depth = defaultdict(unicode)
+        for i, a in enumerate(sorted(self.name2id.keys())):
+            print(i, '/', len(self.name2id), end='\r')
+            ofname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
+            with io.open(ofname, encoding='utf-8') as infile:
+                for line in infile:
+                    m = re.findall(r'subject\.(.+?)\.ht', line)
+                    if m:
+                        category_depth[i] = np.mean([p.count('.') for p in m])
+                        category[i] = [p.split('.') for p in m]
+                        break
 
-    def get_category_depth(self, start, target):
-        pass
+        category_distance = np.zeros((len(self.name2id), len(self.name2id))) - 1
+        for i, ai in enumerate(sorted(self.name2id.keys())):
+            print(i, '/', len(self.name2id), end='\r')
+            for j, ja in enumerate(sorted(self.name2id.keys())):
+                if i == j:
+                    category_distance[i, j] = 0
+                elif i > j:
+                    category_distance[i, j] = category_distance[j, i]
+                else:
+                    min_dists = []
+                    for p in category[i]:
+                        min_dist = 1000
+                        for q in category[j]:
+                            shared = 2 * sum([a == b for a, b in zip(p, q)])
+                            d = len(p) + len(q) - shared
+                            if d < min_dist:
+                                min_dist = d
+                        min_dists.append(min_dist)
 
-    def compute_category_distance(self):
-        pass
+                    for q in category[j]:
+                        min_dist = 1000
+                        for p in category[i]:
+                            shared = 2 * sum([a == b for a, b in zip(p, q)])
+                            d = len(p) + len(q) - shared
+                            if d < min_dist:
+                                min_dist = d
+                        min_dists.append(min_dist)
+
+                    num_cats = len(category[i]) + len(category[j])
+                    category_distance[i, j] = sum(min_dists) / num_cats
+
+        with open('data/category_distance.obj', 'wb') as outfile:
+            pickle.dump(category_distance, outfile, -1)
+
+        with open('data/category_depth.obj', 'wb') as outfile:
+            pickle.dump(category_depth, outfile, -1)
+
+    def get_category_depth(self, node):
+        if self.category_depth is None:
+            with open('data/category_depth.obj', 'rb') as infile:
+                self.category_depth = pickle.load(infile)
+        return self.category_depth[node]
 
     def get_category_distance(self, start, target):
-        pass
-
+        if self.category_distance is None:
+            with open('data/category_distance.obj', 'rb') as infile:
+                self.category_distance = pickle.load(infile)
+        return self.category_distance[start, target]
 
 
 def main():
@@ -401,6 +453,10 @@ def main():
                                         for i in df['node_id']]
                     df['tfidf_target'] = [1 - nw.get_tfidf_similarity(i, tid)
                                           for i in df['node_id']]
+                    df['category_depth'] = [nw.get_category_depth(i)
+                                            for i in df['node_id']]
+                    df['category_target'] = [nw.get_category_distance(i, tid)
+                                             for i in df['node_id']]
                 except KeyError, e:
                     print_error('key not found, dropping' + repr(e))
                     continue
@@ -431,6 +487,8 @@ class Plotter(object):
             'degree_in',
             'pagerank',
             'ngram',
+            'category_depth',
+            'category_target'
         ]:
             print(feature)
             fig, ax = plt.subplots(1, figsize=(10, 5))
@@ -454,6 +512,10 @@ class Plotter(object):
 
 
 if __name__ == '__main__':
-    main()
+    # nw = Network()
+    # nw.compute_category_stats()
+
+    # main()
+
     p = Plotter()
     p.plot()
