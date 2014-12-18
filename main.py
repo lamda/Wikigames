@@ -8,6 +8,7 @@ import io
 import os
 import pdb
 import re
+import sys
 import urllib2
 
 # import graph_tool.all as gt
@@ -18,6 +19,9 @@ import numpy as np
 import pandas as pd
 pd.options.mode.chained_assignment = None
 import pymysql
+import PySide.QtCore
+import PySide.QtGui
+import PySide.QtWebKit
 import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
@@ -147,6 +151,50 @@ class LogisticRegressor(object):
         regressor.regress(df['chd'],
                           df[['intercept', 'tobacco', 'ldl', 'famhist_Present',
                               'age']])
+
+
+class WebPageSize(PySide.QtGui.QMainWindow):
+    def __init__(self, qt_application):
+        self.qt_application = qt_application
+        PySide.QtGui.QMainWindow.__init__(self)
+        self.web_view = PySide.QtWebKit.QWebView()
+        self.setCentralWidget(self.web_view)
+        self.web_view.loadFinished.connect(self._load_finished)
+        try:
+            with open('data/webpagesizes.obj', 'rb') as infile:
+                    self.size = pickle.load(infile)
+        except (IOError, EOFError):
+            self.size = {}
+        self.curr_page = ''
+        self.curr_width = 0
+        self.folder_base = 'file:///C:/PhD/Code/Wikigames/data/wiki-schools/wp/'
+
+    def get_size(self, page, width):
+        try:
+            return self.size[(page, width)]
+        except KeyError:
+            self.compute_size(page, width)
+            return self.size[(page, width)]
+
+    def compute_size(self, page, width):
+        self.curr_page = page
+        self.curr_width = width
+        site_address = PySide.QtCore.QUrl(self.folder_base +
+                                          page[0].lower() + '/' + page + '.htm')
+        self.web_view.page().setViewportSize(PySide.QtCore.QSize(width, 1))
+        self.web_view.load(site_address)
+        self.qt_application.exec_()
+
+    def _load_finished(self):
+        frame = self.web_view.page().mainFrame()
+        html_data = frame.toHtml()
+        result = (frame.contentsSize().width(), frame.contentsSize().height())
+        self.size[(self.curr_page, self.curr_width)] = result
+        self.close()
+
+    def __del__(self):
+        with open('data/webpagesizes.obj', 'wb') as outfile:
+            pickle.dump(self.size, outfile, -1)
 
 
 class Network(object):
@@ -403,6 +451,10 @@ def main():
         def print_error(message):
             print('        Error:', message, folder, filename)
 
+        regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
+                       r" u'size': {u'y': \d+, u'x': (\d+)"
+        qt_application = PySide.QtGui.QApplication(sys.argv)
+        page_size = WebPageSize(qt_application)
         results = []
         folder_logs = 'data/logfiles/'
         for folder in sorted(os.listdir(folder_logs)):
@@ -439,9 +491,32 @@ def main():
                     last = df_full[df_full['action'] == 'link_data']
                     last = parse_node(last.iloc[-1]['node'])
                     df.loc[df.index[-1] + 1] = [last]
+                    df_full.loc[df_full.index[-1] + 1] = ['load', last]
+                df.index = np.arange(len(df))
                 spl = nw.get_spl(nw.name2id[start], nw.name2id[target])
 
-                df.index = np.arange(len(df))
+                # get scrolling range
+                idx = df_full[df_full['action'] == 'load'].index
+                df_full_scroll = df_full[(df_full['action'] != 'link_data')]
+                df_full_scroll = df_full
+                # idx = [df_full_scroll.index[0]] + list(idx)
+                idx = list(idx)
+                df_groups = [df_full_scroll.loc[a:b, :]
+                             for a, b in zip(idx, idx[1:])]
+                exploration = [np.nan]
+                for i, g in enumerate(df_groups):
+                    # print(i)
+                    df_scroll = g.node.str.extract(regex_scroll)
+                    df_scroll = df_scroll.dropna()
+                    df_scroll.columns = ['scrolled', 'width']
+                    df_scroll['scrolled'] = df_scroll['scrolled'].apply(int)
+                    df_scroll['width'] = df_scroll['width'].apply(int)
+                    seen = df_scroll.loc[df_scroll['scrolled'].idxmax()]
+                    seen_max = sum(page_size.get_size(df.iloc[i]['node'],
+                                                      seen[1]))
+                    seen = sum(seen)
+                    exploration.append(seen / seen_max)
+
                 try:
                     df['node_id'] = [nw.name2id[n] for n in df['node']]
                     df['degree_out'] = [nw.id2deg_out[i] for i in df['node_id']]
@@ -457,6 +532,7 @@ def main():
                                             for i in df['node_id']]
                     df['category_target'] = [nw.get_category_distance(i, tid)
                                              for i in df['node_id']]
+                    df['exploration'] = exploration
                 except KeyError, e:
                     print_error('key not found, dropping' + repr(e))
                     continue
@@ -488,7 +564,8 @@ class Plotter(object):
             'pagerank',
             'ngram',
             'category_depth',
-            'category_target'
+            'category_target',
+            'exploration',
         ]:
             print(feature)
             fig, ax = plt.subplots(1, figsize=(10, 5))
@@ -514,6 +591,10 @@ class Plotter(object):
 if __name__ == '__main__':
     # nw = Network()
     # nw.compute_category_stats()
+
+    # qt_application = PySide.QtGui.QApplication(sys.argv)
+    # wps = WebPageSize(qt_application)
+    # pdb.set_trace()
 
     # main()
 
