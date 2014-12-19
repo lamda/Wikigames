@@ -17,15 +17,19 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
-pd.options.mode.chained_assignment = None
 import pymysql
 import PySide.QtCore
 import PySide.QtGui
 import PySide.QtWebKit
 import seaborn as sns
-sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]))
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
+
+
+# set a few options
+pd.options.mode.chained_assignment = None
+sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6",
+                                   "#e74c3c", "#34495e", "#2ecc71"]))
 
 
 class DbConnector(object):
@@ -61,49 +65,38 @@ class DbConnector(object):
     def last_id(self):
         return self.db_connection.insert_id()
 
-    # ------------------------ NON BUFFERED STUFF
-
     def fetch_cursor_nobuff(self, _statement, _args):
         self.db_cursor_nobuff.execute(_statement, _args)
         return self.db_cursor_nobuff
 
 
-class NgramConnector(object):
+class NgramFrequency(object):
     def __init__(self):
         token = 'bec1748d-5665-4266-83fb-e657ef4070ea'
         corpus = 'bing-body/2013-12/5/'
         base_url = 'http://weblm.research.microsoft.com/weblm/rest.svc/'
         self.base_url = base_url + corpus + 'jp?u=' + token + '&p='
+        try:
+            with open('data/ngrams.obj', 'rb') as infile:
+                    self.ngrams = pickle.load(infile)
+        except (IOError, EOFError):
+            self.ngrams = {}
 
-    def get(self, word):
-        word = word.replace(' ', '+').replace('_', '+')
-        return float(urllib2.urlopen(self.base_url + word).read())
+    def get_frequency(self, title):
+        try:
+            return self.ngrams[title]
+        except KeyError:
+            self.retrieve_frequency(title)
+            return self.ngrams[title]
 
-    def get_ngrams(self):
-        db_connector = DbConnector()
-        query = '''CREATE TABLE IF NOT EXISTS `ngrams` (
-                       `node_id` int(11) NOT NULL,
-                       `probability` float NOT NULL,
-                        PRIMARY KEY (`node_id`)
-                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
-                       '''
-        db_connector.execute(query)
-        db_connector.commit()
-        pages = db_connector.execute('SELECT * FROM pages')
-        page_ids = set(p['id'] for p in pages)
-        id2name = {p['id']:
-                   re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages}
-        ids = db_connector.execute('SELECT id FROM ngrams')
-        ngram_ids = set(p['id'] for p in ids)
-        ids = sorted(page_ids - ngram_ids)
-        ngram_connector = NgramConnector()
-        for i in ids:
-            print(i, '/', len(ids))
-            probability = ngram_connector.get(id2name[i])
-            stmt = '''INSERT INTO `ngrams` (node_id, probability)
-                      values (%s, %s)''' % (i, probability)
-            db_connector.execute(stmt)
-            db_connector.commit()
+    def retrieve_frequency(self, title):
+        title_url = title.replace(' ', '+').replace('_', '+')
+        url = self.base_url + title_url
+        self.ngrams[title] = float(urllib2.urlopen(url).read())
+
+    def __del__(self):
+        with open('data/ngrams.obj', 'wb') as outfile:
+            pickle.dump(self.ngrams, outfile, -1)
 
 
 class LogisticRegressor(object):
@@ -232,9 +225,6 @@ class Network(object):
         self.id2deg_out = {p['id']: p['out_degree'] for p in nodes}
         self.id2deg_in = {p['id']: p['in_degree'] for p in nodes}
         self.id2pr = {p['id']: p['pagerank'] for p in nodes}
-
-        ngrams = self.db_connector.execute('SELECT * FROM ngrams')
-        self.id2ngram = {p['id']: p['probability'] for p in ngrams}
 
         links = self.db_connector.execute('''SELECT page_id,
                                                     SUM(amount) as links
@@ -506,7 +496,6 @@ def main():
                              for a, b in zip(idx, idx[1:])]
                 exploration = [np.nan]
                 for i, g in enumerate(df_groups):
-                    # print(i)
                     df_scroll = g.node.str.extract(regex_scroll)
                     df_scroll = df_scroll.dropna()
                     df_scroll.columns = ['scrolled', 'width']
@@ -518,12 +507,14 @@ def main():
                     seen = sum(seen)
                     exploration.append(seen / seen_max)
 
+                ngrams = NgramFrequency()
                 try:
                     df['node_id'] = [nw.name2id[n] for n in df['node']]
                     df['degree_out'] = [nw.id2deg_out[i] for i in df['node_id']]
                     df['degree_in'] = [nw.id2deg_in[i] for i in df['node_id']]
                     df['pagerank'] = [nw.id2pr[i] for i in df['node_id']]
-                    df['ngram'] = [nw.id2ngram[i] for i in df['node_id']]
+                    df['ngram'] = [ngrams.get_frequency(n) for n in df['node']]
+
                     tid = nw.name2id[target]
                     df['spl_target'] = [nw.get_spl(i, tid)
                                         for i in df['node_id']]
@@ -601,7 +592,7 @@ if __name__ == '__main__':
     # wps = WebPageSize(qt_application)
     # pdb.set_trace()
 
-    # main()
+    main()
 
-    p = Plotter()
-    p.plot()
+    # p = Plotter()
+    # p.plot()
