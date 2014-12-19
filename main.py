@@ -23,6 +23,7 @@ import PySide.QtCore
 import PySide.QtGui
 import PySide.QtWebKit
 import seaborn as sns
+sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]))
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
@@ -556,35 +557,39 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        for feature in [
-            'spl_target',
-            'tfidf_target',
-            'degree_out',
-            'degree_in',
-            'pagerank',
-            'ngram',
-            'category_depth',
-            'category_target',
-            'exploration',
+        for feature, title in [
+            ('spl_target', 'Shortest Path Length to target'),
+            ('tfidf_target', 'TF-IDF similarity to target'),
+            ('degree_out', 'Out-degree'),
+            ('degree_in', 'In-degree'),
+            ('pagerank', 'PageRank'),
+            ('ngram', 'N-Gram occurrence frequency (=~ familiarity)'),
+            ('category_depth', 'Category depth (1...most general)'),
+            ('category_target', 'Category distance to target'),
+            ('exploration', 'Explored percentage of page'),
         ]:
             print(feature)
             fig, ax = plt.subplots(1, figsize=(10, 5))
-            for k in [4, 5, 6, 7, 8]:
+            for k, m in zip([4, 5, 6, 7], ['o', 'x', 'd', 'v']):
                 df = self.data[(self.data.pl == k) & self.data.successful]
                 data = [[d[feature].iloc[i] for d in df['data']]
                         for i in range(k)]
                 data = [np.mean(d) for d in data]
                 print(k, data)
                 data.reverse()
-                plt.plot(data, label=str(k))
+                plt.plot(data, label=str(k), marker=m)
 
-            plt.gca().invert_xaxis()
             plt.legend()
 
             # Beautification
-            plt.title(feature)
-            plt.xlabel('steps to target')
+            plt.title(title)
+            plt.xlabel('distance to-go to target')
             plt.ylabel(feature)
+            offset = 0.1 * plt.xlim()[1]
+            plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
+            offset = 0.1 * plt.ylim()[1]
+            plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
+            plt.gca().invert_xaxis()
             plt.savefig(self.plot_folder + feature + '.png')
 
 
