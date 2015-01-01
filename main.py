@@ -100,9 +100,6 @@ class NgramFrequency(object):
 
 
 class LogisticRegressor(object):
-    def __init__(self):
-        pass
-
     def regress(self, dependent, independent):
         logit = sm.Logit(dependent, independent)
         result = logit.fit()
@@ -432,7 +429,7 @@ def main():
 
     # load or compute the click data as a pandas frame
     try:  # load the precomputed click data
-        data = pd.read_pickle('data/data.pd')
+        pd.read_pickle('data/data.pd')
     except IOError:  # compute click data
         # helper functions
         def parse_node(node_string):
