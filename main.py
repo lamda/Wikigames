@@ -25,6 +25,8 @@ import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
+import credentials
+
 
 # set a few options
 pd.options.mode.chained_assignment = None
@@ -72,7 +74,7 @@ class DbConnector(object):
 
 class NgramFrequency(object):
     def __init__(self):
-        token = 'bec1748d-5665-4266-83fb-e657ef4070ea'
+        token = credentials.microsoft_token
         corpus = 'bing-body/2013-12/5/'
         base_url = 'http://weblm.research.microsoft.com/weblm/rest.svc/'
         self.base_url = base_url + corpus + 'jp?u=' + token + '&p='
@@ -475,6 +477,7 @@ def main():
                 if not df.iloc[0]['node'] == start:
                     print_error('start node not present')
                     pdb.set_trace()
+
                 if successful and not target == df.iloc[-1]['node']:
                     last = df_full[df_full['action'] == 'link_data']
                     last = parse_node(last.iloc[-1]['node'])
@@ -583,11 +586,12 @@ class Plotter(object):
 
 if __name__ == '__main__':
     # nw = Network()
+    # nw.extract_plaintext()
+    # nw.compute_tfidf_similarity()
     # nw.compute_category_stats()
 
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application)
-    # pdb.set_trace()
 
     main()
 
