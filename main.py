@@ -147,7 +147,7 @@ class LogisticRegressor(object):
 
 
 class WebPageSize(PySide.QtGui.QMainWindow):
-    def __init__(self, qt_application):
+    def __init__(self, qt_application, label):
         self.qt_application = qt_application
         PySide.QtGui.QMainWindow.__init__(self)
         self.web_view = PySide.QtWebKit.QWebView()
@@ -160,7 +160,8 @@ class WebPageSize(PySide.QtGui.QMainWindow):
             self.size = {}
         self.curr_page = ''
         self.curr_width = 0
-        self.folder_base = 'file:///C:/PhD/Code/Wikigames/data/wiki-schools/wp/'
+        self.folder_base = 'file:///C:/PhD/Code/Wikigames/data/' + label +\
+                           '/wpcd/wp/'
 
     def get_size(self, page, width):
         try:
@@ -193,8 +194,8 @@ class WebPageSize(PySide.QtGui.QMainWindow):
 class Wikigame(object):
     def __init__(self, label, graph_tool=False):
         self.label = label
-        self.html_base_folder = 'data/' + label + '/wp/'
-        self.plaintext_folder = 'data/' + label + '/plaintext/'
+        self.html_base_folder = 'data/' + label + '/wpcd/wp/'
+        self.plaintext_folder = 'data/' + label + '/wpcd/plaintext/'
         self.tfidf_similarity = None
         self.category_depth = None
         self.category_distance = None
@@ -313,15 +314,15 @@ class Wikigame(object):
         tvec = TfidfVectorizer(stop_words=stopwords)
         tfidf = tvec.fit_transform(content)
         tfidf_similarity = tfidf * tfidf.T
-        with open('data/tfidf_similarity_sparse.obj', 'wb') as outfile:
-            pickle.dump(tfidf_similarity, outfile, -1)
         tfidf_similarity = tfidf_similarity.todense()
-        with open('data/tfidf_similarity_dense.obj', 'wb') as outfile:
+        tfidf_path = 'data/' + self.label + '/tfidf_similarity.obj'
+        with open(tfidf_path, 'wb') as outfile:
             pickle.dump(tfidf_similarity, outfile, -1)
 
     def get_tfidf_similarity(self, start, target):
         if self.tfidf_similarity is None:
-            with open('data/tfidf_similarity_dense.obj', 'rb') as infile:
+            tfidf_path = 'data/' + self.label + '/tfidf_similarity.obj'
+            with open(tfidf_path, 'rb') as infile:
                 self.tfidf_similarity = pickle.load(infile)
         return self.tfidf_similarity[start, target]
 
@@ -370,28 +371,32 @@ class Wikigame(object):
                     num_cats = len(category[i]) + len(category[j])
                     category_distance[i, j] = sum(min_dists) / num_cats
 
-        with open('data/category_distance.obj', 'wb') as outfile:
+        category_path = 'data/' + self.label + '/category_distance.obj'
+        with open(category_path, 'wb') as outfile:
             pickle.dump(category_distance, outfile, -1)
 
-        with open('data/category_depth.obj', 'wb') as outfile:
+        category_path = 'data/' + self.label + '/category_depth.obj'
+        with open(category_path, 'wb') as outfile:
             pickle.dump(category_depth, outfile, -1)
 
     def get_category_depth(self, node):
         if self.category_depth is None:
-            with open('data/category_depth.obj', 'rb') as infile:
+            category_path = 'data/' + self.label + '/category_depth.obj'
+            with open(category_path, 'rb') as infile:
                 self.category_depth = pickle.load(infile)
         return self.category_depth[node]
 
     def get_category_distance(self, start, target):
         if self.category_distance is None:
-            with open('data/category_distance.obj', 'rb') as infile:
+            category_path = 'data/' + self.label + '/category_distance.obj'
+            with open(category_path, 'rb') as infile:
                 self.category_distance = pickle.load(infile)
         return self.category_distance[start, target]
 
 
-class Wikispeedia(Wikigame):
+class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
-        super(Wikispeedia, self).__init__('wikispeedia', graph_tool)
+        super(WIKTI, self).__init__('wikti', graph_tool)
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
@@ -432,7 +437,7 @@ class Wikispeedia(Wikigame):
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
         try:  # load the precomputed click data
-            pd.read_pickle('data/data.pd')
+            pd.read_pickle('data/' + self.label + '/data.pd')
         except IOError:  # compute click data
             # helper functions
             def parse_node(node_string):
@@ -445,9 +450,9 @@ class Wikispeedia(Wikigame):
             regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
                            r" u'size': {u'y': \d+, u'x': (\d+)"
             qt_application = PySide.QtGui.QApplication(sys.argv)
-            page_size = WebPageSize(qt_application)
+            page_size = WebPageSize(qt_application, self.label)
             results = []
-            folder_logs = 'data/logfiles/'
+            folder_logs = 'data/' + self.label + '/logfiles/'
             for folder in sorted(os.listdir(folder_logs)):
                 print('\n', folder)
                 files = sorted([f for f in os.listdir(folder_logs + folder)
@@ -486,7 +491,8 @@ class Wikispeedia(Wikigame):
                         df.loc[df.index[-1] + 1] = [last]
                         df_full.loc[df_full.index[-1] + 1] = ['load', last]
                     df.index = np.arange(len(df))
-                    spl = nw.get_spl(nw.name2id[start], nw.name2id[target])
+                    spl = self.get_spl(self.name2id[start],
+                                       self.name2id[target])
 
                     # get scrolling range
                     idx = df_full[df_full['action'] == 'load'].index
@@ -546,12 +552,12 @@ class Wikispeedia(Wikigame):
                     })
 
             data = pd.DataFrame(results)
-            data.to_pickle('data/data.pd')
+            data.to_pickle('data/' + self.label + '/data.pd')
 
 
-class WIKTI(Wikigame):
+class Wikispeedia(Wikigame):
     def __init__(self, label, graph_tool=False):
-        super(WIKTI, self).__init__('wikti', graph_tool)
+        super(Wikispeedia, self).__init__('wikispeedia', graph_tool)
 
         # build some mappings # TODO
         self.id2title = None
@@ -618,8 +624,11 @@ if __name__ == '__main__':
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application)
 
-    ws = Wikispeedia()
+    # ws = Wikispeedia()
     wk = WIKTI()
+    # wk.compute_tfidf_similarity()
+    # wk.compute_category_stats()
+    wk.create_dataframe()
 
     # p = Plotter()
     # p.plot()
