@@ -206,6 +206,31 @@ class Wikigame(object):
         else:
             self.graph = self.read_edge_list_nx('data/' + label + '/links.txt')
 
+        # build some mappings from the database
+        self.db_connector = DbConnector(self.label)
+        pages = self.db_connector.execute('SELECT * FROM pages')
+        self.id2title = {p['id']: p['name'] for p in pages}
+        self.id2name = {p['id']: re.findall(r'\\([^\\]*?)\.htm', p['link'])[0]
+                        for p in pages}
+        self.name2id = {v: k for k, v in self.id2name.items()}
+
+        games = self.db_connector.execute("""SELECT * FROM games
+                                     WHERE `game_name` LIKE 'PLAIN%'""")
+        self.game2start_target = {v['game_name']:
+                                  (self.id2name[v['start_page_id']],
+                                   self.id2name[v['goal_page_id']])
+                                  for v in games}
+
+        nodes = self.db_connector.execute('SELECT * FROM node_data')
+        self.id2deg_out = {p['id']: p['out_degree'] for p in nodes}
+        self.id2deg_in = {p['id']: p['in_degree'] for p in nodes}
+        self.id2pr = {p['id']: p['pagerank'] for p in nodes}
+
+        links = self.db_connector.execute('''SELECT page_id,
+                                                    SUM(amount) as links
+                                             FROM links GROUP BY page_id;''')
+        self.id2links = {p['page_id']: int(p['links']) for p in links}
+
     def read_edge_list_gt(self, filename, directed=True, parallel_edges=False):
         graph = gt.Graph(directed=directed)
         id_mapping = defaultdict(lambda: graph.add_vertex())
@@ -393,36 +418,6 @@ class Wikigame(object):
                 self.category_distance = pickle.load(infile)
         return self.category_distance[start, target]
 
-
-class WIKTI(Wikigame):
-    def __init__(self, graph_tool=False):
-        super(WIKTI, self).__init__('wikti', graph_tool)
-
-        # build some mappings from the database
-        self.db_connector = DbConnector(self.label)
-        pages = self.db_connector.execute('SELECT * FROM pages')
-        self.id2title = {p['id']: p['name'] for p in pages}
-        self.id2name = {p['id']: re.findall(r'\\([^\\]*?)\.htm', p['link'])[0]
-                        for p in pages}
-        self.name2id = {v: k for k, v in self.id2name.items()}
-
-        games = self.db_connector.execute("""SELECT * FROM games
-                                     WHERE `game_name` LIKE 'PLAIN%'""")
-        self.game2start_target = {v['game_name']:
-                                  (self.id2name[v['start_page_id']],
-                                   self.id2name[v['goal_page_id']])
-                                  for v in games}
-
-        nodes = self.db_connector.execute('SELECT * FROM node_data')
-        self.id2deg_out = {p['id']: p['out_degree'] for p in nodes}
-        self.id2deg_in = {p['id']: p['in_degree'] for p in nodes}
-        self.id2pr = {p['id']: p['pagerank'] for p in nodes}
-
-        links = self.db_connector.execute('''SELECT page_id,
-                                                    SUM(amount) as links
-                                             FROM links GROUP BY page_id;''')
-        self.id2links = {p['page_id']: int(p['links']) for p in links}
-
     def get_spl(self, start, target):
         """ get the shortest path length for two nodes from the database
         if this is too slow, add an index to the table as follows:
@@ -433,6 +428,11 @@ class WIKTI(Wikigame):
                 % (start, target)
         length = self.db_connector.execute(query)
         return length[0]['path_length']
+
+
+class WIKTI(Wikigame):
+    def __init__(self, graph_tool=False):
+        super(WIKTI, self).__init__('wikti', graph_tool)
 
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
@@ -557,20 +557,13 @@ class WIKTI(Wikigame):
 
 class Wikispeedia(Wikigame):
     def __init__(self, label, graph_tool=False):
+        self.build_database()
         super(Wikispeedia, self).__init__('wikispeedia', graph_tool)
 
-        # build some mappings # TODO
-        self.id2title = None
-        self.id2name = None
-        self.name2id = None
-        self.game2start_target = None
-        self.id2deg_out = None
-        self.id2deg_in = None
-        self.id2pr = None
-        self.id2links = None
-
-    def get_spl(self, start, target):
-        pass  # TODO
+    def build_database(self):
+        self.db_connector = DbConnector(self.label)
+        # TODO: create tables
+        # TODO: fill tables with computed data
 
     def create_dataframe(self):
         pass  # TODO
@@ -624,11 +617,12 @@ if __name__ == '__main__':
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application)
 
-    # ws = Wikispeedia()
-    wk = WIKTI()
+    ws = Wikispeedia()
+
+    # wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
-    wk.create_dataframe()
+    # wk.create_dataframe()
 
     # p = Plotter()
     # p.plot()
