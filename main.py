@@ -556,13 +556,20 @@ class WIKTI(Wikigame):
 
 
 class Wikispeedia(Wikigame):
-    def __init__(self, label, graph_tool=False):
-        self.build_database()
+    def __init__(self, graph_tool=False):
+        self.build_database('wikispeedia')
         super(Wikispeedia, self).__init__('wikispeedia', graph_tool)
 
-    def build_database(self):
-        self.db_connector = DbConnector(self.label)
-        # TODO: create tables
+    def build_database(self, label):
+        self.db_connector = DbConnector('')
+        with io.open('data/' + label + '/SQL/structure.sql', encoding='utf-8') \
+                as infile:
+            stmt = infile.read()
+        self.db_connector.execute(stmt)
+        self.db_connector.commit()
+        # self.db_connector.execute('USE ' + label + ';')
+        # self.db_connector.commit()
+
         # TODO: fill tables with computed data
 
     def create_dataframe(self):
