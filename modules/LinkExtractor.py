@@ -37,12 +37,16 @@ class LinkParser(HTMLParser):
 
     def set_db_connection(self, _db_connection):
         self.db_connection = _db_connection
+        if self.db_connection.db == 'wikispeedia':
+            self.tags = ('a', 'area')
+        else:
+            self.tags = ('a',)
 
     def set_id(self, _id):
         self.current_id = _id
 
     def handle_starttag(self, tag, attrs):
-        if tag == "a":
+        if tag in self.tags:
             for attr in attrs:
                 if attr[0] == "href":
                     self.find_page_id(attr[1])
@@ -62,7 +66,7 @@ class LinkExtractor:
                    (SELECT DISTINCT page_id from links);'''
         pages = self.db_connection.execute(query, (), "SELECT")
 
-        for page in pages:
+        for i, page in enumerate(pages):
             current_id = page['id']
             print("Currently processing #" + str(current_id) + "(" + page['name'] + ")")
             wikifile = open(root_path + page['link'][16:], "r")

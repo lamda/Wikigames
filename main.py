@@ -26,6 +26,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
 import credentials
+from modules import PageExtractor
+from modules import LinkExtractor
+from modules import LinkCleaner
+from modules import PathCalculator
 
 
 # set a few options
@@ -46,12 +50,13 @@ class DbConnector(object):
         self.db_cursor = self.db_connection.cursor(pymysql.cursors.DictCursor)
         self.db_cursor_nobuff = self.db_connection.cursor(
             pymysql.cursors.SSCursor)
+        self.db = db
 
     def __exit__(self):
         self.db_cursor.close()
         self.db_connection.close()
 
-    def execute(self, _statement, _args=None):
+    def execute(self, _statement, _args=None, _type=None):
         self.db_cursor.execute(_statement, _args)
 
         if _statement.lower().startswith("select"):
@@ -557,20 +562,33 @@ class WIKTI(Wikigame):
 
 class Wikispeedia(Wikigame):
     def __init__(self, graph_tool=False):
-        self.build_database('wikispeedia')
         super(Wikispeedia, self).__init__('wikispeedia', graph_tool)
 
-    def build_database(self, label):
-        self.db_connector = DbConnector('')
+    @staticmethod
+    def build_database(label):
+        db_connector = DbConnector('')
         with io.open('data/' + label + '/SQL/structure.sql', encoding='utf-8') \
                 as infile:
             stmt = infile.read()
-        self.db_connector.execute(stmt)
-        self.db_connector.commit()
-        # self.db_connector.execute('USE ' + label + ';')
-        # self.db_connector.commit()
+        db_connector.execute(stmt)
+        db_connector.execute('USE ' + label + ';')
+        db_connector.commit()
 
-        # TODO: fill tables with computed data
+    @staticmethod
+    def git fill_database():
+        db_connector = DbConnector('wikispeedia')
+
+        # page_extractor = PageExtractor.PageExtractor(db_connector)
+        # page_extractor.run()
+
+        # link_extractor = LinkExtractor.LinkExtractor(db_connector)
+        # link_extractor.run()
+
+        link_cleaner = LinkCleaner.LinkCleaner(db_connector)
+        link_cleaner.run()
+
+        # path_calculator = PathCalculator.PathCalculator(db_connector)
+        # path_calculator.run()
 
     def create_dataframe(self):
         pass  # TODO
@@ -624,7 +642,8 @@ if __name__ == '__main__':
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application)
 
-    ws = Wikispeedia()
+    # ws = Wikispeedia()
+    Wikispeedia.fill_database()
 
     # wk = WIKTI()
     # wk.compute_tfidf_similarity()

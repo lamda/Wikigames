@@ -35,4 +35,16 @@ class LinkCleaner:
                                            "DELETE"
                                            )
 
+        if self.db_connection.db == 'wikispeedia':
+            # remove links to the following article from the database:
+            # Wikipedia:Text of the GNU Free Documentation License
+            name = "Wikipedia:Text of the GNU Free Documentation License"
+            wid = self.db_connection.execute('''SELECT id FROM pages
+                                             WHERE name = %s''',
+                                             name)
+            # import pdb; pdb.set_trace()
+            self.db_connection.execute('''DELETE FROM links
+                                       WHERE linked_page_id = %s''',
+                                       wid[0]['id'])
+
         self.db_connection.commit()
