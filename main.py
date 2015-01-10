@@ -30,6 +30,7 @@ from modules import PageExtractor
 from modules import LinkExtractor
 from modules import LinkCleaner
 from modules import PathCalculator
+from modules import NodeValues
 
 
 # set a few options
@@ -575,23 +576,149 @@ class Wikispeedia(Wikigame):
         db_connector.commit()
 
     @staticmethod
-    def git fill_database():
+    def fill_database():
         db_connector = DbConnector('wikispeedia')
 
-        # page_extractor = PageExtractor.PageExtractor(db_connector)
-        # page_extractor.run()
+        page_extractor = PageExtractor.PageExtractor(db_connector)
+        page_extractor.run()
 
-        # link_extractor = LinkExtractor.LinkExtractor(db_connector)
-        # link_extractor.run()
+        link_extractor = LinkExtractor.LinkExtractor(db_connector)
+        link_extractor.run()
 
         link_cleaner = LinkCleaner.LinkCleaner(db_connector)
         link_cleaner.run()
 
-        # path_calculator = PathCalculator.PathCalculator(db_connector)
-        # path_calculator.run()
+        path_calculator = PathCalculator.PathCalculator(db_connector)
+        path_calculator.run()
+
+        node_values = NodeValues.NodeValues(db_connector)
+        node_values.run()
+
+    def open_wikigame_file(self, filename, limit=0):
+        with io.open(filename, encoding='utf-8') as infile:
+            for i, line in enumerate(infile):
+                if limit and i > limit:
+                    continue
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                yield line
 
     def create_dataframe(self):
-        pass  # TODO
+        # load or compute the click data as a pandas frame
+        try:  # load the precomputed click data
+            pd.read_pickle('data/' + self.label + '/data.pd')
+        except IOError:  # compute click data
+            # helper functions
+            def parse_node(node_string):
+                m = re.findall(r'/([^/]*?)\.htm', node_string)
+                return m[0].replace('%25', '%') if m else ''
+
+            def print_error(message):
+                print('        Error:', message, folder, filename)
+
+            results = []
+            folder_logs = os.path.join('data', self.label, 'logfiles')
+
+            for filename in sorted(os.listdir(folder_logs)):
+                print('\n', filename)
+
+                # TODO from here on...
+
+                fname = folder_logs + folder + '/' + filename
+                df_full = pd.read_csv(fname, sep='\t',
+                                      usecols=[2, 3],
+                                      names=['action', 'node'])
+
+                # perform sanity checks
+                action_counts = df_full['action'].value_counts()
+                if action_counts['GAME_STARTED'] > 1:
+                    print_error('duplicated_game_start, dropping')
+                    continue
+                elif action_counts['load'] < 2:
+                    print_error('game too short, dropping')
+                    continue
+
+                # get additional mission attributes
+                successful = df_full.iloc[-1]['action'] == 'GAME_COMPLETED'
+                match = re.findall(r'(PLAIN_[\d]+_[a-z0-9_\-]+)\.',
+                                   filename)[0]
+                start, target = self.game2start_target[match]
+                df = df_full[df_full['action'] == 'load']
+                df.drop('action', inplace=True, axis=1)
+                df['node'] = df['node'].apply(parse_node)
+                if not df.iloc[0]['node'] == start:
+                    print_error('start node not present')
+                    pdb.set_trace()
+
+                if successful and not target == df.iloc[-1]['node']:
+                    last = df_full[df_full['action'] == 'link_data']
+                    last = parse_node(last.iloc[-1]['node'])
+                    df.loc[df.index[-1] + 1] = [last]
+                    df_full.loc[df_full.index[-1] + 1] = ['load', last]
+                df.index = np.arange(len(df))
+                spl = self.get_spl(self.name2id[start],
+                                   self.name2id[target])
+
+                # get scrolling range
+                idx = df_full[df_full['action'] == 'load'].index
+                df_full_scroll = df_full[(df_full['action'] != 'link_data')]
+                df_full_scroll = df_full
+                # idx = [df_full_scroll.index[0]] + list(idx)
+                idx = list(idx)
+                df_groups = [df_full_scroll.loc[a:b, :]
+                             for a, b in zip(idx, idx[1:])]
+                exploration = [np.nan]
+                for i, g in enumerate(df_groups):
+                    df_scroll = g.node.str.extract(regex_scroll)
+                    df_scroll = df_scroll.dropna()
+                    df_scroll.columns = ['scrolled', 'width']
+                    df_scroll['scrolled'] = df_scroll['scrolled'].apply(int)
+                    df_scroll['width'] = df_scroll['width'].apply(int)
+                    seen = df_scroll.loc[df_scroll['scrolled'].idxmax()]
+                    seen_max = sum(page_size.get_size(df.iloc[i]['node'],
+                                                      seen[1]))
+                    seen = sum(seen)
+                    exploration.append(seen / seen_max)
+
+                ngrams = NgramFrequency()
+                try:
+                    df['node_id'] = [self.name2id[n]
+                                     for n in df['node']]
+                    df['degree_out'] = [self.id2deg_out[i]
+                                        for i in df['node_id']]
+                    df['degree_in'] = [self.id2deg_in[i]
+                                       for i in df['node_id']]
+                    df['pagerank'] = [self.id2pr[i]
+                                      for i in df['node_id']]
+                    df['ngram'] = [ngrams.get_frequency(n)
+                                   for n in df['node']]
+
+                    tid = self.name2id[target]
+                    df['spl_target'] = [self.get_spl(i, tid)
+                                        for i in df['node_id']]
+                    df['tfidf_target'] = [1 - self.get_tfidf_similarity(i,
+                                                                        tid)
+                                          for i in df['node_id']]
+                    df['category_depth'] = [self.get_category_depth(i)
+                                            for i in df['node_id']]
+                    df['category_target'] = [self.get_category_distance(i,
+                                                                        tid)
+                                             for i in df['node_id']]
+                    df['exploration'] = exploration
+                except KeyError, e:
+                    print_error('key not found, dropping' + repr(e))
+                    continue
+
+                results.append({
+                    'data': df,
+                    'successful': successful,
+                    'spl': spl,
+                    'pl': len(df)
+                })
+
+            data = pd.DataFrame(results)
+            data.to_pickle('data/' + self.label + '/data.pd')
 
 
 class Plotter(object):
@@ -642,8 +769,9 @@ if __name__ == '__main__':
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application)
 
-    # ws = Wikispeedia()
-    Wikispeedia.fill_database()
+    # Wikispeedia.fill_database()
+    ws = Wikispeedia()
+    ws.create_dataframe()
 
     # wk = WIKTI()
     # wk.compute_tfidf_similarity()
