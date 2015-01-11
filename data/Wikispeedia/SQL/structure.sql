@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS `node_data` (
   `in_degree` int(11) NOT NULL,
   `out_degree` int(11) NOT NULL,
   `pagerank` float NOT NULL
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;
 
 -- Data exporting was unselected.

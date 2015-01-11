@@ -14,7 +14,8 @@ class PageParser(HTMLParser):
     copyright = [
         'Copyright © SOS Children',
         "Copyright (c) SOS Children's Villages UK",
-        'Copyright SOS Children.'
+        'Copyright SOS Children.',
+        "SOS Children: the world's largest charity for orphanned ",
     ]
     data_to_store = [True, None, None]
 
