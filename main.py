@@ -12,8 +12,8 @@ import sys
 import urllib2
 
 # import graph_tool.all as gt
-import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib
+# import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -355,7 +355,8 @@ class Wikigame(object):
             tfidf_path = 'data/' + self.label + '/tfidf_similarity.obj'
             with open(tfidf_path, 'rb') as infile:
                 self.tfidf_similarity = pickle.load(infile)
-        return self.tfidf_similarity[start, target]
+        # subtract one because Wikipedia ids start with 1 and not 0
+        return self.tfidf_similarity[start-1, target-1]
 
     def compute_category_stats(self):
         category = defaultdict(unicode)
@@ -432,7 +433,8 @@ class Wikigame(object):
             category_path = 'data/' + self.label + '/category_distance.obj'
             with open(category_path, 'rb') as infile:
                 self.category_distance = pickle.load(infile)
-        return self.category_distance[start, target]
+        # subtract one because Wikipedia ids start with 1 and not 0
+        return self.category_distance[start-1, target-1]
 
     def get_spl(self, start, target):
         """ get the shortest path length for two nodes from the database
@@ -443,6 +445,8 @@ class Wikigame(object):
                    WHERE page_id=%d AND target_page_id=%d'''\
                 % (start, target)
         length = self.db_connector.execute(query)
+        if not length:
+            return np.NaN
         return length[0]['path_length']
 
 
@@ -621,7 +625,7 @@ class Wikispeedia(Wikigame):
             folder_logs = os.path.join('data', self.label, 'logfiles')
             ngrams = NgramFrequency()
 
-            for filename in sorted(os.listdir(folder_logs)):
+            for filename in sorted(os.listdir(folder_logs))[1:]:
                 print('\n', filename)
                 fname = os.path.join(folder_logs, filename)
                 successful = False if 'unfinished' in filename else True
@@ -638,8 +642,6 @@ class Wikispeedia(Wikigame):
                 df_full['target'] = target
                 for eid, entry in enumerate(df_full.iterrows()):
                     print(eid, end='\r')
-                    if eid > 10:
-                        continue
                     node = entry[1]['path'].split(';')
                     if '<' in node:
                         # resolve backtracks
@@ -654,22 +656,25 @@ class Wikispeedia(Wikigame):
                                 stack.append(p)
                             game.append(stack[-1])
                         node = game
-                    node_id = [self.name2id[n] for n in node]
-                    degree_out = [self.id2deg_out[i] for i in node_id]
-                    degree_in = [self.id2deg_in[i] for i in node_id]
-                    pagerank = [self.id2pr[i] for i in node_id]
-                    ngram = [ngrams.get_frequency(n) for n in node]
-                    tid = self.name2id[entry[1]['target']]
-                    spl_target = [self.get_spl(i, tid) for i in node_id]
-                    tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
-                                    for i in node_id]
-                    category_depth = [self.get_category_depth(i)
-                                      for i in node_id]
-                    category_target = [self.get_category_distance(i, tid)
-                                       for i in node_id]
+                    try:
+                        node_id = [self.name2id[n] for n in node]
+                        degree_out = [self.id2deg_out[i] for i in node_id]
+                        degree_in = [self.id2deg_in[i] for i in node_id]
+                        pagerank = [self.id2pr[i] for i in node_id]
+                        ngram = [ngrams.get_frequency(n) for n in node]
+                        tid = self.name2id[entry[1]['target']]
+                        spl_target = [self.get_spl(i, tid) for i in node_id]
+                        tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
+                                        for i in node_id]
+                        category_depth = [self.get_category_depth(i)
+                                          for i in node_id]
+                        category_target = [self.get_category_distance(i, tid)
+                                           for i in node_id]
+                    except KeyError:
+                        continue
                     data = zip(node, node_id, degree_out, degree_in,
-                            pagerank, ngram, spl_target, tfidf_target,
-                            category_depth, category_target)
+                               pagerank, ngram, spl_target, tfidf_target,
+                               category_depth, category_target)
                     columns = ['node', 'node_id', 'degree_out', 'degree_in',
                                'pagerank', 'ngram', 'spl_target',
                                'tfidf_target', 'category_depth',
@@ -741,9 +746,9 @@ if __name__ == '__main__':
 
     # Wikispeedia.fill_database()
 
-    data = pd.read_pickle('data/Wikispeedia/data.pd')
-    print(data.iloc[0]['data'])
-    pdb.set_trace()
+    # data = pd.read_pickle('data/Wikispeedia/data.pd')
+    # print(data.iloc[0]['data'])
+    # pdb.set_trace()
 
     ws = Wikispeedia()
     # ws.compute_tfidf_similarity()
