@@ -11,10 +11,7 @@ import re
 import sys
 import urllib2
 
-# import graph_tool.all as gt
-# import matplotlib
-# import matplotlib.pyplot as plt
-import networkx as nx
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymysql
@@ -234,6 +231,8 @@ class Wikigame(object):
         self.id2links = {p['page_id']: int(p['links']) for p in links}
 
     def read_edge_list_gt(self, filename, directed=True, parallel_edges=False):
+        if gt is None:
+            import graph_tool.all as gt
         graph = gt.Graph(directed=directed)
         id_mapping = defaultdict(lambda: graph.add_vertex())
         graph.vertex_properties['NodeId'] = graph.new_vertex_property('string')
@@ -254,6 +253,8 @@ class Wikigame(object):
         return graph
 
     def read_edge_list_nx(self, filename, directed=True, parallel_edges=False):
+        if nx is None:
+            import networkx as nx
         if directed:
             if parallel_edges:
                 graph = nx.MultiDiGraph()
@@ -446,7 +447,7 @@ class Wikigame(object):
         return length[0]['path_length']
 
     def load_data(self):
-        self.data = pd.read_pickle('data/data.pd')
+        self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
 
     def load_graph(self, graph_tool=False):
         # read the graph
@@ -459,7 +460,7 @@ class Wikigame(object):
 
 class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
-        super(WIKTI, self).__init__('wikti', graph_tool)
+        super(WIKTI, self).__init__('wikti')
 
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
@@ -580,8 +581,8 @@ class WIKTI(Wikigame):
 
 
 class Wikispeedia(Wikigame):
-    def __init__(self, graph_tool=False):
-        super(Wikispeedia, self).__init__('wikispeedia', graph_tool)
+    def __init__(self):
+        super(Wikispeedia, self).__init__('wikispeedia')
 
     @staticmethod
     def build_database(label):
@@ -624,8 +625,7 @@ class Wikispeedia(Wikigame):
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
         ngrams = NgramFrequency()
-
-        for filename in sorted(os.listdir(folder_logs)):
+        for filename in sorted(os.listdir(folder_logs))[:1]:
             print('\n', filename)
             fname = os.path.join(folder_logs, filename)
             successful = False if 'unfinished' in filename else True
@@ -642,6 +642,8 @@ class Wikispeedia(Wikigame):
             df_full['target'] = target
             for eid, entry in enumerate(df_full.iterrows()):
                 print(eid, end='\r')
+                # if eid > 1000:
+                #     break
                 node = entry[1]['path'].split(';')
                 if '<' in node:
                     # resolve backtracks
@@ -683,13 +685,12 @@ class Wikispeedia(Wikigame):
 
                 spl = self.get_spl(self.name2id[entry[1]['start']],
                                    self.name2id[entry[1]['target']])
-                successful = True if 'unfinished' in filename else False
 
                 results.append({
                     'data': df,
                     'successful': successful,
                     'spl': spl,
-                    'pl': len(entry[1]['path'])
+                    'pl': len(entry[1]['path'].split(';'))
                 })
 
         data = pd.DataFrame(results)
@@ -697,9 +698,10 @@ class Wikispeedia(Wikigame):
 
 
 class Plotter(object):
-    def __init__(self):
-        self.data = pd.read_pickle('data/data.pd')
-        self.plot_folder = 'plots/'
+    def __init__(self, wiki_game):
+        self.wiki_game = wiki_game
+        self.wiki_game.load_data()
+        self.plot_folder = os.path.join('data', self.wiki_game.label, 'plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
@@ -716,9 +718,17 @@ class Plotter(object):
             ('exploration', 'Explored percentage of page'),
         ]:
             print(feature)
+            try:
+                self.wiki_game.data.iloc[0]['data'][feature]
+            except KeyError, e:
+                print('Feature not present')
+                continue
+
             fig, ax = plt.subplots(1, figsize=(10, 5))
             for k, m in zip([4, 5, 6, 7], ['o', 'x', 'd', 'v']):
-                df = self.data[(self.data.pl == k) & self.data.successful]
+                df = self.wiki_game.data[(self.wiki_game.data.pl == k) &
+                                         (self.wiki_game.data.spl == 3) &
+                                         self.wiki_game.data.successful]
                 data = [[d[feature].iloc[i] for d in df['data']]
                         for i in range(k)]
                 data = [np.mean(d) for d in data]
@@ -726,6 +736,7 @@ class Plotter(object):
                 data.reverse()
                 plt.plot(data, label=str(k), marker=m)
 
+            print()
             plt.legend()
 
             # Beautification
@@ -737,7 +748,8 @@ class Plotter(object):
             offset = 0.1 * plt.ylim()[1]
             plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
             plt.gca().invert_xaxis()
-            plt.savefig(self.plot_folder + feature + '.png')
+            fname = os.path.join(self.plot_folder, feature + '.png')
+            plt.savefig(fname)
 
 
 if __name__ == '__main__':
@@ -753,5 +765,8 @@ if __name__ == '__main__':
     # wk.compute_category_stats()
     # wk.create_dataframe()
 
-    p = Plotter()
+    # p = Plotter(WIKTI())
+    # p.plot()
+
+    p = Plotter(Wikispeedia())
     p.plot()
