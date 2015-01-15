@@ -28,15 +28,15 @@ class Plotter(object):
 
     def plot(self):
         for feature, title in [
-            # ('spl_target', 'Shortest Path Length to target'),
-            # ('tfidf_target', 'TF-IDF similarity to target'),
-            # ('degree_out', 'Out-degree'),
-            # ('degree_in', 'In-degree'),
-            # ('pagerank', 'PageRank'),
-            # ('ngram', 'N-Gram occurrence frequency (=~ familiarity)'),
+            ('spl_target', 'Shortest Path Length to target'),
+            ('tfidf_target', 'TF-IDF similarity to target'),
+            ('degree_out', 'Out-degree'),
+            ('degree_in', 'In-degree'),
+            ('pagerank', 'PageRank'),
+            ('ngram', 'N-Gram occurrence frequency (=~ familiarity)'),
             ('category_depth', 'Category depth (1...most general)'),
-            # ('category_target', 'Category distance to target'),
-            # ('exploration', 'Explored percentage of page'),
+            ('category_target', 'Category distance to target'),
+            ('exploration', 'Explored percentage of page'),
         ]:
             print(feature)
             try:
@@ -52,7 +52,8 @@ class Plotter(object):
                                self.data.successful]
                 data = [[d[feature].iloc[i] for d in df['data']]
                         for i in range(k)]
-                data = [np.mean([e for e in d if e != '']) for d in data]
+                data = [np.mean([e for e in d if e != '' and not np.isnan(e)])
+                        for d in data]
                 print(k, data)
                 data.reverse()
                 plt.plot(data, label=str(k), marker=m)
@@ -64,9 +65,9 @@ class Plotter(object):
             plt.title(title)
             plt.xlabel('distance to-go to target')
             plt.ylabel(feature)
-            offset = 0.1 * plt.xlim()[1]
+            offset = np.abs(0.1 * plt.xlim()[1])
             plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-            offset = 0.1 * plt.ylim()[1]
+            offset = np.abs(0.1 * plt.ylim()[1])
             plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
             plt.gca().invert_xaxis()
             fname = os.path.join(self.plot_folder, feature + '.png')
