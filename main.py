@@ -11,14 +11,12 @@ import re
 import sys
 import urllib2
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pymysql
 import PySide.QtCore
 import PySide.QtGui
 import PySide.QtWebKit
-import seaborn as sns
 from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
@@ -32,8 +30,6 @@ from modules import NodeValues
 
 # set a few options
 pd.options.mode.chained_assignment = None
-sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6",
-                                   "#e74c3c", "#34495e", "#2ecc71"]))
 
 
 class DbConnector(object):
@@ -356,8 +352,8 @@ class Wikigame(object):
         return self.tfidf_similarity[start-1, target-1]
 
     def compute_category_stats(self):
-        category = defaultdict(unicode)
-        category_depth = defaultdict(unicode)
+        category = defaultdict(np.NaN)
+        category_depth = defaultdict(np.NaN)
         for a, i in self.name2id.items():
             print(i, '/', len(self.name2id), end='\r')
             ofname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
@@ -696,77 +692,15 @@ class Wikispeedia(Wikigame):
         data = pd.DataFrame(results)
         data.to_pickle('data/' + self.label + '/data.pd')
 
-
-class Plotter(object):
-    def __init__(self, wiki_game):
-        self.wiki_game = wiki_game
-        self.wiki_game.load_data()
-        self.plot_folder = os.path.join('data', self.wiki_game.label, 'plots')
-        if not os.path.exists(self.plot_folder):
-            os.makedirs(self.plot_folder)
-
-    def plot(self):
-        for feature, title in [
-            ('spl_target', 'Shortest Path Length to target'),
-            ('tfidf_target', 'TF-IDF similarity to target'),
-            ('degree_out', 'Out-degree'),
-            ('degree_in', 'In-degree'),
-            ('pagerank', 'PageRank'),
-            ('ngram', 'N-Gram occurrence frequency (=~ familiarity)'),
-            ('category_depth', 'Category depth (1...most general)'),
-            ('category_target', 'Category distance to target'),
-            ('exploration', 'Explored percentage of page'),
-        ]:
-            print(feature)
-            try:
-                self.wiki_game.data.iloc[0]['data'][feature]
-            except KeyError, e:
-                print('Feature not present')
-                continue
-
-            fig, ax = plt.subplots(1, figsize=(10, 5))
-            for k, m in zip([4, 5, 6, 7], ['o', 'x', 'd', 'v']):
-                df = self.wiki_game.data[(self.wiki_game.data.pl == k) &
-                                         (self.wiki_game.data.spl == 3) &
-                                         self.wiki_game.data.successful]
-                data = [[d[feature].iloc[i] for d in df['data']]
-                        for i in range(k)]
-                data = [np.mean(d) for d in data]
-                print(k, data)
-                data.reverse()
-                plt.plot(data, label=str(k), marker=m)
-
-            print()
-            plt.legend()
-
-            # Beautification
-            plt.title(title)
-            plt.xlabel('distance to-go to target')
-            plt.ylabel(feature)
-            offset = 0.1 * plt.xlim()[1]
-            plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-            offset = 0.1 * plt.ylim()[1]
-            plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
-            plt.gca().invert_xaxis()
-            fname = os.path.join(self.plot_folder, feature + '.png')
-            plt.savefig(fname)
-
-
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    # ws = Wikispeedia()
+    ws = Wikispeedia()
     # ws.compute_tfidf_similarity()
     # ws.compute_category_stats()
-    # ws.create_dataframe()
+    ws.create_dataframe()
 
-    # wk = WIKTI()
+    wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
-    # wk.create_dataframe()
-
-    # p = Plotter(WIKTI())
-    # p.plot()
-
-    p = Plotter(Wikispeedia())
-    p.plot()
+    wk.create_dataframe()
