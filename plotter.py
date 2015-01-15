@@ -45,7 +45,7 @@ class Plotter(object):
                 print('Feature not present')
                 continue
 
-            fig, ax = plt.subplots(1, figsize=(10, 5))
+            fig, ax = plt.subplots(1, figsize=(5, 3))
             for k, m in zip([4, 5, 6, 7], ['o', 'h', 'd', 'v']):
                 df = self.data[(self.data.pl == k) &
                                (self.data.spl == 3) &
