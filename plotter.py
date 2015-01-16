@@ -45,18 +45,41 @@ class Plotter(object):
                 print('Feature not present')
                 continue
 
-            fig, ax = plt.subplots(1, figsize=(5, 3))
+            fig, ax = plt.subplots(1, figsize=(8, 5))
+            use_tsplot = True
+            result = []
+            subj = 0
             for k, m in zip([4, 5, 6, 7], ['o', 'h', 'd', 'v']):
                 df = self.data[(self.data.pl == k) &
                                (self.data.spl == 3) &
                                self.data.successful]
                 data = [[d[feature].iloc[i] for d in df['data']]
                         for i in range(k)]
-                data = [np.mean([e for e in d if e != '' and not np.isnan(e)])
-                        for d in data]
-                print(k, data)
-                data.reverse()
-                plt.plot(data, label=str(k), marker=m)
+                if use_tsplot:
+                    data = [[d[k] for d in data] for k in range(len(data))]
+                    for d in data:
+                        distance = range(k+1)
+                        distance.reverse()
+                        result.append(pd.DataFrame({
+                            'condition': ['pl=%d' % k] * len(data),
+                            'subj': [str(subj)] * len(data),
+                            'distance': distance,
+                            'path': d,
+                        }, dtype=np.float))
+                        subj += 1
+                else:
+                    data = [np.mean([e for e in d
+                                     if e != '' and not np.isnan(e)])
+                            for d in data]
+                    print(k, data)
+                    data.reverse()
+                    plt.plot(data, label=str(k), marker=m)
+            if use_tsplot:
+                result = pd.concat(result)
+                ax = plt.gca()
+                ax.invert_xaxis()
+                sns.tsplot(result, time='distance', unit='subj',
+                           condition='condition', value='path', marker='o', ci=90)
 
             print()
             plt.legend()
@@ -75,8 +98,8 @@ class Plotter(object):
 
 
 if __name__ == '__main__':
-    # p = Plotter('WIKTI')
-    # p.plot()
-
-    p = Plotter('Wikispeedia')
+    p = Plotter('WIKTI')
     p.plot()
+
+    # p = Plotter('Wikispeedia')
+    # p.plot()

@@ -511,7 +511,6 @@ class WIKTI(Wikigame):
                     last = parse_node(last.iloc[-1]['node'])
                     df.loc[df.index[-1] + 1] = [last]
                     df_full.loc[df_full.index[-1] + 1] = ['load', last]
-                df.index = np.arange(len(df))
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
 
