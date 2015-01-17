@@ -27,6 +27,7 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
+        markers = ['o', 'h', 'd', 'v']
         for feature, title in [
             ('spl_target', 'Shortest Path Length to target'),
             ('tfidf_target', 'TF-IDF similarity to target'),
@@ -49,7 +50,7 @@ class Plotter(object):
             use_tsplot = True
             result = []
             subj = 0
-            for k, m in zip([4, 5, 6, 7], ['o', 'h', 'd', 'v']):
+            for k, m in zip([4, 5, 6, 7], markers):
                 df = self.data[(self.data.pl == k) &
                                (self.data.spl == 3) &
                                self.data.successful]
@@ -79,12 +80,15 @@ class Plotter(object):
                 ax = plt.gca()
                 ax.invert_xaxis()
                 sns.tsplot(result, time='distance', unit='subj',
-                           condition='condition', value='path', marker='o', ci=90)
+                           condition='condition', value='path',
+                           marker='o', ci=90)
 
             print()
-            plt.legend()
 
             # Beautification
+            for i, m in enumerate(markers):
+                ax.lines[-i].set_marker(m)
+            plt.legend()
             plt.title(title)
             plt.xlabel('distance to-go to target')
             plt.ylabel(feature)
@@ -101,5 +105,5 @@ if __name__ == '__main__':
     p = Plotter('WIKTI')
     p.plot()
 
-    # p = Plotter('Wikispeedia')
-    # p.plot()
+    p = Plotter('Wikispeedia')
+    p.plot()
