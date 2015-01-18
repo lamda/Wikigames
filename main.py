@@ -9,6 +9,7 @@ import os
 import pdb
 import re
 import sys
+import urlparse, urllib
 import urllib2
 
 import numpy as np
@@ -152,8 +153,9 @@ class WebPageSize(PySide.QtGui.QMainWindow):
         self.web_view = PySide.QtWebKit.QWebView()
         self.setCentralWidget(self.web_view)
         self.web_view.loadFinished.connect(self._load_finished)
+        self.pickle_path = os.path.join('data', label, 'webpagesizes.obj')
         try:
-            with open('data/webpagesizes.obj', 'rb') as infile:
+            with open(self.pickle_path, 'rb') as infile:
                     self.size = pickle.load(infile)
         except (IOError, EOFError):
             self.size = {}
@@ -172,10 +174,12 @@ class WebPageSize(PySide.QtGui.QMainWindow):
     def compute_size(self, page, width):
         self.curr_page = page
         self.curr_width = width
-        site_address = PySide.QtCore.QUrl(self.folder_base +
-                                          page[0].lower() + '/' + page + '.htm')
+        # path = self.folder_base + '/' + page[0].lower() + '/' + page + '.htm'
+        path = page[0].lower() + '/' + page + '.htm'
+        site_address = PySide.QtCore.QUrl(path)
         self.web_view.page().setViewportSize(PySide.QtCore.QSize(width, 1))
-        self.web_view.load(site_address)
+        # self.web_view.load(site_address)
+        self.web_view.load('http://localhost:8000/wp/' + path)
         self.qt_application.exec_()
 
     def _load_finished(self):
@@ -186,7 +190,7 @@ class WebPageSize(PySide.QtGui.QMainWindow):
         self.close()
 
     def __del__(self):
-        with open('data/webpagesizes.obj', 'wb') as outfile:
+        with open(self.pickle_path, 'wb') as outfile:
             pickle.dump(self.size, outfile, -1)
 
 
@@ -469,7 +473,7 @@ class WIKTI(Wikigame):
             print('        Error:', message, folder, filename)
 
         regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
-                       r" u'size': {u'y': \d+, u'x': (\d+)"
+                       r" u'size': {u'y': (\d+), u'x': (\d+)"
         qt_application = PySide.QtGui.QApplication(sys.argv)
         page_size = WebPageSize(qt_application, self.label)
         results = []
@@ -515,25 +519,33 @@ class WIKTI(Wikigame):
                                    self.name2id[target])
 
                 # get scrolling range
-                idx = df_full[df_full['action'] == 'load'].index
-                df_full_scroll = df_full[(df_full['action'] != 'link_data')]
-                df_full_scroll = df_full
-                # idx = [df_full_scroll.index[0]] + list(idx)
-                idx = list(idx)
-                df_groups = [df_full_scroll.loc[a:b, :]
+                idx = list(df_full[df_full['action'] == 'load'].index)
+                df_groups = [df_full.loc[a:b, :]
                              for a, b in zip(idx, idx[1:])]
                 exploration = [np.nan]
                 for i, g in enumerate(df_groups):
-                    df_scroll = g.node.str.extract(regex_scroll)
+                    print('            ', df.iloc[i]['node'])
+                    slct = (g['action'] == 'scroll') | (g['action'] == 'resize')
+                    if len(g[slct]) == 0:
+                        from_index = None
+                        print('            ', 'from_index is None')
+                    else:
+                        from_index = g[slct].index[0]
+                    df_scroll = g.loc[from_index:]
+                    df_scroll = df_scroll.node.str.extract(regex_scroll)
                     df_scroll = df_scroll.dropna()
-                    df_scroll.columns = ['scrolled', 'width']
+                    df_scroll.columns = ['scrolled', 'height', 'width']
                     df_scroll['scrolled'] = df_scroll['scrolled'].apply(int)
+                    df_scroll['height'] = df_scroll['height'].apply(int)
                     df_scroll['width'] = df_scroll['width'].apply(int)
                     seen = df_scroll.loc[df_scroll['scrolled'].idxmax()]
-                    seen_max = sum(page_size.get_size(df.iloc[i]['node'],
-                                                      seen[1]))
-                    seen = sum(seen)
+                    seen_max = page_size.get_size(df.iloc[i].node, seen[2])[1]
+                    seen = seen['scrolled'] + seen['height']
+                    if from_index is None:
+                        seen_max = seen
                     exploration.append(seen / seen_max)
+                    print(seen, seen_max, seen/seen_max)
+                    pdb.set_trace()
 
                 ngrams = NgramFrequency()
                 try:
@@ -694,12 +706,18 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    ws = Wikispeedia()
+    # ws = Wikispeedia()
     # ws.compute_tfidf_similarity()
     # ws.compute_category_stats()
-    ws.create_dataframe()
+    # ws.create_dataframe()
 
     wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
     wk.create_dataframe()
+
+    # qt_application = PySide.QtGui.QApplication(sys.argv)
+    # wps = WebPageSize(qt_application, 'wikti')
+    # print(wps.get_size('Krakatoa', 1766))
+    # pdb.set_trace()
+
