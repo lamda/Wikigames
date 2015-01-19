@@ -9,7 +9,6 @@ import os
 import pdb
 import re
 import sys
-import urlparse, urllib
 import urllib2
 
 import numpy as np
@@ -462,6 +461,88 @@ class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
         super(WIKTI, self).__init__('wikti')
 
+    def compute_link_positions(self):
+        class MLStripper(HTMLParser.HTMLParser):
+            def __init__(self):
+                HTMLParser.HTMLParser.__init__(self)
+                self.reset()
+                self.fed = []
+
+            def handle_data(self, d):
+                self.fed.append(d)
+
+            def get_data(self):
+                return ''.join(self.fed)
+
+            def reset(self):
+                self.fed = []
+                HTMLParser.HTMLParser.reset(self)
+
+        parser = MLStripper()
+        link_regex = re.compile(('(<a href="../../wp/[^/]+/(.+?)\.htm" '
+                                 'title="[^"]+">.+?</a>)'))
+        folder = 'data/WIKTI/wpcd/wp/'
+        link2pos_first = {}
+        link2pos_last = {}
+        pos2link = {}
+        lengths = {}
+        for i, a in enumerate(self.name2id.keys()):
+            print(unicode(i+1) + '/' + unicode(len(self.name2id)))
+            lpos_first = defaultdict(int)
+            lpos_last = defaultdict(int)
+            posl = defaultdict(int)
+            fname = folder + a[0].lower() + '/' + a + '.htm'
+            with io.open(fname, encoding='utf-8') as infile:
+                data = infile.read()
+            data = data.split('<!-- start content -->')[1]
+            data = data.split('<div class="printfooter">')[0]
+            # TODO: make sure self.id2links and re.findall(link_regex)
+            #  yield the same result
+            pdb.set_trace()
+            for link in re.findall(link_regex, data):
+                link = [l for l in link if l]
+                data = data.replace(link[0], ' [['+link[1]+']] ')
+            data = [d.strip() for d in data.splitlines()]
+            data = [d for d in data if d]
+            text = []
+            for d in data:
+                parser.reset()
+                parser.feed(parser.unescape(d))
+                stripped_d = parser.get_data()
+                if stripped_d:
+                    text.append(stripped_d)
+            text = ' '.join(text)
+            text = text.replace(']][[', ']] [[')
+            words = (re.split(': |\. |, |\? |! |\n | ', text))
+            for wi, word in enumerate(reversed(words)):
+                if word.startswith('[['):
+                    try:
+                        aid = self.name2id[word[2:-2].replace('%25', '%')]
+                        lpos_first[aid] = len(words) - wi - 1
+                    except KeyError:
+                        pass
+            for wi, word in enumerate(words):
+                if word.startswith('[['):
+                    try:
+                        aid = self.name2id[word[2:-2].replace('%25', '%')]
+                        lpos_last[aid] = wi
+                        posl[wi] = aid
+                    except KeyError:
+                        pass
+            link2pos_first[a] = lpos_first
+            link2pos_last[a] = lpos_last
+            pos2link[a] = posl
+            lengths[a] = len(words)
+            # hugo = {v: k for k, v in lpos_first.items()}
+            # for k in sorted(hugo):
+            #     print k, self.id2art[hugo[k]]
+            # hugo = {v: k for k, v in lpos_last.items()}
+            # for k in sorted(hugo):
+            #     print k, self.id2art[hugo[k]]
+        with open('data/WIKTI/link2pos.obj', 'wb') as outfile:
+            pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
+                        outfile, -1)
+
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
         # helper functions
@@ -714,7 +795,8 @@ if __name__ == '__main__':
     wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
-    wk.create_dataframe()
+    wk.compute_link_positions()
+    # wk.create_dataframe()
 
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application, 'wikti')
