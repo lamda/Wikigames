@@ -479,27 +479,26 @@ class WIKTI(Wikigame):
                 HTMLParser.HTMLParser.reset(self)
 
         parser = MLStripper()
-        link_regex = re.compile(('(<a href="../../wp/[^/]+/(.+?)\.htm" '
-                                 'title="[^"]+">.+?</a>)'))
-        folder = 'data/WIKTI/wpcd/wp/'
+        link_regex = re.compile(('(<a (class="mw-redirect" )?href="../../wp/[^/]+/(.+?)\.htm" title="[^"]+">.+?</a>)'))
+        folder = os.path.join('data', self.label, 'wpcd', 'wp')
         link2pos_first = {}
         link2pos_last = {}
         pos2link = {}
         lengths = {}
         for i, a in enumerate(self.name2id.keys()):
-            print(unicode(i+1) + '/' + unicode(len(self.name2id)))
+            print(unicode(i+1) + '/' + unicode(len(self.name2id)), end='\r')
             lpos_first = defaultdict(int)
             lpos_last = defaultdict(int)
             posl = defaultdict(int)
-            fname = folder + a[0].lower() + '/' + a + '.htm'
+            fname = os.path.join(folder, a[0].lower(), a + '.htm')
             with io.open(fname, encoding='utf-8') as infile:
                 data = infile.read()
             data = data.split('<!-- start content -->')[1]
             data = data.split('<div class="printfooter">')[0]
-            # TODO: make sure self.id2links and re.findall(link_regex)
-            #  yield the same result
-            pdb.set_trace()
-            for link in re.findall(link_regex, data):
+
+            regex_results = link_regex.findall(data)
+            regex_results = [(r[0], r[2]) for r in regex_results]
+            for link in regex_results:
                 link = [l for l in link if l]
                 data = data.replace(link[0], ' [['+link[1]+']] ')
             data = [d.strip() for d in data.splitlines()]
@@ -533,13 +532,8 @@ class WIKTI(Wikigame):
             link2pos_last[a] = lpos_last
             pos2link[a] = posl
             lengths[a] = len(words)
-            # hugo = {v: k for k, v in lpos_first.items()}
-            # for k in sorted(hugo):
-            #     print k, self.id2art[hugo[k]]
-            # hugo = {v: k for k, v in lpos_last.items()}
-            # for k in sorted(hugo):
-            #     print k, self.id2art[hugo[k]]
-        with open('data/WIKTI/link2pos.obj', 'wb') as outfile:
+        path = os.path.join('data', self.label, 'link_positions.obj')
+        with open(path, 'wb') as outfile:
             pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
                         outfile, -1)
 
@@ -801,5 +795,11 @@ if __name__ == '__main__':
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application, 'wikti')
     # print(wps.get_size('Krakatoa', 1766))
+    # pdb.set_trace()
+
+    # title = 'Aardvark'
+    # data = open('data/wp/' + title[0].lower() + '/' + title + '.htm').read()
+    # link_regex = re.compile(('(<a href="../../wp/[^/]+/(.+?)\.htm" title="[^"]+">.+?</a>)'))
+    # link_regex.findall(data)
     # pdb.set_trace()
 
