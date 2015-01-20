@@ -456,6 +456,19 @@ class Wikigame(object):
         else:
             self.graph = self.read_edge_list_nx(path)
 
+    def plot_link_amount_distribution(self):
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+        sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6",
+                                   "#e74c3c", "#34495e", "#2ecc71"]))
+        query = 'SELECT amount, COUNT(*) FROM links GROUP BY amount;'
+        df = pd.io.sql.read_sql(query, self.db_connector.db_connection)
+        df.index = df.amount
+        df.plot(kind='bar')
+        plt.show()
+        frac = df.iloc[1:]['COUNT(*)'].sum() / df['COUNT(*)'].sum()
+        print('links with multiple occurrences:', frac)
+
 
 class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
@@ -781,15 +794,17 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    # ws = Wikispeedia()
+    ws = Wikispeedia()
     # ws.compute_tfidf_similarity()
     # ws.compute_category_stats()
     # ws.create_dataframe()
+    ws.plot_link_amount_distribution()
 
-    wk = WIKTI()
+    # wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
-    wk.compute_link_positions()
+    # wk.compute_link_positions()
+    # pdb.set_trace()
     # wk.create_dataframe()
 
     # qt_application = PySide.QtGui.QApplication(sys.argv)
