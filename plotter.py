@@ -100,7 +100,6 @@ class Plotter(object):
             fname = os.path.join(self.plot_folder, feature + '.png')
             plt.savefig(fname)
 
-
 if __name__ == '__main__':
     p = Plotter('WIKTI')
     p.plot()
