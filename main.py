@@ -161,8 +161,12 @@ class WebPageSize(PySide.QtGui.QMainWindow):
             self.size = {}
         self.curr_page = ''
         self.curr_width = 0
-        self.folder_base = 'file:///C:/PhD/Code/Wikigames/data/' + label +\
-                           '/wpcd/wp/'
+        self.server = False
+        if self.server:
+            self.base_url = 'http://localhost:8000/wp/'
+        else:
+            self.base_url = 'file:///C:/PhD/Code/Wikigames/data/' + label +\
+                            '/wpcd/wp/'
 
     def get_size(self, page, width):
         try:
@@ -174,18 +178,19 @@ class WebPageSize(PySide.QtGui.QMainWindow):
     def compute_size(self, page, width):
         self.curr_page = page
         self.curr_width = width
-        # path = self.folder_base + '/' + page[0].lower() + '/' + page + '.htm'
-        path = page[0].lower() + '/' + page + '.htm'
-        site_address = PySide.QtCore.QUrl(path)
+        if self.server:
+            path = self.base_url + '/' + page[0].lower() + '/' + page + '.htm'
+        else:
+            path = PySide.QtCore.QUrl(page[0].lower() + '/' + page + '.htm')
+        self.web_view.load(path)
         self.web_view.page().setViewportSize(PySide.QtCore.QSize(width, 1))
-        # self.web_view.load(site_address)
-        self.web_view.load('http://localhost:8000/wp/' + path)
         self.qt_application.exec_()
 
     def _load_finished(self):
         frame = self.web_view.page().mainFrame()
         html_data = frame.toHtml()
         result = (frame.contentsSize().width(), frame.contentsSize().height())
+        pdb.set_trace()
         self.size[(self.curr_page, self.curr_width)] = result
         self.close()
 
@@ -544,7 +549,7 @@ class WIKTI(Wikigame):
                     if from_index is None:
                         seen_max = seen
                     exploration.append(seen / seen_max)
-                    print(seen, seen_max, seen/seen_max)
+                    print(df.iloc[0].node, seen, seen_max)
                     pdb.set_trace()
 
                 ngrams = NgramFrequency()
@@ -711,13 +716,14 @@ if __name__ == '__main__':
     # ws.compute_category_stats()
     # ws.create_dataframe()
 
-    wk = WIKTI()
+    # wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
-    wk.create_dataframe()
+    # wk.create_dataframe()
 
-    # qt_application = PySide.QtGui.QApplication(sys.argv)
-    # wps = WebPageSize(qt_application, 'wikti')
-    # print(wps.get_size('Krakatoa', 1766))
-    # pdb.set_trace()
+    qt_application = PySide.QtGui.QApplication(sys.argv)
+    wps = WebPageSize(qt_application, 'wikti')
+    print(wps.get_size('Krakatoa', 1766))
+    # das scheint noch nicht so ganz zu funktionieren...
+    pdb.set_trace()
 
