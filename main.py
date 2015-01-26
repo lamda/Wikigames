@@ -422,6 +422,89 @@ class Wikigame(object):
         with open(category_path, 'wb') as outfile:
             pickle.dump(category_depth, outfile, -1)
 
+    def compute_link_positions(self):
+        class MLStripper(HTMLParser.HTMLParser):
+            def __init__(self):
+                HTMLParser.HTMLParser.__init__(self)
+                self.reset()
+                self.fed = []
+
+            def handle_data(self, d):
+                self.fed.append(d)
+
+            def get_data(self):
+                return ''.join(self.fed)
+
+            def reset(self):
+                self.fed = []
+                HTMLParser.HTMLParser.reset(self)
+
+        parser = MLStripper()
+        link_regex = re.compile(('(<a (class="mw-redirect" )?'
+                                 'href="../../wp/[^/]+/(.+?)\.htm"'
+                                 'title="[^"]+">.+?</a>)'))
+        folder = os.path.join('data', self.label, 'wpcd', 'wp')
+        link2pos_first = {}
+        link2pos_last = {}
+        pos2link = {}
+        lengths = {}
+        for i, a in enumerate(self.name2id.keys()):
+            print(unicode(i+1) + '/' + unicode(len(self.name2id)), end='\r')
+            lpos_first = defaultdict(int)
+            lpos_last = defaultdict(int)
+            posl = defaultdict(int)
+            fname = os.path.join(folder, a[0].lower(), a + '.htm')
+            try:
+                with io.open(fname, encoding='utf-8') as infile:
+                    data = infile.read()
+            except UnicodeDecodeError, e:
+                # there exist decoding errors for a few irrelevant pages
+                print(fname)
+                continue
+            data = data.split('<!-- start content -->')[1]
+            data = data.split('<div class="printfooter">')[0]
+
+            regex_results = link_regex.findall(data)
+            regex_results = [(r[0], r[2]) for r in regex_results]
+            for link in regex_results:
+                link = [l for l in link if l]
+                data = data.replace(link[0], ' [['+link[1]+']] ')
+            data = [d.strip() for d in data.splitlines()]
+            data = [d for d in data if d]
+            text = []
+            for d in data:
+                parser.reset()
+                parser.feed(parser.unescape(d))
+                stripped_d = parser.get_data()
+                if stripped_d:
+                    text.append(stripped_d)
+            text = ' '.join(text)
+            text = text.replace(']][[', ']] [[')
+            words = (re.split(': |\. |, |\? |! |\n | ', text))
+            for wi, word in enumerate(reversed(words)):
+                if word.startswith('[['):
+                    try:
+                        aid = self.name2id[word[2:-2].replace('%25', '%')]
+                        lpos_first[aid] = len(words) - wi - 1
+                    except KeyError:
+                        pass
+            for wi, word in enumerate(words):
+                if word.startswith('[['):
+                    try:
+                        aid = self.name2id[word[2:-2].replace('%25', '%')]
+                        lpos_last[aid] = wi
+                        posl[wi] = aid
+                    except KeyError:
+                        pass
+            link2pos_first[a] = lpos_first
+            link2pos_last[a] = lpos_last
+            pos2link[a] = posl
+            lengths[a] = len(words)
+        path = os.path.join('data', self.label, 'link_positions.obj')
+        with open(path, 'wb') as outfile:
+            pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
+                        outfile, -1)
+
     def get_category_depth(self, node):
         if self.category_depth is None:
             category_path = 'data/' + self.label + '/category_depth.obj'
@@ -478,82 +561,6 @@ class Wikigame(object):
 class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
         super(WIKTI, self).__init__('wikti')
-
-    def compute_link_positions(self):
-        class MLStripper(HTMLParser.HTMLParser):
-            def __init__(self):
-                HTMLParser.HTMLParser.__init__(self)
-                self.reset()
-                self.fed = []
-
-            def handle_data(self, d):
-                self.fed.append(d)
-
-            def get_data(self):
-                return ''.join(self.fed)
-
-            def reset(self):
-                self.fed = []
-                HTMLParser.HTMLParser.reset(self)
-
-        parser = MLStripper()
-        link_regex = re.compile(('(<a (class="mw-redirect" )?href="../../wp/[^/]+/(.+?)\.htm" title="[^"]+">.+?</a>)'))
-        folder = os.path.join('data', self.label, 'wpcd', 'wp')
-        link2pos_first = {}
-        link2pos_last = {}
-        pos2link = {}
-        lengths = {}
-        for i, a in enumerate(self.name2id.keys()):
-            print(unicode(i+1) + '/' + unicode(len(self.name2id)), end='\r')
-            lpos_first = defaultdict(int)
-            lpos_last = defaultdict(int)
-            posl = defaultdict(int)
-            fname = os.path.join(folder, a[0].lower(), a + '.htm')
-            with io.open(fname, encoding='utf-8') as infile:
-                data = infile.read()
-            data = data.split('<!-- start content -->')[1]
-            data = data.split('<div class="printfooter">')[0]
-
-            regex_results = link_regex.findall(data)
-            regex_results = [(r[0], r[2]) for r in regex_results]
-            for link in regex_results:
-                link = [l for l in link if l]
-                data = data.replace(link[0], ' [['+link[1]+']] ')
-            data = [d.strip() for d in data.splitlines()]
-            data = [d for d in data if d]
-            text = []
-            for d in data:
-                parser.reset()
-                parser.feed(parser.unescape(d))
-                stripped_d = parser.get_data()
-                if stripped_d:
-                    text.append(stripped_d)
-            text = ' '.join(text)
-            text = text.replace(']][[', ']] [[')
-            words = (re.split(': |\. |, |\? |! |\n | ', text))
-            for wi, word in enumerate(reversed(words)):
-                if word.startswith('[['):
-                    try:
-                        aid = self.name2id[word[2:-2].replace('%25', '%')]
-                        lpos_first[aid] = len(words) - wi - 1
-                    except KeyError:
-                        pass
-            for wi, word in enumerate(words):
-                if word.startswith('[['):
-                    try:
-                        aid = self.name2id[word[2:-2].replace('%25', '%')]
-                        lpos_last[aid] = wi
-                        posl[wi] = aid
-                    except KeyError:
-                        pass
-            link2pos_first[a] = lpos_first
-            link2pos_last[a] = lpos_last
-            pos2link[a] = posl
-            lengths[a] = len(words)
-        path = os.path.join('data', self.label, 'link_positions.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
-                        outfile, -1)
 
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
@@ -799,26 +806,23 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    ws = Wikispeedia()
+    # ws = Wikispeedia()
     # ws.compute_tfidf_similarity()
     # ws.compute_category_stats()
     # ws.create_dataframe()
-    ws.plot_link_amount_distribution()
+    # ws.plot_link_amount_distribution()
 
     # wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
     # wk.create_dataframe()
 
-    qt_application = PySide.QtGui.QApplication(sys.argv)
-    wps = WebPageSize(qt_application, 'wikti')
-    print(wps.get_size('Krakatoa', 1766))
-    # das scheint noch nicht so ganz zu funktionieren...
-    pdb.set_trace()
-
-    # title = 'Aardvark'
-    # data = open('data/wp/' + title[0].lower() + '/' + title + '.htm').read()
-    # link_regex = re.compile(('(<a href="../../wp/[^/]+/(.+?)\.htm" title="[^"]+">.+?</a>)'))
-    # link_regex.findall(data)
+    # qt_application = PySide.QtGui.QApplication(sys.argv)
+    # wps = WebPageSize(qt_application, 'wikti')
+    # print(wps.get_size('Krakatoa', 1766))
+    # # das scheint noch nicht so ganz zu funktionieren...
     # pdb.set_trace()
 
+    wk = Wikispeedia()
+    wk.compute_link_positions()
+    pdb.set_trace()
