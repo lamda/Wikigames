@@ -30,13 +30,13 @@ class Plotter(object):
         markers = ['o', 'h', 'd', 'v']
         for feature, title in [
             ('spl_target', 'Shortest Path Length to Target'),
-            # ('tfidf_target', 'TF-IDF similarity to Target'),
-            # ('degree_out', 'Out-degree'),
-            # ('degree_in', 'In-degree'),
-            # ('pagerank', 'PageRank'),
-            # ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
-            # ('category_depth', 'Category Depth (1...most general)'),
-            # ('category_target', 'Category Distance to target'),
+            ('tfidf_target', 'TF-IDF similarity to Target'),
+            ('degree_out', 'Out-degree'),
+            ('degree_in', 'In-degree'),
+            ('pagerank', 'PageRank'),
+            ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
+            ('category_depth', 'Category Depth (1...most general)'),
+            ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
         ]:
             print(feature)

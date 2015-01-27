@@ -578,6 +578,7 @@ class Wikigame(object):
     def print_error(self, message):
         print('        Error:', message)
 
+
 class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
         super(WIKTI, self).__init__('wikti')
@@ -803,7 +804,6 @@ class Wikispeedia(Wikigame):
                     ngram = [ngrams.get_frequency(n) for n in node]
                     tid = self.name2id[entry[1]['target']]
                     spl_target = [self.get_spl(i, tid) for i in node_id]
-                    self.check_spl(spl_target, successful)
                     tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
                                     for i in node_id]
                     category_depth = [self.get_category_depth(i)
@@ -844,17 +844,17 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    # ws = Wikispeedia()
+    ws = Wikispeedia()
     # ws.compute_tfidf_similarity()
     # ws.compute_category_stats()
-    # ws.create_dataframe()
+    ws.create_dataframe()
     # ws.plot_link_amount_distribution()
 
-    wk = WIKTI()
+    # wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
     # wk.compute_link_positions()
-    wk.create_dataframe()
+    # wk.create_dataframe()
 
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application, 'wikti')
