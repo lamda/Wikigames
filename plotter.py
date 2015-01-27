@@ -29,15 +29,15 @@ class Plotter(object):
     def plot(self):
         markers = ['o', 'h', 'd', 'v']
         for feature, title in [
-            ('spl_target', 'Shortest Path Length to target'),
-            ('tfidf_target', 'TF-IDF similarity to target'),
-            ('degree_out', 'Out-degree'),
-            ('degree_in', 'In-degree'),
-            ('pagerank', 'PageRank'),
-            ('ngram', 'N-Gram occurrence frequency (=~ familiarity)'),
-            ('category_depth', 'Category depth (1...most general)'),
-            ('category_target', 'Category distance to target'),
-            ('exploration', 'Explored percentage of page'),
+            ('spl_target', 'Shortest Path Length to Target'),
+            # ('tfidf_target', 'TF-IDF similarity to Target'),
+            # ('degree_out', 'Out-degree'),
+            # ('degree_in', 'In-degree'),
+            # ('pagerank', 'PageRank'),
+            # ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
+            # ('category_depth', 'Category Depth (1...most general)'),
+            # ('category_target', 'Category Distance to target'),
+            # ('exploration', 'Explored Percentage of Page'),
         ]:
             print(feature)
             try:
@@ -54,40 +54,44 @@ class Plotter(object):
                 df = self.data[(self.data.pl == k) &
                                (self.data.spl == 3) &
                                self.data.successful]
-                data = [[d[feature].iloc[i] for d in df['data']]
-                        for i in range(k)]
+                data_raw = [[d[feature].iloc[i] for d in df['data']]
+                            for i in range(k)]
                 if use_tsplot:
-                    data = [[d[k] for d in data] for k in range(len(data))]
+                    data = [[d[k1] for d in data_raw]
+                            for k1 in range(len(data_raw[0]))]
                     for d in data:
-                        distance = range(k+1)
+                        distance = range(k)
                         distance.reverse()
                         result.append(pd.DataFrame({
-                            'condition': ['pl=%d' % k] * len(data),
-                            'subj': [str(subj)] * len(data),
+                            'condition': ['PL %d' % k] * len(d),
+                            'subj': [str(subj)] * len(d),
                             'distance': distance,
                             'path': d,
                         }, dtype=np.float))
                         subj += 1
                 else:
-                    data = [np.mean([e for e in d
-                                     if e != '' and not np.isnan(e)])
-                            for d in data]
+                    data = [[e for e in d if e != '' and not np.isnan(e)]
+                            for d in data_raw]
+                    data = [np.mean(d) for d in data]
                     print(k, data)
                     data.reverse()
                     plt.plot(data, label=str(k), marker=m)
+
             if use_tsplot:
                 result = pd.concat(result)
                 ax = plt.gca()
                 ax.invert_xaxis()
                 sns.tsplot(result, time='distance', unit='subj',
                            condition='condition', value='path',
-                           marker='o', ci=90)
+                           marker='o', ci=68)  # TODO 68 is the standard error?
 
             print()
 
             # Beautification
-            for i, m in enumerate(markers):
-                ax.lines[-i].set_marker(m)
+            # for i, m in enumerate(markers):
+            #     ax.lines[-i].set_marker(m)
+            for m, a in zip(markers, reversed(ax.lines)):
+                a.set_marker(m)
             plt.legend()
             plt.title(title)
             plt.xlabel('distance to-go to target')
@@ -97,8 +101,10 @@ class Plotter(object):
             offset = np.abs(0.05 * plt.ylim()[1])
             plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
             plt.gca().invert_xaxis()
-            fname = os.path.join(self.plot_folder, feature + '.png')
+            alt = '' if use_tsplot else '_alt'
+            fname = os.path.join(self.plot_folder, feature + alt + '.png')
             plt.savefig(fname)
+
 
 if __name__ == '__main__':
     p = Plotter('WIKTI')

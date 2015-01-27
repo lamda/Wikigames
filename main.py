@@ -160,7 +160,7 @@ class WebPageSize(PySide.QtGui.QMainWindow):
             self.size = {}
         self.curr_page = ''
         self.curr_width = 0
-        self.server = False
+        self.server = True
         if self.server:
             self.base_url = 'http://localhost:8000/wp/'
         else:
@@ -189,7 +189,6 @@ class WebPageSize(PySide.QtGui.QMainWindow):
         frame = self.web_view.page().mainFrame()
         html_data = frame.toHtml()
         result = (frame.contentsSize().width(), frame.contentsSize().height())
-        pdb.set_trace()
         self.size[(self.curr_page, self.curr_width)] = result
         self.close()
 
@@ -208,6 +207,8 @@ class Wikigame(object):
         self.tfidf_similarity = None
         self.category_depth = None
         self.category_distance = None
+        self.link2pos_first, self.link2pos_last = None, None
+        self.lengths, self.pos2link = None, None
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
@@ -422,6 +423,34 @@ class Wikigame(object):
         with open(category_path, 'wb') as outfile:
             pickle.dump(category_depth, outfile, -1)
 
+    def get_category_depth(self, node):
+        if self.category_depth is None:
+            category_path = 'data/' + self.label + '/category_depth.obj'
+            with open(category_path, 'rb') as infile:
+                self.category_depth = pickle.load(infile)
+        return self.category_depth[node]
+
+    def get_category_distance(self, start, target):
+        if self.category_distance is None:
+            path = os.path.join('data', self.label, 'category_distance.obj')
+            with open(path, 'rb') as infile:
+                self.category_distance = pickle.load(infile)
+        # subtract one because Wikipedia ids start with 1 and not 0
+        return self.category_distance[start-1, target-1]
+
+    def get_spl(self, start, target):
+        """ get the shortest path length for two nodes from the database
+        if this is too slow, add an index to the table as follows:
+        ALTER TABLE path_lengths ADD INDEX page_id (page_id);
+        """
+        query = '''SELECT path_length FROM path_lengths
+                   WHERE page_id=%d AND target_page_id=%d'''\
+                % (start, target)
+        length = self.db_connector.execute(query)
+        if not length:
+            return np.NaN
+        return length[0]['path_length']
+
     def compute_link_positions(self):
         class MLStripper(HTMLParser.HTMLParser):
             def __init__(self):
@@ -505,33 +534,12 @@ class Wikigame(object):
             pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
                         outfile, -1)
 
-    def get_category_depth(self, node):
-        if self.category_depth is None:
-            category_path = 'data/' + self.label + '/category_depth.obj'
-            with open(category_path, 'rb') as infile:
-                self.category_depth = pickle.load(infile)
-        return self.category_depth[node]
-
-    def get_category_distance(self, start, target):
-        if self.category_distance is None:
-            category_path = 'data/' + self.label + '/category_distance.obj'
-            with open(category_path, 'rb') as infile:
-                self.category_distance = pickle.load(infile)
-        # subtract one because Wikipedia ids start with 1 and not 0
-        return self.category_distance[start-1, target-1]
-
-    def get_spl(self, start, target):
-        """ get the shortest path length for two nodes from the database
-        if this is too slow, add an index to the table as follows:
-        ALTER TABLE path_lengths ADD INDEX page_id (page_id);
-        """
-        query = '''SELECT path_length FROM path_lengths
-                   WHERE page_id=%d AND target_page_id=%d'''\
-                % (start, target)
-        length = self.db_connector.execute(query)
-        if not length:
-            return np.NaN
-        return length[0]['path_length']
+    def load_link_positions(self):
+        if self.link2pos_first is None:
+            path = os.path.join('data', self.label, 'link_positions.obj')
+            with open(path, 'rb') as infile:
+                self.link2pos_first, self.link2pos_last, self.lengths,\
+                    self.pos2link = pickle.load(infile)
 
     def load_data(self):
         self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
@@ -557,6 +565,18 @@ class Wikigame(object):
         frac = df.iloc[1:]['COUNT(*)'].sum() / df['COUNT(*)'].sum()
         print('links with multiple occurrences:', frac)
 
+    # dataframe preparation helpers ----
+
+    def check_spl(self, data, successful):
+        # assert that the spl data is correct
+        assert all(y >= x-1 for x, y in zip(data, data[1:])),\
+            'error in SPL: erroneous difference in SPL'
+        if successful:
+            assert data[-1] == 0,\
+                'error in SPL: last node is not target in successful mission'
+
+    def print_error(self, message):
+        print('        Error:', message)
 
 class WIKTI(Wikigame):
     def __init__(self, graph_tool=False):
@@ -569,16 +589,17 @@ class WIKTI(Wikigame):
             m = re.findall(r'/([^/]*?)\.htm', node_string)
             return m[0].replace('%25', '%') if m else ''
 
-        def print_error(message):
-            print('        Error:', message, folder, filename)
-
-        regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
-                       r" u'size': {u'y': (\d+), u'x': (\d+)"
+        # web page size calculation disabled for now - needs a workover
+        # regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
+        #                r" u'size': {u'y': (\d+), u'x': (\d+)"
         qt_application = PySide.QtGui.QApplication(sys.argv)
-        page_size = WebPageSize(qt_application, self.label)
+        # page_size = WebPageSize(qt_application, self.label)
         results = []
         folder_logs = 'data/' + self.label + '/logfiles/'
-        for folder in sorted(os.listdir(folder_logs)):
+        ngrams = NgramFrequency()
+        self.load_link_positions()
+        folders = ['U' + '%02d' % i for i in range(1, 10)]
+        for folder in folders:
             print('\n', folder)
             files = sorted([f for f in os.listdir(folder_logs + folder)
                             if f.startswith('PLAIN')])
@@ -592,10 +613,10 @@ class WIKTI(Wikigame):
                 # perform sanity checks
                 action_counts = df_full['action'].value_counts()
                 if action_counts['GAME_STARTED'] > 1:
-                    print_error('duplicated_game_start, dropping')
+                    self.print_error('duplicated_game_start, dropping')
                     continue
                 elif action_counts['load'] < 2:
-                    print_error('game too short, dropping')
+                    self.print_error('game too short, dropping')
                     continue
 
                 # get additional mission attributes
@@ -607,47 +628,53 @@ class WIKTI(Wikigame):
                 df.drop('action', inplace=True, axis=1)
                 df['node'] = df['node'].apply(parse_node)
                 if not df.iloc[0]['node'] == start:
-                    print_error('start node not present')
+                    self.print_error('start node not present')
                     pdb.set_trace()
-
                 if successful and not target == df.iloc[-1]['node']:
+                    # insert the target if the load event is not present
+                    # this is the case for some of the earlier log files
                     last = df_full[df_full['action'] == 'link_data']
                     last = parse_node(last.iloc[-1]['node'])
                     df.loc[df.index[-1] + 1] = [last]
                     df_full.loc[df_full.index[-1] + 1] = ['load', last]
+                    if last != target:
+                        # in some cases, the target is entirely missing
+                        df.loc[df.index[-1] + 1] = target
+                        df_full.loc[df_full.index[-1] + 1] = ['load', target]
+
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
 
                 # get scrolling range
-                idx = list(df_full[df_full['action'] == 'load'].index)
-                df_groups = [df_full.loc[a:b, :]
-                             for a, b in zip(idx, idx[1:])]
-                exploration = [np.nan]
-                for i, g in enumerate(df_groups):
-                    print('            ', df.iloc[i]['node'])
-                    slct = (g['action'] == 'scroll') | (g['action'] == 'resize')
-                    if len(g[slct]) == 0:
-                        from_index = None
-                        print('            ', 'from_index is None')
-                    else:
-                        from_index = g[slct].index[0]
-                    df_scroll = g.loc[from_index:]
-                    df_scroll = df_scroll.node.str.extract(regex_scroll)
-                    df_scroll = df_scroll.dropna()
-                    df_scroll.columns = ['scrolled', 'height', 'width']
-                    df_scroll['scrolled'] = df_scroll['scrolled'].apply(int)
-                    df_scroll['height'] = df_scroll['height'].apply(int)
-                    df_scroll['width'] = df_scroll['width'].apply(int)
-                    seen = df_scroll.loc[df_scroll['scrolled'].idxmax()]
-                    seen_max = page_size.get_size(df.iloc[i].node, seen[2])[1]
-                    seen = seen['scrolled'] + seen['height']
-                    if from_index is None:
-                        seen_max = seen
-                    exploration.append(seen / seen_max)
-                    print(df.iloc[0].node, seen, seen_max)
-                    pdb.set_trace()
+                # idx = list(df_full[df_full['action'] == 'load'].index)
+                # df_groups = [df_full.loc[a:b, :]
+                #              for a, b in zip(idx, idx[1:])]
+                # exploration = [np.nan]
+                # for i, g in enumerate(df_groups):
+                #     print('            ', df.iloc[i]['node'])
+                #     slct = (g['action'] == 'scroll') | (g['action'] == 'resize')
+                #     if len(g[slct]) == 0:
+                #         from_index = None
+                #         print('            ', 'from_index is None')
+                #     else:
+                #         from_index = g[slct].index[0]
+                #     df_scroll = g.loc[from_index:]
+                #     df_scroll = df_scroll.node.str.extract(regex_scroll)
+                #     df_scroll = df_scroll.dropna()
+                #     df_scroll.columns = ['scrolled', 'height', 'width']
+                #     df_scroll['scrolled'] = df_scroll['scrolled'].apply(int)
+                #     df_scroll['height'] = df_scroll['height'].apply(int)
+                #     df_scroll['width'] = df_scroll['width'].apply(int)
+                #     seen_log = df_scroll.loc[df_scroll['scrolled'].idxmax()]
+                #     seen_max = page_size.get_size(df.iloc[i].node, seen_log[2])[1]
+                #     seen = seen_log['scrolled'] + seen_log['height']
+                #     if from_index is None:
+                #         seen_max = seen
+                #     exploration.append(seen / seen_max)
+                #     print(df.iloc[0].node, seen, seen_max)
+                #     pdb.set_trace()
+                #     TODO: This currently doesn't work
 
-                ngrams = NgramFrequency()
                 try:
                     df['node_id'] = [self.name2id[n]
                                      for n in df['node']]
@@ -663,6 +690,10 @@ class WIKTI(Wikigame):
                     tid = self.name2id[target]
                     df['spl_target'] = [self.get_spl(i, tid)
                                         for i in df['node_id']]
+                    try:
+                        self.check_spl(df['spl_target'].tolist(), successful)
+                    except AssertionError, a:
+                        pdb.set_trace()
                     df['tfidf_target'] = [1 - self.get_tfidf_similarity(i,
                                                                         tid)
                                           for i in df['node_id']]
@@ -671,9 +702,14 @@ class WIKTI(Wikigame):
                     df['category_target'] = [self.get_category_distance(i,
                                                                         tid)
                                              for i in df['node_id']]
-                    df['exploration'] = exploration
+                    # df['exploration'] = exploration
+                    zipped = zip(df['node'].iloc[0:], df['node_id'].iloc[1:])
+                    df['linkpos_first'] = [self.link2pos_first[a][b]
+                                           for a, b in zipped] + [np.NaN]
+                    df['linkpos_last'] = [self.link2pos_last[a][b]
+                                          for a, b in zipped] + [np.NaN]
                 except KeyError, e:
-                    print_error('key not found, dropping' + repr(e))
+                    self.print_error('key not found, dropping' + repr(e))
                     continue
 
                 results.append({
@@ -722,16 +758,10 @@ class Wikispeedia(Wikigame):
 
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
-        def parse_node(node_string):
-            m = re.findall(r'/([^/]*?)\.htm', node_string)
-            return m[0].replace('%25', '%') if m else ''
-
-        def print_error(message):
-            print('        Error:', message, folder, filename)
-
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
         ngrams = NgramFrequency()
+        self.load_link_positions()
         for filename in sorted(os.listdir(folder_logs))[:1]:
             print('\n', filename)
             fname = os.path.join(folder_logs, filename)
@@ -773,21 +803,28 @@ class Wikispeedia(Wikigame):
                     ngram = [ngrams.get_frequency(n) for n in node]
                     tid = self.name2id[entry[1]['target']]
                     spl_target = [self.get_spl(i, tid) for i in node_id]
+                    self.check_spl(spl_target, successful)
                     tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
                                     for i in node_id]
                     category_depth = [self.get_category_depth(i)
                                       for i in node_id]
                     category_target = [self.get_category_distance(i, tid)
                                        for i in node_id]
+                    zipped = zip(node, node_id[1:])
+                    linkpos_first = [np.NaN] + [self.link2pos_first[a][b]
+                                                for a, b in zipped]
+                    linkpos_last = [np.NaN] + [self.link2pos_last[a][b]
+                                               for a, b in zipped]
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
                            pagerank, ngram, spl_target, tfidf_target,
-                           category_depth, category_target)
+                           category_depth, category_target, linkpos_first,
+                           linkpos_last)
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
                            'pagerank', 'ngram', 'spl_target',
                            'tfidf_target', 'category_depth',
-                           'category_target']
+                           'category_target', 'linkpos_first', 'linkpos_last']
                 df = pd.DataFrame(data=data, columns=columns)
 
                 spl = self.get_spl(self.name2id[entry[1]['start']],
@@ -803,6 +840,7 @@ class Wikispeedia(Wikigame):
         data = pd.DataFrame(results)
         data.to_pickle('data/' + self.label + '/data.pd')
 
+
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
@@ -812,10 +850,11 @@ if __name__ == '__main__':
     # ws.create_dataframe()
     # ws.plot_link_amount_distribution()
 
-    # wk = WIKTI()
+    wk = WIKTI()
     # wk.compute_tfidf_similarity()
     # wk.compute_category_stats()
-    # wk.create_dataframe()
+    # wk.compute_link_positions()
+    wk.create_dataframe()
 
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application, 'wikti')
@@ -823,6 +862,3 @@ if __name__ == '__main__':
     # # das scheint noch nicht so ganz zu funktionieren...
     # pdb.set_trace()
 
-    wk = Wikispeedia()
-    wk.compute_link_positions()
-    pdb.set_trace()
