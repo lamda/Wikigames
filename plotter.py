@@ -53,7 +53,7 @@ class Plotter(object):
                 df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
                                self.data.successful]
                 data = [d[feature].tolist() for d in df['data']]
-                data = [d for d in data if '' not in d and np.NaN not in d]
+                data = [d for d in data if '' not in d and not np.isnan(sum(d))]
                 for d in data:
                     distance = range(k)
                     distance.reverse()
@@ -98,8 +98,8 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    pt = Plotter('WIKTI')
-    pt.plot()
-
-    # pt = Plotter('Wikispeedia')
+    # pt = Plotter('WIKTI')
     # pt.plot()
+
+    pt = Plotter('Wikispeedia')
+    pt.plot()
