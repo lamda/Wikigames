@@ -12,9 +12,9 @@ import seaborn as sns
 
 # set a few options
 pd.options.mode.chained_assignment = None
-palette = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
+colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
 markers = ['o', 'h', 'd', 'v', 's', 'x']
-sns.set_palette(sns.color_palette(palette))
+sns.set_palette(sns.color_palette(colors))
 
 
 class Plotter(object):
@@ -22,7 +22,7 @@ class Plotter(object):
         self.label = label
         print('loading data...')
         self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
-        print('loaded')
+        print('loaded\n')
         self.plot_folder = os.path.join('data', self.label, 'plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
@@ -33,7 +33,6 @@ class Plotter(object):
             ('tfidf_target', 'TF-IDF similarity to Target'),
             ('degree_out', 'Out-degree'),
             ('degree_in', 'In-degree'),
-            ('pagerank', 'PageRank'),
             ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
             ('category_depth', 'Category Depth (1...most general)'),
             ('category_target', 'Category Distance to target'),
@@ -47,7 +46,7 @@ class Plotter(object):
                 continue
             p = Plot(title, 'Distance to Target')
 
-            for k, m, c in zip([4, 5, 6, 7], markers, palette):
+            for k, m, c in zip([4, 5, 6, 7], markers, colors):
                 subj = 0
                 result = []
                 df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
@@ -70,6 +69,36 @@ class Plotter(object):
                              marker=m, color=c)
             p.finish(os.path.join(self.plot_folder, feature + '.png'))
 
+    def plot_linkpos(self):
+        print('linkpos')
+        p = Plot('Link Position', 'Distance to Target')
+        for k, c in zip([4, 5, 6, 7], colors):
+            for feature, label, m in [
+                ('linkpos_first', 'first', '^'),
+                ('linkpos_last', 'last', 'v')
+            ]:
+                subj = 0
+                result = []
+                df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
+                               self.data.successful]
+                data = [d[feature].tolist() for d in df['data']]
+                data = [d for d in data if '' not in d]
+                for d in data:
+                    distance = range(k)
+                    distance.reverse()
+                    result.append(pd.DataFrame({
+                        'condition': ['PL %d (%s)' % (k, label)] * len(d),
+                        'subj': [str(subj)] * len(d),
+                        'distance': distance,
+                        'path': d,
+                    }, dtype=np.float))
+                    subj += 1
+                result = pd.concat(result)
+                p.add_tsplot(result, time='distance', unit='subj',
+                             condition='condition', value='path',
+                             marker=m, color=c, ci=0)
+        p.finish(os.path.join(self.plot_folder, 'linkpos.png'))
+
 
 class Plot(object):
     def __init__(self, title, xlabel):
@@ -83,7 +112,7 @@ class Plot(object):
             self.ax.invert_xaxis()
             sns.tsplot(data, time=time, unit=unit, condition=condition,
                        value=value, marker=marker, color=color,
-                       ci=68)  # TODO 68 is the standard error?
+                       ci=ci)  # TODO 68 is the standard error?
 
     def finish(self, fname):
         """perform some beautification"""
@@ -101,7 +130,7 @@ class Plot(object):
 
 if __name__ == '__main__':
     pt = Plotter('WIKTI')
-    pt.plot()
-
     # pt = Plotter('Wikispeedia')
     # pt.plot()
+    pt.plot_linkpos()
+

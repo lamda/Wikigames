@@ -17,15 +17,9 @@ import pymysql
 import PySide.QtCore
 import PySide.QtGui
 import PySide.QtWebKit
-from sklearn.feature_extraction.text import TfidfVectorizer
 import statsmodels.api as sm
 
 import credentials
-from modules import PageExtractor
-from modules import LinkExtractor
-from modules import LinkCleaner
-from modules import PathCalculator
-from modules import NodeValues
 
 
 # set a few options
@@ -209,6 +203,7 @@ class Wikigame(object):
         self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
         self.lengths, self.pos2link = None, None
+        self.spl = {}
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
@@ -228,7 +223,6 @@ class Wikigame(object):
         nodes = self.db_connector.execute('SELECT * FROM node_data')
         self.id2deg_out = {p['node_id']: p['out_degree'] for p in nodes}
         self.id2deg_in = {p['node_id']: p['in_degree'] for p in nodes}
-        self.id2pr = {p['node_id']: p['pagerank'] for p in nodes}
 
         links = self.db_connector.execute('''SELECT page_id,
                                                     SUM(amount) as links
@@ -332,6 +326,8 @@ class Wikigame(object):
 
         articles are sorted by their ID as in the MySQL database
         """
+
+        from sklearn.feature_extraction.text import TfidfVectorizer
 
         # read plaintext files
         content = []
@@ -443,13 +439,18 @@ class Wikigame(object):
         if this is too slow, add an index to the table as follows:
         ALTER TABLE path_lengths ADD INDEX page_id (page_id);
         """
-        query = '''SELECT path_length FROM path_lengths
-                   WHERE page_id=%d AND target_page_id=%d'''\
-                % (start, target)
-        length = self.db_connector.execute(query)
+        try:
+            return self.spl[(start, target)]
+        except KeyError:
+            query = '''SELECT path_length FROM path_lengths
+                       WHERE page_id=%d AND target_page_id=%d'''\
+                    % (start, target)
+            length = self.db_connector.execute(query)
         if not length:
-            return np.NaN
-        return length[0]['path_length']
+            self.spl[(start, target)] = np.NaN
+        else:
+            self.spl[(start, target)] = length[0]['path_length']
+        return self.spl[(start, target)]
 
     def compute_link_positions(self):
         class MLStripper(HTMLParser.HTMLParser):
@@ -470,7 +471,7 @@ class Wikigame(object):
 
         parser = MLStripper()
         link_regex = re.compile(('(<a (class="mw-redirect" )?'
-                                 'href="../../wp/[^/]+/(.+?)\.htm"'
+                                 'href="../../wp/[^/]+/(.+?)\.htm" '
                                  'title="[^"]+">.+?</a>)'))
         folder = os.path.join('data', self.label, 'wpcd', 'wp')
         link2pos_first = {}
@@ -683,8 +684,6 @@ class WIKTI(Wikigame):
                                         for i in df['node_id']]
                     df['degree_in'] = [self.id2deg_in[i]
                                        for i in df['node_id']]
-                    df['pagerank'] = [self.id2pr[i]
-                                      for i in df['node_id']]
                     df['ngram'] = [ngrams.get_frequency(n)
                                    for n in df['node']]
 
@@ -740,6 +739,12 @@ class Wikispeedia(Wikigame):
 
     @staticmethod
     def fill_database():
+        from modules import PageExtractor
+        from modules import LinkExtractor
+        from modules import LinkCleaner
+        from modules import PathCalculator
+        from modules import NodeValues
+
         db_connector = DbConnector('wikispeedia')
 
         page_extractor = PageExtractor.PageExtractor(db_connector)
@@ -758,13 +763,14 @@ class Wikispeedia(Wikigame):
         node_values.run()
 
     def create_dataframe(self):
+        from datetime import datetime
         # load or compute the click data as a pandas frame
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
         ngrams = NgramFrequency()
         self.load_link_positions()
         for filename in sorted(os.listdir(folder_logs))[:1]:
-            print('\n', filename)
+            print(filename)
             fname = os.path.join(folder_logs, filename)
             successful = False if 'unfinished' in filename else True
             df_full = pd.read_csv(fname, sep='\t', comment='#',
@@ -780,8 +786,6 @@ class Wikispeedia(Wikigame):
             df_full['target'] = target
             for eid, entry in enumerate(df_full.iterrows()):
                 print(eid, end='\r')
-                # if eid > 1000:
-                #     break
                 node = entry[1]['path'].split(';')
                 if '<' in node:
                     # resolve backtracks
@@ -800,7 +804,6 @@ class Wikispeedia(Wikigame):
                     node_id = [self.name2id[n] for n in node]
                     degree_out = [self.id2deg_out[i] for i in node_id]
                     degree_in = [self.id2deg_in[i] for i in node_id]
-                    pagerank = [self.id2pr[i] for i in node_id]
                     ngram = [ngrams.get_frequency(n) for n in node]
                     tid = self.name2id[entry[1]['target']]
                     spl_target = [self.get_spl(i, tid) for i in node_id]
@@ -818,15 +821,14 @@ class Wikispeedia(Wikigame):
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
-                           pagerank, ngram, spl_target, tfidf_target,
+                           ngram, spl_target, tfidf_target,
                            category_depth, category_target, linkpos_first,
                            linkpos_last)
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
-                           'pagerank', 'ngram', 'spl_target',
-                           'tfidf_target', 'category_depth',
-                           'category_target', 'linkpos_first', 'linkpos_last']
+                           'ngram', 'spl_target', 'tfidf_target',
+                           'category_depth', 'category_target',
+                           'linkpos_first', 'linkpos_last']
                 df = pd.DataFrame(data=data, columns=columns)
-
                 spl = self.get_spl(self.name2id[entry[1]['start']],
                                    self.name2id[entry[1]['target']])
 
@@ -844,17 +846,11 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    ws = Wikispeedia()
-    # ws.compute_tfidf_similarity()
-    # ws.compute_category_stats()
-    ws.create_dataframe()
+    # w = WIKTI()
+    w = Wikispeedia()
+    # w.compute_link_positions()
+    w.create_dataframe()
     # ws.plot_link_amount_distribution()
-
-    # wk = WIKTI()
-    # wk.compute_tfidf_similarity()
-    # wk.compute_category_stats()
-    # wk.compute_link_positions()
-    # wk.create_dataframe()
 
     # qt_application = PySide.QtGui.QApplication(sys.argv)
     # wps = WebPageSize(qt_application, 'wikti')
