@@ -814,10 +814,10 @@ class Wikispeedia(Wikigame):
                     category_target = [self.get_category_distance(i, tid)
                                        for i in node_id]
                     zipped = zip(node, node_id[1:])
-                    linkpos_first = [np.NaN] + [self.link2pos_first[a][b]
-                                                for a, b in zipped]
-                    linkpos_last = [np.NaN] + [self.link2pos_last[a][b]
-                                               for a, b in zipped]
+                    linkpos_first = [self.link2pos_first[a][b]
+                                     for a, b in zipped] + [np.NaN]
+                    linkpos_last =[self.link2pos_last[a][b]
+                                   for a, b in zipped] + [np.NaN]
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,

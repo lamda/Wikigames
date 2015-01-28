@@ -19,6 +19,7 @@ sns.set_palette(sns.color_palette(colors))
 
 class Plotter(object):
     def __init__(self, label):
+        print(label)
         self.label = label
         print('loading data...')
         self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
@@ -74,8 +75,8 @@ class Plotter(object):
         p = Plot('Link Position', 'Distance to Target')
         for k, c in zip([4, 5, 6, 7], colors):
             for feature, label, m in [
+                ('linkpos_last', 'last', 'v'),
                 ('linkpos_first', 'first', '^'),
-                ('linkpos_last', 'last', 'v')
             ]:
                 subj = 0
                 result = []
@@ -97,6 +98,7 @@ class Plotter(object):
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c, ci=0)
+                pdb.set_trace()
         p.finish(os.path.join(self.plot_folder, 'linkpos.png'))
 
 
@@ -108,15 +110,14 @@ class Plot(object):
         self.xlabel = xlabel
 
     def add_tsplot(self, data, time, unit, condition, value,
-                   marker, color, ci=68):
+                   marker, color, ci=68):  # TODO 68 is the standard error?
             self.ax.invert_xaxis()
             sns.tsplot(data, time=time, unit=unit, condition=condition,
-                       value=value, marker=marker, color=color,
-                       ci=ci)  # TODO 68 is the standard error?
+                       value=value, marker=marker, color=color, ci=ci)
 
     def finish(self, fname):
         """perform some beautification"""
-        plt.legend()
+        plt.legend(loc=0)
         offset = np.abs(0.05 * plt.xlim()[1])
         plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
         offset = np.abs(0.05 * plt.ylim()[1])
@@ -129,8 +130,8 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    pt = Plotter('WIKTI')
-    # pt = Plotter('Wikispeedia')
+    # pt = Plotter('WIKTI')
+    pt = Plotter('Wikispeedia')
     # pt.plot()
     pt.plot_linkpos()
 
