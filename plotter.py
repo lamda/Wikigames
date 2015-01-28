@@ -12,8 +12,9 @@ import seaborn as sns
 
 # set a few options
 pd.options.mode.chained_assignment = None
-sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6",
-                                   "#e74c3c", "#34495e", "#2ecc71"]))
+palette = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
+markers = ['o', 'h', 'd', 'v', 's', 'x']
+sns.set_palette(sns.color_palette(palette))
 
 
 class Plotter(object):
@@ -27,7 +28,6 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        markers = ['o', 'h', 'd', 'v']
         for feature, title in [
             ('spl_target', 'Shortest Path Length to Target'),
             ('tfidf_target', 'TF-IDF similarity to Target'),
@@ -45,11 +45,11 @@ class Plotter(object):
             except KeyError, e:
                 print('    Feature not present')
                 continue
-            p = Plot(title, title, 'Distance to Target')
+            p = Plot(title, 'Distance to Target')
 
-            result = []
-            subj = 0
-            for k in [4, 5, 6, 7]:
+            for k, m, c in zip([4, 5, 6, 7], markers, palette):
+                subj = 0
+                result = []
                 df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
                                self.data.successful]
                 data = [d[feature].tolist() for d in df['data']]
@@ -64,27 +64,26 @@ class Plotter(object):
                         'path': d,
                     }, dtype=np.float))
                     subj += 1
-            result = pd.concat(result)
-
-            p.add_tsplot(result, time='distance', unit='subj',
-                         condition='condition', value='path', markers=markers)
+                result = pd.concat(result)
+                p.add_tsplot(result, time='distance', unit='subj',
+                             condition='condition', value='path',
+                             marker=m, color=c)
             p.finish(os.path.join(self.plot_folder, feature + '.png'))
 
 
 class Plot(object):
-    def __init__(self, title, xlabel, ylabel):
+    def __init__(self, title, xlabel):
         """create the plot"""
         self.fig, self.ax = plt.subplots(1, figsize=(8, 5))
-        plt.title(title)
-        plt.xlabel('distance to-go to target')
-        plt.ylabel(xlabel)
+        self.title = title
+        self.xlabel = xlabel
 
-    def add_tsplot(self, data, time, unit, condition, value, markers, ci=68):
+    def add_tsplot(self, data, time, unit, condition, value,
+                   marker, color, ci=68):
             self.ax.invert_xaxis()
             sns.tsplot(data, time=time, unit=unit, condition=condition,
-                       value=value, ci=68)  # TODO 68 is the standard error?
-            for m, a in zip(markers, reversed(self.ax.lines)):
-                a.set_marker(m)
+                       value=value, marker=marker, color=color,
+                       ci=68)  # TODO 68 is the standard error?
 
     def finish(self, fname):
         """perform some beautification"""
@@ -94,12 +93,15 @@ class Plot(object):
         offset = np.abs(0.05 * plt.ylim()[1])
         plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
         self.ax.invert_xaxis()
+        plt.title(self.title)
+        plt.xlabel(self.xlabel)
+        plt.ylabel(self.title)
         plt.savefig(fname)
 
 
 if __name__ == '__main__':
-    # pt = Plotter('WIKTI')
-    # pt.plot()
-
-    pt = Plotter('Wikispeedia')
+    pt = Plotter('WIKTI')
     pt.plot()
+
+    # pt = Plotter('Wikispeedia')
+    # pt.plot()
