@@ -73,11 +73,18 @@ class Plotter(object):
     def plot_linkpos(self):
         print('linkpos')
         p = Plot('Link Position', 'Distance to Target')
-        for k, c in zip([4, 5, 6, 7], colors):
-            for feature, label, m in [
-                ('linkpos_last', 'last', 'v'),
-                ('linkpos_first', 'first', '^'),
+        # for k, c in zip([4, 5, 6, 7], colors):
+        for k, c in zip([5], colors):
+            for feature, label, m, ls in [
+                # ('linkpos_last', 'last', 'v', 'solid'),
+                ('linkpos_actual', 'actual', 'o', 'dashed'),
+                # ('linkpos_first', 'first', '^', 'solid'),
             ]:
+                try:
+                    self.data.iloc[0]['data'][feature]
+                except KeyError, e:
+                    print('    Feature not present')
+                    continue
                 subj = 0
                 result = []
                 df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
@@ -97,7 +104,7 @@ class Plotter(object):
                 result = pd.concat(result)
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
-                             marker=m, color=c, ci=0)
+                             marker=m, color=c, linestyle=ls, ci=0)
                 pdb.set_trace()
         p.finish(os.path.join(self.plot_folder, 'linkpos.png'))
 
@@ -110,7 +117,8 @@ class Plot(object):
         self.xlabel = xlabel
 
     def add_tsplot(self, data, time, unit, condition, value,
-                   marker, color, ci=68):  # TODO 68 is the standard error?
+                   marker='o', color='black', linestyle='solid', ci=68):
+            # TODO 68 is the standard error?
             self.ax.invert_xaxis()
             sns.tsplot(data, time=time, unit=unit, condition=condition,
                        value=value, marker=marker, color=color, ci=ci)
@@ -130,8 +138,8 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    # pt = Plotter('WIKTI')
-    pt = Plotter('Wikispeedia')
+    pt = Plotter('WIKTI')
+    # pt = Plotter('Wikispeedia')
     # pt.plot()
     pt.plot_linkpos()
 

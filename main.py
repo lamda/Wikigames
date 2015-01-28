@@ -357,9 +357,10 @@ class Wikigame(object):
         return self.tfidf_similarity[start-1, target-1]
 
     def compute_category_stats(self):
-        category = defaultdict(np.NaN)
-        category_depth = defaultdict(np.NaN)
-        for a, i in self.name2id.items():
+        category = defaultdict(lambda: np.NaN)
+        category_depth = defaultdict(lambda: np.NaN)
+        for i in sorted(self.id2name.keys()):
+            a = self.id2name[i]
             print(i, '/', len(self.name2id), end='\r')
             ofname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
             try:
@@ -375,10 +376,10 @@ class Wikigame(object):
                     category_depth[i] = np.mean([(p.count('.') + 1) for p in m])
                     category[i] = [p.split('.') for p in m]
                     break
-
         category_distance = np.zeros((len(self.name2id), len(self.name2id))) - 1
         for i, ai in enumerate(sorted(self.name2id.keys())):
             print(i, '/', len(self.name2id), end='\r')
+            i += 1
             for j, ja in enumerate(sorted(self.name2id.keys())):
                 if i == j:
                     category_distance[i, j] = 0
@@ -480,8 +481,8 @@ class Wikigame(object):
         lengths = {}
         for i, a in enumerate(self.name2id.keys()):
             print(unicode(i+1) + '/' + unicode(len(self.name2id)), end='\r')
-            lpos_first = defaultdict(int)
-            lpos_last = defaultdict(int)
+            lpos_first = defaultdict(lambda: np.NaN)
+            lpos_last = defaultdict(lambda: np.NaN)
             posl = defaultdict(int)
             fname = os.path.join(folder, a[0].lower(), a + '.htm')
             try:
@@ -587,9 +588,17 @@ class WIKTI(Wikigame):
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
         # helper functions
+
+        regex_parse_node = re.compile(r'/([^/]*?)\.htm')
+        regex_parse_node_link = re.compile(r"offset': (\d+)")
+
         def parse_node(node_string):
-            m = re.findall(r'/([^/]*?)\.htm', node_string)
+            m = regex_parse_node.findall(node_string)
             return m[0].replace('%25', '%') if m else ''
+
+        def parse_node_link(node_string):
+            m = regex_parse_node_link.findall(node_string)
+            return int(m[0]) if m else ''
 
         # web page size calculation disabled for now - needs a workover
         # regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
@@ -643,6 +652,10 @@ class WIKTI(Wikigame):
                         # in some cases, the target is entirely missing
                         df.loc[df.index[-1] + 1] = target
                         df_full.loc[df_full.index[-1] + 1] = ['load', target]
+
+                link_data = df_full[df_full['action'] == 'link_data']
+                link_data.drop('action', inplace=True, axis=1)
+                link_data = link_data['node'].apply(parse_node_link)
 
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
@@ -708,6 +721,13 @@ class WIKTI(Wikigame):
                                            for a, b in zipped] + [np.NaN]
                     df['linkpos_last'] = [self.link2pos_last[a][b]
                                           for a, b in zipped] + [np.NaN]
+                    # try:
+                    #     df['linkpos_actual'] = link_data.tolist() + [np.NaN]
+                    # except ValueError:
+                    #     pdb.set_trace()
+                    if 0 in df['linkpos_first'].tolist() or 0 in df['linkpos_last'].tolist():
+                        print(df)
+                        pdb.set_trace()
                 except KeyError, e:
                     self.print_error('key not found, dropping' + repr(e))
                     continue
@@ -846,15 +866,9 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    # w = WIKTI()
-    w = Wikispeedia()
-    # w.compute_link_positions()
+    w = WIKTI()
+    # w = Wikispeedia()
+    w.compute_tfidf_similarity()
+    w.compute_category_stats()
+    w.compute_link_positions()
     w.create_dataframe()
-    # ws.plot_link_amount_distribution()
-
-    # qt_application = PySide.QtGui.QApplication(sys.argv)
-    # wps = WebPageSize(qt_application, 'wikti')
-    # print(wps.get_size('Krakatoa', 1766))
-    # # das scheint noch nicht so ganz zu funktionieren...
-    # pdb.set_trace()
-
