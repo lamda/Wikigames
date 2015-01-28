@@ -37,78 +37,69 @@ class Plotter(object):
             ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
             ('category_depth', 'Category Depth (1...most general)'),
             ('category_target', 'Category Distance to target'),
-            # ('exploration', 'Explored Percentage of Page'),
+            ('exploration', 'Explored Percentage of Page'),
         ]:
             print(feature)
             try:
                 self.data.iloc[0]['data'][feature]
             except KeyError, e:
-                print('Feature not present')
+                print('    Feature not present')
                 continue
+            p = Plot(title, title, 'Distance to Target')
 
-            fig, ax = plt.subplots(1, figsize=(8, 5))
-            use_tsplot = True
             result = []
             subj = 0
-            for k, m in zip([4, 5, 6, 7], markers):
-                df = self.data[(self.data.pl == k) &
-                               (self.data.spl == 3) &
+            for k in [4, 5, 6, 7]:
+                df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
                                self.data.successful]
-                data_raw = [[d[feature].iloc[i] for d in df['data']]
-                            for i in range(k)]
-                if use_tsplot:
-                    data = [[d[k1] for d in data_raw]
-                            for k1 in range(len(data_raw[0]))]
-                    for d in data:
-                        distance = range(k)
-                        distance.reverse()
-                        result.append(pd.DataFrame({
-                            'condition': ['PL %d' % k] * len(d),
-                            'subj': [str(subj)] * len(d),
-                            'distance': distance,
-                            'path': d,
-                        }, dtype=np.float))
-                        subj += 1
-                else:
-                    data = [[e for e in d if e != '' and not np.isnan(e)]
-                            for d in data_raw]
-                    data = [np.mean(d) for d in data]
-                    print(k, data)
-                    data.reverse()
-                    plt.plot(data, label=str(k), marker=m)
+                data = [d[feature].tolist() for d in df['data']]
+                data = [d for d in data if '' not in d and np.NaN not in d]
+                for d in data:
+                    distance = range(k)
+                    distance.reverse()
+                    result.append(pd.DataFrame({
+                        'condition': ['PL %d' % k] * len(d),
+                        'subj': [str(subj)] * len(d),
+                        'distance': distance,
+                        'path': d,
+                    }, dtype=np.float))
+                    subj += 1
+            result = pd.concat(result)
 
-            if use_tsplot:
-                result = pd.concat(result)
-                ax = plt.gca()
-                ax.invert_xaxis()
-                sns.tsplot(result, time='distance', unit='subj',
-                           condition='condition', value='path',
-                           marker='o', ci=68)  # TODO 68 is the standard error?
+            p.add_tsplot(result, time='distance', unit='subj',
+                         condition='condition', value='path', markers=markers)
+            p.finish(os.path.join(self.plot_folder, feature + '.png'))
 
-            print()
 
-            # Beautification
-            # for i, m in enumerate(markers):
-            #     ax.lines[-i].set_marker(m)
-            for m, a in zip(markers, reversed(ax.lines)):
+class Plot(object):
+    def __init__(self, title, xlabel, ylabel):
+        """create the plot"""
+        self.fig, self.ax = plt.subplots(1, figsize=(8, 5))
+        plt.title(title)
+        plt.xlabel('distance to-go to target')
+        plt.ylabel(xlabel)
+
+    def add_tsplot(self, data, time, unit, condition, value, markers, ci=68):
+            self.ax.invert_xaxis()
+            sns.tsplot(data, time=time, unit=unit, condition=condition,
+                       value=value, ci=68)  # TODO 68 is the standard error?
+            for m, a in zip(markers, reversed(self.ax.lines)):
                 a.set_marker(m)
-            plt.legend()
-            plt.title(title)
-            plt.xlabel('distance to-go to target')
-            plt.ylabel(feature)
-            offset = np.abs(0.05 * plt.xlim()[1])
-            plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-            offset = np.abs(0.05 * plt.ylim()[1])
-            plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
-            plt.gca().invert_xaxis()
-            alt = '' if use_tsplot else '_alt'
-            fname = os.path.join(self.plot_folder, feature + alt + '.png')
-            plt.savefig(fname)
+
+    def finish(self, fname):
+        """perform some beautification"""
+        plt.legend()
+        offset = np.abs(0.05 * plt.xlim()[1])
+        plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
+        offset = np.abs(0.05 * plt.ylim()[1])
+        plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
+        self.ax.invert_xaxis()
+        plt.savefig(fname)
 
 
 if __name__ == '__main__':
-    p = Plotter('WIKTI')
-    p.plot()
+    pt = Plotter('WIKTI')
+    pt.plot()
 
-    # p = Plotter('Wikispeedia')
-    # p.plot()
+    # pt = Plotter('Wikispeedia')
+    # pt.plot()
