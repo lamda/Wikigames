@@ -76,9 +76,9 @@ class Plotter(object):
         # for k, c in zip([4, 5, 6, 7], colors):
         for k, c in zip([5], colors):
             for feature, label, m, ls in [
-                # ('linkpos_last', 'last', 'v', 'solid'),
+                ('linkpos_last', 'last', 'v', 'solid'),
                 ('linkpos_actual', 'actual', 'o', 'dashed'),
-                # ('linkpos_first', 'first', '^', 'solid'),
+                ('linkpos_first', 'first', '^', 'solid'),
             ]:
                 try:
                     self.data.iloc[0]['data'][feature]
@@ -140,6 +140,6 @@ class Plot(object):
 if __name__ == '__main__':
     pt = Plotter('WIKTI')
     # pt = Plotter('Wikispeedia')
-    # pt.plot()
+    pt.plot()
     pt.plot_linkpos()
 

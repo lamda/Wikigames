@@ -193,6 +193,7 @@ class WebPageSize(PySide.QtGui.QMainWindow):
 
 class Wikigame(object):
     def __init__(self, label):
+        print(label)
         self.label = label
         self.data = None
         self.graph = None
@@ -326,7 +327,7 @@ class Wikigame(object):
 
         articles are sorted by their ID as in the MySQL database
         """
-
+        print('computing TF-IDF similarity...')
         from sklearn.feature_extraction.text import TfidfVectorizer
 
         # read plaintext files
@@ -357,8 +358,10 @@ class Wikigame(object):
         return self.tfidf_similarity[start-1, target-1]
 
     def compute_category_stats(self):
+        print('computing category stats...')
         category = defaultdict(lambda: np.NaN)
         category_depth = defaultdict(lambda: np.NaN)
+
         for i in sorted(self.id2name.keys()):
             a = self.id2name[i]
             print(i, '/', len(self.name2id), end='\r')
@@ -376,6 +379,7 @@ class Wikigame(object):
                     category_depth[i] = np.mean([(p.count('.') + 1) for p in m])
                     category[i] = [p.split('.') for p in m]
                     break
+
         category_distance = np.zeros((len(self.name2id), len(self.name2id))) - 1
         for i, ai in enumerate(sorted(self.name2id.keys())):
             print(i, '/', len(self.name2id), end='\r')
@@ -410,7 +414,7 @@ class Wikigame(object):
                         category_distance[i, j] = sum(min_dists) / num_cats
                     else:
                         # pages do not have categories
-                        category_distance[i, j] = 100
+                        category_distance[i, j] = np.NaN
 
         category_path = 'data/' + self.label + '/category_distance.obj'
         with open(category_path, 'wb') as outfile:
@@ -454,6 +458,7 @@ class Wikigame(object):
         return self.spl[(start, target)]
 
     def compute_link_positions(self):
+        print('computing link positions...')
         class MLStripper(HTMLParser.HTMLParser):
             def __init__(self):
                 HTMLParser.HTMLParser.__init__(self)
@@ -586,8 +591,8 @@ class WIKTI(Wikigame):
         super(WIKTI, self).__init__('wikti')
 
     def create_dataframe(self):
-        # load or compute the click data as a pandas frame
-        # helper functions
+        """compute the click data as a pandas frame"""
+        print('creating dataframe...')
 
         regex_parse_node = re.compile(r'/([^/]*?)\.htm')
         regex_parse_node_link = re.compile(r"offset': (\d+)")
@@ -868,7 +873,7 @@ if __name__ == '__main__':
 
     w = WIKTI()
     # w = Wikispeedia()
-    w.compute_tfidf_similarity()
+    # w.compute_tfidf_similarity()
     w.compute_category_stats()
     w.compute_link_positions()
     w.create_dataframe()
