@@ -87,9 +87,9 @@ class Plotter(object):
                     continue
                 subj = 0
                 result = []
-                df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
-                               self.data.successful]
-                data = [d[feature].tolist() for d in df['data']]
+                df_raw = self.data[(self.data.pl == k) & (self.data.spl == 3) &
+                                   self.data.successful]
+                data = [d[feature].tolist() for d in df_raw['data']]
                 data = [d for d in data if '' not in d]
                 for d in data:
                     distance = range(k)
@@ -107,7 +107,7 @@ class Plotter(object):
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c, linestyle=ls, ci=0)
-        p.finish(os.path.join(self.plot_folder, 'linkpos.pdf'))
+        p.finish(os.path.join(self.plot_folder, 'linkpos.png'))
 
 
 def estimator(data, **kwargs):

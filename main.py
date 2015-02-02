@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
+import bisect
 from collections import defaultdict
 import cPickle as pickle
 import HTMLParser
@@ -484,10 +485,9 @@ class Wikigame(object):
         pos2link = {}
         lengths = {}
         for i, a in enumerate(self.name2id.keys()):
+        # for i, a in enumerate(['Krakatoa']):
             print(unicode(i+1), '/', unicode(len(self.name2id)), end='\r')
-            lpos_first = {}
-            lpos_last = {}
-            posl = {}
+            lpos_first, lpos_last, posl = {}, {}, {}
             fname = os.path.join(folder, a[0].lower(), a + '.htm')
             try:
                 with io.open(fname, encoding='utf-8') as infile:
@@ -498,6 +498,9 @@ class Wikigame(object):
                 continue
             data = data.split('<!-- start content -->')[1]
             data = data.split('<div class="printfooter">')[0]
+            if self.label == WIKTI.label:
+                # skip a boilerplate line
+                data = data.split('\n', 2)[2].strip()
 
             regex_results = link_regex.findall(data)
             regex_results = [(r[0], r[2]) for r in regex_results]
@@ -515,7 +518,8 @@ class Wikigame(object):
                     text.append(stripped_d)
             text = ' '.join(text)
             text = text.replace(']][[', ']] [[')
-            words = (re.split(': |\. |, |\? |! |\n | ', text))
+            words = (re.split(': |\. |, |\? |! |\n | |\(|\)', text))
+            words = [wo for wo in words if wo]
             for wi, word in enumerate(reversed(words)):
                 if word.startswith('[['):
                     try:
@@ -535,6 +539,8 @@ class Wikigame(object):
             link2pos_last[a] = lpos_last
             pos2link[a] = posl
             lengths[a] = len(words)
+            # for k in sorted(posl): print(k, self.id2name[posl[k]])
+            # pdb.set_trace()
         path = os.path.join('data', self.label, 'link_positions.obj')
         with open(path, 'wb') as outfile:
             pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
@@ -586,8 +592,10 @@ class Wikigame(object):
 
 
 class WIKTI(Wikigame):
+    label = 'wikti'
+
     def __init__(self, graph_tool=False):
-        super(WIKTI, self).__init__('wikti')
+        super(WIKTI, self).__init__(WIKTI.label)
 
     def create_dataframe(self):
         """compute the click data as a pandas frame"""
@@ -665,32 +673,43 @@ class WIKTI(Wikigame):
                 zipped = zip(actions, actions[1:])
 
                 action_indices = []
-                # print(df)
-                # print(link_data)
                 for idx, act in enumerate(zipped):
                     if act == ('link_data', 'link_data'):
                         action_indices.append(idx + 1)
                 for a in action_indices:
                     link_data.drop(link_data.index[a], inplace=True)
-                # if len(action_indices) > 0:
-                #     print('dropped a few\n', link_data)
 
                 action_indices = []
                 for idx, act in enumerate(zipped):
-                    # print(idx, act, link_data.index[idx + 2])
                     if act == ('load', 'load'):
                         action_indices.append(idx + 2)
-                # print()
                 for a in action_indices:
-                    # print(link_data.index[a] - 1)
                     link_data.loc[link_data.index[a] - 1] = ['link_data', '']
-                # if len(action_indices) > 0:
-                    # print('added a few\n', link_data)
 
                 link_data = link_data[link_data['action'] == 'link_data']
                 link_data.sort_index(inplace=True)
                 link_data.drop('action', inplace=True, axis=1)
                 link_data = link_data['node'].apply(parse_node_link)
+
+                # correct to actual link position
+                link_data_correct = []
+
+                for name_start, name_target, pos in zip(df['node'].tolist(),
+                                                        df['node'].tolist()[1:],
+                                                        link_data.tolist()):
+                    try:
+                        links = [k for k, v in self.pos2link[name_start].iteritems()
+                             if v == self.name2id[name_target]]
+                    except KeyError, e:
+                        continue
+                    if len(links) == 0:
+                        link_data_correct.append(np.NaN)
+                    elif len(links) == 1:
+                        link_data_correct.append(links[0])
+                    else:
+                        links = sorted(links)
+                        pos = bisect.bisect(links, pos)
+                        link_data_correct.append(links[pos - 1])
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
 
@@ -755,14 +774,13 @@ class WIKTI(Wikigame):
                          if b in self.link2pos_last[a] else np.NaN
                          for a, b in zipped] + [np.NaN]
                     try:
-                        df['linkpos_actual'] = link_data.tolist() + [np.NaN]
+                        df['linkpos_actual'] = link_data_correct + [np.NaN]
                     except ValueError, e:
                         self.print_error('???')
                         pdb.set_trace()
                 except KeyError, e:
                     self.print_error('key not found, dropping' + repr(e))
                     continue
-
                 results.append({
                     'data': df,
                     'successful': successful,
@@ -775,8 +793,10 @@ class WIKTI(Wikigame):
 
 
 class Wikispeedia(Wikigame):
+    label = 'wikispeedia'
+
     def __init__(self):
-        super(Wikispeedia, self).__init__('wikispeedia')
+        super(Wikispeedia, self).__init__(Wikispeedia.label)
 
     @staticmethod
     def build_database(label):
@@ -899,7 +919,7 @@ if __name__ == '__main__':
 
     w = WIKTI()
     # w = Wikispeedia()
-    # w.compute_tfidf_similarity()
-    # w.compute_category_stats()
-    # w.compute_link_positions()
+    w.compute_tfidf_similarity()
+    w.compute_category_stats()
+    w.compute_link_positions()
     w.create_dataframe()
