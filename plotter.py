@@ -30,14 +30,15 @@ class Plotter(object):
 
     def plot(self):
         for feature, title in [
-            ('spl_target', 'Shortest Path Length to Target'),
-            ('tfidf_target', 'TF-IDF similarity to Target'),
-            ('degree_out', 'Out-degree'),
-            ('degree_in', 'In-degree'),
-            ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
-            ('category_depth', 'Category Depth (1...most general)'),
-            ('category_target', 'Category Distance to target'),
-            ('exploration', 'Explored Percentage of Page'),
+            # ('spl_target', 'Shortest Path Length to Target'),
+            # ('tfidf_target', 'TF-IDF similarity to Target'),
+            # ('degree_out', 'Out-degree'),
+            # ('degree_in', 'In-degree'),
+            # ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
+            # ('category_depth', 'Category Depth (1...most general)'),
+            # ('category_target', 'Category Distance to target'),
+            # ('exploration', 'Explored Percentage of Page'),
+            ('linkpos_intro', 'Link Position in Intro'),
         ]:
             print(feature)
             try:
@@ -53,7 +54,7 @@ class Plotter(object):
                 df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
                                self.data.successful]
                 data = [d[feature].tolist() for d in df['data']]
-                data = [d for d in data if '' not in d and not np.isnan(sum(d))]
+                data = [d for d in data if '' not in d]
                 for d in data:
                     distance = range(k)
                     distance.reverse()
@@ -68,7 +69,8 @@ class Plotter(object):
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c)
-            p.finish(os.path.join(self.plot_folder, feature + '.png'))
+            fname = feature + '_' + self.label.lower() + '.pdf'
+            p.finish(os.path.join(self.plot_folder, fname))
 
     def plot_linkpos(self):
         print('linkpos')
@@ -105,7 +107,8 @@ class Plotter(object):
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c, linestyle=ls, ci=0)
-        p.finish(os.path.join(self.plot_folder, 'linkpos.png'))
+        fname = 'linkpos_' + self.label.lower() + '.pdf'
+        p.finish(os.path.join(self.plot_folder, fname))
 
 
 class Plot(object):
@@ -138,8 +141,8 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    # pt = Plotter('WIKTI')
-    pt = Plotter('Wikispeedia')
+    pt = Plotter('WIKTI')
+    # pt = Plotter('Wikispeedia')
     pt.plot()
-    pt.plot_linkpos()
+    # pt.plot_linkpos()
 

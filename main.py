@@ -204,7 +204,7 @@ class Wikigame(object):
         self.category_depth = None
         self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
-        self.lengths, self.pos2link = None, None
+        self.lengths, self.pos2link, self.intro_length = None, None, None
         self.spl = {}
 
         # build some mappings from the database
@@ -480,12 +480,9 @@ class Wikigame(object):
                                  'href="../../wp/[^/]+/(.+?)\.htm" '
                                  'title="[^"]+">.+?</a>)'))
         folder = os.path.join('data', self.label, 'wpcd', 'wp')
-        link2pos_first = {}
-        link2pos_last = {}
-        pos2link = {}
-        lengths = {}
+        link2pos_first, link2pos_last, pos2link = {}, {}, {}
+        length, intro_length = {}, {}
         for i, a in enumerate(self.name2id.keys()):
-        # for i, a in enumerate(['Krakatoa']):
             print(unicode(i+1), '/', unicode(len(self.name2id)), end='\r')
             lpos_first, lpos_last, posl = {}, {}, {}
             fname = os.path.join(folder, a[0].lower(), a + '.htm')
@@ -507,6 +504,11 @@ class Wikigame(object):
             for link in regex_results:
                 link = [l for l in link if l]
                 data = data.replace(link[0], ' [['+link[1]+']] ')
+            idx = data.find('<span class="mw-headline"')
+            if idx == -1:
+                data += ' [[[ENDINTRO]]] '
+            else:
+                data = data[:idx] + ' [[[ENDINTRO]]] ' + data[idx:]
             data = [d.strip() for d in data.splitlines()]
             data = [d for d in data if d]
             text = []
@@ -520,6 +522,9 @@ class Wikigame(object):
             text = text.replace(']][[', ']] [[')
             words = (re.split(': |\. |, |\? |! |\n | |\(|\)', text))
             words = [wo for wo in words if wo]
+            idx = words.index('[[[ENDINTRO]]]')
+            intro_length[a] = idx
+            del words[idx]
             for wi, word in enumerate(reversed(words)):
                 if word.startswith('[['):
                     try:
@@ -538,20 +543,18 @@ class Wikigame(object):
             link2pos_first[a] = lpos_first
             link2pos_last[a] = lpos_last
             pos2link[a] = posl
-            lengths[a] = len(words)
-            # for k in sorted(posl): print(k, self.id2name[posl[k]])
-            # pdb.set_trace()
+            length[a] = len(words)
         path = os.path.join('data', self.label, 'link_positions.obj')
         with open(path, 'wb') as outfile:
-            pickle.dump([link2pos_first, link2pos_last, lengths, pos2link],
-                        outfile, -1)
+            pickle.dump([link2pos_first, link2pos_last,
+                         length, pos2link, intro_length], outfile, -1)
 
     def load_link_positions(self):
         if self.link2pos_first is None:
             path = os.path.join('data', self.label, 'link_positions.obj')
             with open(path, 'rb') as infile:
                 self.link2pos_first, self.link2pos_last, self.lengths,\
-                    self.pos2link = pickle.load(infile)
+                    self.pos2link, self.intro_length = pickle.load(infile)
 
     def load_data(self):
         self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
@@ -710,6 +713,7 @@ class WIKTI(Wikigame):
                         links = sorted(links)
                         pos = bisect.bisect(links, pos)
                         link_data_correct.append(links[pos - 1])
+
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
 
@@ -775,6 +779,10 @@ class WIKTI(Wikigame):
                          for a, b in zipped] + [np.NaN]
                     try:
                         df['linkpos_actual'] = link_data_correct + [np.NaN]
+                        intros = [self.intro_length[d] for d in df['node']][:-1]
+                        zipped = zip(link_data_correct, intros)
+                        df['linkpos_intro'] = [l < i for l, i in zipped] +\
+                                              [np.NaN]
                     except ValueError, e:
                         self.print_error('???')
                         pdb.set_trace()
@@ -917,9 +925,9 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    # w = WIKTI()
-    w = Wikispeedia()
+    w = WIKTI()
+    # w = Wikispeedia()
     # w.compute_tfidf_similarity()
-    w.compute_category_stats()
-    w.compute_link_positions()
+    # w.compute_category_stats()
+    # w.compute_link_positions()
     w.create_dataframe()
