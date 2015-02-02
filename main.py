@@ -917,9 +917,9 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    w = WIKTI()
-    # w = Wikispeedia()
-    w.compute_tfidf_similarity()
+    # w = WIKTI()
+    w = Wikispeedia()
+    # w.compute_tfidf_similarity()
     w.compute_category_stats()
     w.compute_link_positions()
     w.create_dataframe()
