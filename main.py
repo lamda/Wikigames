@@ -424,7 +424,7 @@ class Wikigame(object):
 
     def get_category_depth(self, node):
         if self.category_depth is None:
-            path = os.path.join('data/', self.label, '/category_depth.obj')
+            path = os.path.join('data', self.label, 'category_depth.obj')
             with open(path, 'rb') as infile:
                 self.category_depth = pickle.load(infile)
         return self.category_depth[node]
@@ -434,9 +434,9 @@ class Wikigame(object):
             path = os.path.join('data', self.label, 'category_distance.obj')
             with open(path, 'rb') as infile:
                 self.category_distance = pickle.load(infile)
-        elif target > start:
-            return self.category_distance[target, start]
-        return self.category_distance[start, target]
+        elif start > target:
+            return self.category_distance[target][start]
+        return self.category_distance[start][target]
 
     def get_spl(self, start, target):
         """ get the shortest path length for two nodes from the database
@@ -484,10 +484,10 @@ class Wikigame(object):
         pos2link = {}
         lengths = {}
         for i, a in enumerate(self.name2id.keys()):
-            print(unicode(i+1) + '/' + unicode(len(self.name2id)), end='\r')
-            lpos_first = defaultdict(lambda: np.NaN)
-            lpos_last = defaultdict(lambda: np.NaN)
-            posl = defaultdict(int)
+            print(unicode(i+1), '/', unicode(len(self.name2id)), end='\r')
+            lpos_first = {}
+            lpos_last = {}
+            posl = {}
             fname = os.path.join(folder, a[0].lower(), a + '.htm')
             try:
                 with io.open(fname, encoding='utf-8') as infile:
@@ -657,10 +657,40 @@ class WIKTI(Wikigame):
                         df.loc[df.index[-1] + 1] = target
                         df_full.loc[df_full.index[-1] + 1] = ['load', target]
 
-                link_data = df_full[df_full['action'] == 'link_data']
+                # get link position information
+                link_data = df_full[(df_full['action'] == 'link_data') |
+                                    (df_full['action'] == 'load')]
+                link_data = link_data.copy(deep=True)
+                actions = link_data['action'].tolist()[1:]
+                zipped = zip(actions, actions[1:])
+
+                action_indices = []
+                # print(df)
+                # print(link_data)
+                for idx, act in enumerate(zipped):
+                    if act == ('link_data', 'link_data'):
+                        action_indices.append(idx + 1)
+                for a in action_indices:
+                    link_data.drop(link_data.index[a], inplace=True)
+                # if len(action_indices) > 0:
+                #     print('dropped a few\n', link_data)
+
+                action_indices = []
+                for idx, act in enumerate(zipped):
+                    # print(idx, act, link_data.index[idx + 2])
+                    if act == ('load', 'load'):
+                        action_indices.append(idx + 2)
+                # print()
+                for a in action_indices:
+                    # print(link_data.index[a] - 1)
+                    link_data.loc[link_data.index[a] - 1] = ['link_data', '']
+                # if len(action_indices) > 0:
+                    # print('added a few\n', link_data)
+
+                link_data = link_data[link_data['action'] == 'link_data']
+                link_data.sort_index(inplace=True)
                 link_data.drop('action', inplace=True, axis=1)
                 link_data = link_data['node'].apply(parse_node_link)
-
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
 
@@ -695,14 +725,11 @@ class WIKTI(Wikigame):
                 #     TODO: This currently doesn't work
 
                 try:
-                    df['node_id'] = [self.name2id[n]
-                                     for n in df['node']]
+                    df['node_id'] = [self.name2id[n] for n in df['node']]
                     df['degree_out'] = [self.id2deg_out[i]
                                         for i in df['node_id']]
-                    df['degree_in'] = [self.id2deg_in[i]
-                                       for i in df['node_id']]
-                    df['ngram'] = [ngrams.get_frequency(n)
-                                   for n in df['node']]
+                    df['degree_in'] = [self.id2deg_in[i] for i in df['node_id']]
+                    df['ngram'] = [ngrams.get_frequency(n) for n in df['node']]
 
                     tid = self.name2id[target]
                     df['spl_target'] = [self.get_spl(i, tid)
@@ -711,26 +738,26 @@ class WIKTI(Wikigame):
                         self.check_spl(df['spl_target'].tolist(), successful)
                     except AssertionError, a:
                         pdb.set_trace()
-                    df['tfidf_target'] = [1 - self.get_tfidf_similarity(i,
-                                                                        tid)
+                    df['tfidf_target'] = [1 - self.get_tfidf_similarity(i, tid)
                                           for i in df['node_id']]
                     df['category_depth'] = [self.get_category_depth(i)
                                             for i in df['node_id']]
-                    df['category_target'] = [self.get_category_distance(i,
-                                                                        tid)
+                    df['category_target'] = [self.get_category_distance(i, tid)
                                              for i in df['node_id']]
                     # df['exploration'] = exploration
                     zipped = zip(df['node'].iloc[0:], df['node_id'].iloc[1:])
-                    df['linkpos_first'] = [self.link2pos_first[a][b]
-                                           for a, b in zipped] + [np.NaN]
-                    df['linkpos_last'] = [self.link2pos_last[a][b]
-                                          for a, b in zipped] + [np.NaN]
-                    # try:
-                    #     df['linkpos_actual'] = link_data.tolist() + [np.NaN]
-                    # except ValueError:
-                    #     pdb.set_trace()
-                    if 0 in df['linkpos_first'].tolist() or 0 in df['linkpos_last'].tolist():
-                        print(df)
+                    df['linkpos_first'] =\
+                        [self.link2pos_first[a][b]
+                         if b in self.link2pos_first[a] else np.NaN
+                         for a, b in zipped] + [np.NaN]
+                    df['linkpos_last'] =\
+                        [self.link2pos_last[a][b]
+                         if b in self.link2pos_last[a] else np.NaN
+                         for a, b in zipped] + [np.NaN]
+                    try:
+                        df['linkpos_actual'] = link_data.tolist() + [np.NaN]
+                    except ValueError, e:
+                        self.print_error('???')
                         pdb.set_trace()
                 except KeyError, e:
                     self.print_error('key not found, dropping' + repr(e))
@@ -873,6 +900,6 @@ if __name__ == '__main__':
     w = WIKTI()
     # w = Wikispeedia()
     # w.compute_tfidf_similarity()
-    w.compute_category_stats()
+    # w.compute_category_stats()
     # w.compute_link_positions()
-    # w.create_dataframe()
+    w.create_dataframe()

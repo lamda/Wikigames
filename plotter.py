@@ -73,8 +73,8 @@ class Plotter(object):
     def plot_linkpos(self):
         print('linkpos')
         p = Plot('Link Position', 'Distance to Target')
-        # for k, c in zip([4, 5, 6, 7], colors):
-        for k, c in zip([5], colors):
+        for k, c in zip([4, 5, 6, 7], colors):
+        # for k, c in zip([5], colors):
             for feature, label, m, ls in [
                 ('linkpos_last', 'last', 'v', 'solid'),
                 ('linkpos_actual', 'actual', 'o', 'dashed'),
@@ -94,19 +94,29 @@ class Plotter(object):
                 for d in data:
                     distance = range(k)
                     distance.reverse()
-                    result.append(pd.DataFrame({
+                    df = pd.DataFrame({
                         'condition': ['PL %d (%s)' % (k, label)] * len(d),
                         'subj': [str(subj)] * len(d),
                         'distance': distance,
                         'path': d,
-                    }, dtype=np.float))
+                    }, dtype=np.float)
+                    df = df[~np.isnan(df['path'])]
+                    result.append(df)
                     subj += 1
                 result = pd.concat(result)
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c, linestyle=ls, ci=0)
-                pdb.set_trace()
-        p.finish(os.path.join(self.plot_folder, 'linkpos.png'))
+        p.finish(os.path.join(self.plot_folder, 'linkpos.pdf'))
+
+
+def estimator(data, **kwargs):
+    """compute the mean of a list and skip np.NaN values"""
+    if kwargs['axis'] != 0:
+        print('not implemented yet')
+        pdb.set_trace()
+    data = [np.mean([x for x in col if not np.isnan(x)]) for col in data.T]
+    return data
 
 
 class Plot(object):
@@ -121,7 +131,8 @@ class Plot(object):
             # TODO 68 is the standard error?
             self.ax.invert_xaxis()
             sns.tsplot(data, time=time, unit=unit, condition=condition,
-                       value=value, marker=marker, color=color, ci=ci)
+                       value=value, ci=ci, estimator=estimator,
+                       marker=marker, color=color, linestyle=linestyle)
 
     def finish(self, fname):
         """perform some beautification"""
@@ -140,6 +151,6 @@ class Plot(object):
 if __name__ == '__main__':
     pt = Plotter('WIKTI')
     # pt = Plotter('Wikispeedia')
-    pt.plot()
+    # pt.plot()
     pt.plot_linkpos()
 
