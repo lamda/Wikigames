@@ -359,8 +359,8 @@ class Wikigame(object):
 
     def compute_category_stats(self):
         print('computing category stats...')
-        category = defaultdict(lambda: np.NaN)
-        category_depth = defaultdict(lambda: np.NaN)
+        category = defaultdict(list)
+        category_depth = defaultdict(float)
 
         for i in sorted(self.id2name.keys()):
             a = self.id2name[i]
@@ -380,16 +380,14 @@ class Wikigame(object):
                     category[i] = [p.split('.') for p in m]
                     break
 
-        category_distance = np.zeros((len(self.name2id), len(self.name2id))) - 1
-        for i, ai in enumerate(sorted(self.name2id.keys())):
+        category_distance = {}
+        for i in sorted(self.id2name.keys()):
             print(i, '/', len(self.name2id), end='\r')
-            i += 1
-            for j, ja in enumerate(sorted(self.name2id.keys())):
+            category_distance[i] = {}
+            for j in sorted(self.id2name.keys()):
                 if i == j:
-                    category_distance[i, j] = 0
-                elif i > j:
-                    category_distance[i, j] = category_distance[j, i]
-                else:
+                    category_distance[i][j] = 0
+                elif i < j:
                     min_dists = []
                     for p in category[i]:
                         min_dist = 1000
@@ -411,23 +409,23 @@ class Wikigame(object):
 
                     num_cats = len(category[i]) + len(category[j])
                     if num_cats > 0:
-                        category_distance[i, j] = sum(min_dists) / num_cats
+                        category_distance[i][j] = sum(min_dists) / num_cats
                     else:
                         # pages do not have categories
-                        category_distance[i, j] = np.NaN
+                        category_distance[i][j] = np.NaN
 
-        category_path = 'data/' + self.label + '/category_distance.obj'
-        with open(category_path, 'wb') as outfile:
-            pickle.dump(category_distance, outfile, -1)
-
-        category_path = 'data/' + self.label + '/category_depth.obj'
-        with open(category_path, 'wb') as outfile:
+        path = os.path.join('data', self.label, 'category_depth.obj')
+        with open(path, 'wb') as outfile:
             pickle.dump(category_depth, outfile, -1)
+
+        path = os.path.join('data', self.label, 'category_distance.obj')
+        with open(path, 'wb') as outfile:
+            pickle.dump(category_distance, outfile, -1)
 
     def get_category_depth(self, node):
         if self.category_depth is None:
-            category_path = 'data/' + self.label + '/category_depth.obj'
-            with open(category_path, 'rb') as infile:
+            path = os.path.join('data/', self.label, '/category_depth.obj')
+            with open(path, 'rb') as infile:
                 self.category_depth = pickle.load(infile)
         return self.category_depth[node]
 
@@ -436,8 +434,9 @@ class Wikigame(object):
             path = os.path.join('data', self.label, 'category_distance.obj')
             with open(path, 'rb') as infile:
                 self.category_distance = pickle.load(infile)
-        # subtract one because Wikipedia ids start with 1 and not 0
-        return self.category_distance[start-1, target-1]
+        elif target > start:
+            return self.category_distance[target, start]
+        return self.category_distance[start, target]
 
     def get_spl(self, start, target):
         """ get the shortest path length for two nodes from the database
@@ -875,5 +874,5 @@ if __name__ == '__main__':
     # w = Wikispeedia()
     # w.compute_tfidf_similarity()
     w.compute_category_stats()
-    w.compute_link_positions()
-    w.create_dataframe()
+    # w.compute_link_positions()
+    # w.create_dataframe()
