@@ -43,6 +43,8 @@ class Plotter(object):
             # ('exploration', 'Explored Percentage of Page'),
             # ('linkpos_intro', 'Fraction of Links in Introduction'),
             ('time_actual', 'Time spent on article'),
+            ('time_actual_word', 'Time spent on article (per word)'),
+            ('time_actual_link', 'Time spent on article (per link)'),
             ('time_actual_normalized', 'Time spent on article (normalized)'),
         ]:
             print(feature)

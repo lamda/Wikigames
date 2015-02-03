@@ -204,7 +204,7 @@ class Wikigame(object):
         self.category_depth = None
         self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
-        self.lengths, self.pos2link, self.intro_length = None, None, None
+        self.length, self.pos2link, self.intro_length = None, None, None
         self.spl = None
 
         # build some mappings from the database
@@ -560,7 +560,7 @@ class Wikigame(object):
         if self.link2pos_first is None:
             path = os.path.join('data', self.label, 'link_positions.obj')
             with open(path, 'rb') as infile:
-                self.link2pos_first, self.link2pos_last, self.lengths,\
+                self.link2pos_first, self.link2pos_last, self.length,\
                     self.pos2link, self.intro_length = pickle.load(infile)
 
     def load_data(self):
@@ -687,6 +687,13 @@ class WIKTI(Wikigame):
                 time_data = df_full[df_full['action'] == 'load']['time']
                 time_actual = time_data.diff().shift(-1)
                 time_actual_normalized = time_actual / sum(time_actual.iloc[:-1])
+                word_count = [self.length[a] if a in self.length else np.NaN
+                              for a in df['node']]
+                link_count = [len(self.pos2link[a])
+                              if a in self.length else np.NaN
+                              for a in df['node']]
+                time_actual_word = time_actual / word_count
+                time_actual_link = time_actual / link_count
                 # ta = time_data.iloc[-1] / (time_data.shape[0] - 1)
                 # time_average = [ta for t in range(time_data.shape[0] - 1)] +\
                 #                [np.NaN]
@@ -820,6 +827,8 @@ class WIKTI(Wikigame):
 
                     df['time_actual'] = time_actual
                     df['time_actual_normalized'] = time_actual_normalized
+                    df['time_actual_word'] = time_actual_word
+                    df['time_actual_link'] = time_actual_link
                 except KeyError, e:
                     self.print_error('key not found, dropping' + repr(e))
                     continue
