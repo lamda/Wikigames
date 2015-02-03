@@ -601,8 +601,10 @@ class Wikigame(object):
         print('        Error:', message)
 
     def __del__(self):
-        with open(os.path.join('data', self.label, 'spl.obj'), 'wb') as outfile:
-            pickle.dump(self.spl, outfile, -1)
+        if self.spl is not None:
+            path = os.path.join('data', self.label, 'spl.obj')
+            with open(path, 'wb') as outfile:
+                pickle.dump(self.spl, outfile, -1)
 
 
 class WIKTI(Wikigame):
@@ -644,8 +646,8 @@ class WIKTI(Wikigame):
                 print('   ', filename)
                 fname = folder_logs + folder + '/' + filename
                 df_full = pd.read_csv(fname, sep='\t',
-                                      usecols=[2, 3],
-                                      names=['action', 'node'])
+                                      usecols=[1, 2, 3],
+                                      names=['time', 'action', 'node'])
 
                 # perform sanity checks
                 action_counts = df_full['action'].value_counts()
@@ -662,7 +664,7 @@ class WIKTI(Wikigame):
                                    filename)[0]
                 start, target = self.game2start_target[match]
                 df = df_full[df_full['action'] == 'load']
-                df.drop('action', inplace=True, axis=1)
+                df.drop(['time', 'action'], inplace=True, axis=1)
                 df['node'] = df['node'].apply(parse_node)
                 if not df.iloc[0]['node'] == start:
                     self.print_error('start node not present')
@@ -673,13 +675,24 @@ class WIKTI(Wikigame):
                     last = df_full[df_full['action'] == 'link_data']
                     last = parse_node(last.iloc[-1]['node'])
                     df.loc[df.index[-1] + 1] = [last]
-                    df_full.loc[df_full.index[-1] + 1] = ['load', last]
+                    last_time = df_full.iloc[-2]['time']
+                    df_full.loc[df_full.index[-1]+1] = [last_time, 'load', last]
                     if last != target:
                         # in some cases, the target is entirely missing
                         df.loc[df.index[-1] + 1] = target
-                        df_full.loc[df_full.index[-1] + 1] = ['load', target]
+                        df_full.loc[df_full.index[-1] + 1] = [last_time, 'load',
+                                                              target]
 
-                # get link position information
+                # get time information
+                time_data = df_full[df_full['action'] == 'load']['time']
+                time_actual = time_data.diff().shift(-1)
+                time_actual_normalized = time_actual / sum(time_actual.iloc[:-1])
+                # ta = time_data.iloc[-1] / (time_data.shape[0] - 1)
+                # time_average = [ta for t in range(time_data.shape[0] - 1)] +\
+                #                [np.NaN]
+                # pdb.set_trace()
+
+                # get raw link position information
                 link_data = df_full[(df_full['action'] == 'link_data') |
                                     (df_full['action'] == 'load')]
                 link_data = link_data.copy(deep=True)
@@ -698,11 +711,11 @@ class WIKTI(Wikigame):
                     if act == ('load', 'load'):
                         action_indices.append(idx + 2)
                 for a in action_indices:
-                    link_data.loc[link_data.index[a] - 1] = ['link_data', '']
+                    link_data.loc[link_data.index[a]-1] = ['', 'link_data', '']
 
                 link_data = link_data[link_data['action'] == 'link_data']
                 link_data.sort_index(inplace=True)
-                link_data.drop('action', inplace=True, axis=1)
+                link_data.drop(['time', 'action'], inplace=True, axis=1)
                 link_data = link_data['node'].apply(parse_node_link)
 
                 # correct to actual link position
@@ -712,8 +725,8 @@ class WIKTI(Wikigame):
                                                         df['node'].tolist()[1:],
                                                         link_data.tolist()):
                     try:
-                        links = [k for k, v in self.pos2link[name_start].iteritems()
-                             if v == self.name2id[name_target]]
+                        links = [k for k, v in self.pos2link[name_start].items()
+                                 if v == self.name2id[name_target]]
                     except KeyError, e:
                         continue
                     if len(links) == 0:
@@ -725,9 +738,6 @@ class WIKTI(Wikigame):
                         pos = bisect.bisect(links, pos)
                         link_data_correct.append(links[pos - 1])
                     link_data = link_data_correct
-
-                spl = self.get_spl(self.name2id[start],
-                                   self.name2id[target])
 
                 # get scrolling range
                 # idx = list(df_full[df_full['action'] == 'load'].index)
@@ -807,9 +817,14 @@ class WIKTI(Wikigame):
                     except ValueError, e:
                         self.print_error('???')
                         pdb.set_trace()
+
+                    df['time_actual'] = time_actual
+                    df['time_actual_normalized'] = time_actual_normalized
                 except KeyError, e:
                     self.print_error('key not found, dropping' + repr(e))
                     continue
+                spl = self.get_spl(self.name2id[start], self.name2id[target])
+
                 results.append({
                     'data': df,
                     'successful': successful,

@@ -41,7 +41,9 @@ class Plotter(object):
             # ('category_depth', 'Category Depth (1...most general)'),
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
-            ('linkpos_intro', 'Fraction of Links in Introduction'),
+            # ('linkpos_intro', 'Fraction of Links in Introduction'),
+            ('time_actual', 'Time spent on article'),
+            ('time_actual_normalized', 'Time spent on article (normalized)'),
         ]:
             print(feature)
             try:
@@ -147,8 +149,8 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    # pt = Plotter('WIKTI')
-    pt = Plotter('Wikispeedia')
+    pt = Plotter('WIKTI')
+    # pt = Plotter('Wikispeedia')
     pt.plot()
-    pt.plot_linkpos()
+    # pt.plot_linkpos()
 
