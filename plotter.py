@@ -41,11 +41,12 @@ class Plotter(object):
             # ('category_depth', 'Category Depth (1...most general)'),
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
-            # ('linkpos_intro', 'Fraction of Links in Introduction'),
+            ('linkpos_intro', 'Fraction of Links in Introduction'),
             ('time_actual', 'Time spent on article'),
             ('time_actual_word', 'Time spent on article (per word)'),
             ('time_actual_link', 'Time spent on article (per link)'),
             ('time_actual_normalized', 'Time spent on article (normalized)'),
+            ('time_average', 'uniformly distributed time spent on article')
         ]:
             print(feature)
             try:
@@ -83,10 +84,12 @@ class Plotter(object):
         print('linkpos')
         p = Plot('Link Position', 'Distance to Target')
         for k, c in zip([4, 5, 6, 7], colors):
+        # for k, c in zip([4, 5], colors):
             for feature, label, m, ls in [
                 ('linkpos_last', 'last', 'v', 'solid'),
                 ('linkpos_actual', 'actual', 'o', 'dashed'),
                 ('linkpos_first', 'first', '^', 'solid'),
+                # ('word_count', 'article length', '', 'dotted')
             ]:
                 try:
                     self.data.iloc[0]['data'][feature]
@@ -154,5 +157,5 @@ if __name__ == '__main__':
     pt = Plotter('WIKTI')
     # pt = Plotter('Wikispeedia')
     pt.plot()
-    # pt.plot_linkpos()
+    pt.plot_linkpos()
 

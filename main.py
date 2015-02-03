@@ -694,10 +694,10 @@ class WIKTI(Wikigame):
                               for a in df['node']]
                 time_actual_word = time_actual / word_count
                 time_actual_link = time_actual / link_count
-                # ta = time_data.iloc[-1] / (time_data.shape[0] - 1)
-                # time_average = [ta for t in range(time_data.shape[0] - 1)] +\
-                #                [np.NaN]
-                # pdb.set_trace()
+                ta = time_data.iloc[-1] / (time_data.shape[0] - 1)
+                time_average = [ta for t in range(time_data.shape[0] - 1)] +\
+                               [np.NaN]
+                pdb.set_trace()
 
                 # get raw link position information
                 link_data = df_full[(df_full['action'] == 'link_data') |
@@ -829,6 +829,9 @@ class WIKTI(Wikigame):
                     df['time_actual_normalized'] = time_actual_normalized
                     df['time_actual_word'] = time_actual_word
                     df['time_actual_link'] = time_actual_link
+                    df['time_average'] = time_average
+
+                    df['word_count'] = word_count[:-1] + [np.NaN]
                 except KeyError, e:
                     self.print_error('key not found, dropping' + repr(e))
                     continue
