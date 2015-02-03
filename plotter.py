@@ -69,7 +69,7 @@ class Plotter(object):
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c)
-            fname = feature + '_' + self.label.lower() + '.pdf'
+            fname = feature + '_' + self.label.lower() + '.png'
             p.finish(os.path.join(self.plot_folder, fname))
 
     def plot_linkpos(self):
@@ -107,7 +107,7 @@ class Plotter(object):
                 p.add_tsplot(result, time='distance', unit='subj',
                              condition='condition', value='path',
                              marker=m, color=c, linestyle=ls, ci=0)
-        fname = 'linkpos_' + self.label.lower() + '.pdf'
+        fname = 'linkpos_' + self.label.lower() + '.png'
         p.finish(os.path.join(self.plot_folder, fname))
 
 

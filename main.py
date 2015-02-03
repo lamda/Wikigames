@@ -780,9 +780,20 @@ class WIKTI(Wikigame):
                     try:
                         df['linkpos_actual'] = link_data_correct + [np.NaN]
                         intros = [self.intro_length[d] for d in df['node']][:-1]
-                        zipped = zip(link_data_correct, intros)
-                        df['linkpos_intro'] = [l < i for l, i in zipped] +\
-                                              [np.NaN]
+                        # zipped = zip(link_data_correct, intros)
+                        # df['linkpos_intro'] = [l > i for l, i in zipped] +\
+                        #                       [np.NaN]
+                        linkpos_intro = []
+                        for idx in range(len(link_data_correct)):
+                            l = link_data_correct[idx]
+                            i = intros[idx]
+                            if np.isnan(l) or np.isnan(i):
+                                linkpos_intro.append(np.NaN)
+                            else:
+                                linkpos_intro.append(l > i)
+                        for l, i in zipped:
+                            print(l, i, l > i)
+                        pdb.set_trace()
                     except ValueError, e:
                         self.print_error('???')
                         pdb.set_trace()
