@@ -205,7 +205,7 @@ class Wikigame(object):
         self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
         self.lengths, self.pos2link, self.intro_length = None, None, None
-        self.spl = {}
+        self.spl = None
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
@@ -365,7 +365,7 @@ class Wikigame(object):
 
         for i in sorted(self.id2name.keys()):
             a = self.id2name[i]
-            print(i, '/', len(self.name2id), end='\r')
+            print(i, '/', len(self.name2id) - 1, end='\r')
             ofname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
             try:
                 with io.open(ofname, encoding='utf-8') as infile:
@@ -383,7 +383,7 @@ class Wikigame(object):
 
         category_distance = {}
         for i in sorted(self.id2name.keys()):
-            print(i, '/', len(self.name2id), end='\r')
+            print(i, '/', len(self.name2id) - 1, end='\r')
             category_distance[i] = {}
             for j in sorted(self.id2name.keys()):
                 if i == j:
@@ -444,6 +444,13 @@ class Wikigame(object):
         if this is too slow, add an index to the table as follows:
         ALTER TABLE path_lengths ADD INDEX page_id (page_id);
         """
+        if self.spl is None:
+            try:
+                path = os.path.join('data', self.label, 'spl.obj')
+                with open(path, 'rb') as infile:
+                    self.spl = pickle.load(infile)
+            except IOError:
+                self.spl = {}
         try:
             return self.spl[(start, target)]
         except KeyError:
@@ -593,6 +600,10 @@ class Wikigame(object):
     def print_error(self, message):
         print('        Error:', message)
 
+    def __del__(self):
+        with open(os.path.join('data', self.label, 'spl.obj'), 'wb') as outfile:
+            pickle.dump(self.spl, outfile, -1)
+
 
 class WIKTI(Wikigame):
     label = 'wikti'
@@ -713,6 +724,7 @@ class WIKTI(Wikigame):
                         links = sorted(links)
                         pos = bisect.bisect(links, pos)
                         link_data_correct.append(links[pos - 1])
+                    link_data = link_data_correct
 
                 spl = self.get_spl(self.name2id[start],
                                    self.name2id[target])
@@ -778,22 +790,20 @@ class WIKTI(Wikigame):
                          if b in self.link2pos_last[a] else np.NaN
                          for a, b in zipped] + [np.NaN]
                     try:
-                        df['linkpos_actual'] = link_data_correct + [np.NaN]
+                        df['linkpos_actual'] = link_data + [np.NaN]
+                        # click_data = link_data
+                        click_data = df['linkpos_first'].tolist()[:-1]
+
                         intros = [self.intro_length[d] for d in df['node']][:-1]
-                        # zipped = zip(link_data_correct, intros)
-                        # df['linkpos_intro'] = [l > i for l, i in zipped] +\
-                        #                       [np.NaN]
                         linkpos_intro = []
-                        for idx in range(len(link_data_correct)):
-                            l = link_data_correct[idx]
+                        for idx in range(len(click_data)):
+                            l = click_data[idx]
                             i = intros[idx]
                             if np.isnan(l) or np.isnan(i):
                                 linkpos_intro.append(np.NaN)
                             else:
-                                linkpos_intro.append(l > i)
-                        for l, i in zipped:
-                            print(l, i, l > i)
-                        pdb.set_trace()
+                                linkpos_intro.append(l < i)
+                        df['linkpos_intro'] = linkpos_intro + [np.NaN]
                     except ValueError, e:
                         self.print_error('???')
                         pdb.set_trace()
@@ -808,7 +818,7 @@ class WIKTI(Wikigame):
                 })
 
         data = pd.DataFrame(results)
-        data.to_pickle('data/' + self.label + '/data.pd')
+        data.to_pickle(os.path.join('data', self.label, 'data.pd'))
 
 
 class Wikispeedia(Wikigame):
@@ -908,16 +918,28 @@ class Wikispeedia(Wikigame):
                                      for a, b in zipped] + [np.NaN]
                     linkpos_last =[self.link2pos_last[a][b]
                                    for a, b in zipped] + [np.NaN]
+
+                    click_data = linkpos_first[:-1]
+                    intros = [self.intro_length[d] for d in node][:-1]
+                    linkpos_intro = []
+                    for idx in range(len(click_data)):
+                        l = click_data[idx]
+                        i = intros[idx]
+                        if np.isnan(l) or np.isnan(i):
+                            linkpos_intro.append(np.NaN)
+                        else:
+                            linkpos_intro.append(l < i)
+                    linkpos_intro = linkpos_intro + [np.NaN]
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
                            ngram, spl_target, tfidf_target,
                            category_depth, category_target, linkpos_first,
-                           linkpos_last)
+                           linkpos_last, linkpos_intro)
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
                            'ngram', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
-                           'linkpos_first', 'linkpos_last']
+                           'linkpos_first', 'linkpos_last', 'linkpos_intro']
                 df = pd.DataFrame(data=data, columns=columns)
                 spl = self.get_spl(self.name2id[entry[1]['start']],
                                    self.name2id[entry[1]['target']])
@@ -930,7 +952,7 @@ class Wikispeedia(Wikigame):
                 })
 
         data = pd.DataFrame(results)
-        data.to_pickle('data/' + self.label + '/data.pd')
+        data.to_pickle(os.path.join('data', self.label, 'data.pd'))
 
 
 if __name__ == '__main__':

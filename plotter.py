@@ -16,6 +16,9 @@ colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
 markers = ['o', 'h', 'd', 'v', 's', 'x']
 sns.set_palette(sns.color_palette(colors))
 
+# import warnings
+# warnings.simplefilter("error")
+
 
 class Plotter(object):
     def __init__(self, label):
@@ -38,7 +41,7 @@ class Plotter(object):
             # ('category_depth', 'Category Depth (1...most general)'),
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
-            ('linkpos_intro', 'Link Position in Intro'),
+            ('linkpos_intro', 'Fraction of Links in Introduction'),
         ]:
             print(feature)
             try:
@@ -108,7 +111,7 @@ class Plotter(object):
                              condition='condition', value='path',
                              marker=m, color=c, linestyle=ls, ci=0)
         fname = 'linkpos_' + self.label.lower() + '.png'
-        p.finish(os.path.join(self.plot_folder, fname))
+        p.finish(os.path.join(self.plot_folder, fname), ylim=(0, 12000))
 
 
 class Plot(object):
@@ -126,13 +129,16 @@ class Plot(object):
                        value=value, ci=ci, estimator=np.nanmean,
                        marker=marker, color=color, linestyle=linestyle)
 
-    def finish(self, fname):
+    def finish(self, fname, ylim=None):
         """perform some beautification"""
         plt.legend(loc=0)
         offset = np.abs(0.05 * plt.xlim()[1])
         plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-        offset = np.abs(0.05 * plt.ylim()[1])
-        plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
+        if ylim:
+            plt.ylim(ylim)
+        else:
+            offset = np.abs(0.05 * plt.ylim()[1])
+            plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
         self.ax.invert_xaxis()
         plt.title(self.title)
         plt.xlabel(self.xlabel)
@@ -141,8 +147,8 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    pt = Plotter('WIKTI')
-    # pt = Plotter('Wikispeedia')
+    # pt = Plotter('WIKTI')
+    pt = Plotter('Wikispeedia')
     pt.plot()
-    # pt.plot_linkpos()
+    pt.plot_linkpos()
 
