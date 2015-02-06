@@ -32,7 +32,7 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        for feature, title in [
+        for feature, title, ylim in [
             # ('spl_target', 'Shortest Path Length to Target'),
             # ('tfidf_target', 'TF-IDF similarity to Target'),
             # ('degree_out', 'Out-degree'),
@@ -41,12 +41,12 @@ class Plotter(object):
             # ('category_depth', 'Category Depth (1...most general)'),
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
-            ('linkpos_intro', 'Fraction of Links in Introduction'),
-            ('time_actual', 'Time spent on article'),
-            ('time_actual_word', 'Time spent on article (per word)'),
-            ('time_actual_link', 'Time spent on article (per link)'),
-            ('time_actual_normalized', 'Time spent on article (normalized)'),
-            ('time_average', 'uniformly distributed time spent on article')
+            # ('linkpos_intro', 'Fraction of Links in Introduction', (0, 1)),
+            ('time_actual', 'Time spent on article', (0, 11000)),
+            ('time_actual_word', 'Time spent on article (per word)', (0, 11000)),
+            ('time_actual_link', 'Time spent on article (per link)', (0, 11000)),
+            ('time_actual_normalized', 'Time spent on article (normalized)', (0, 11000)),
+            ('time_average', 'uniformly distributed time spent on article', (0, 11000)),
         ]:
             print(feature)
             try:
@@ -78,18 +78,18 @@ class Plotter(object):
                              condition='condition', value='path',
                              marker=m, color=c)
             fname = feature + '_' + self.label.lower() + '.png'
-            p.finish(os.path.join(self.plot_folder, fname))
+            p.finish(os.path.join(self.plot_folder, fname), ylim=ylim)
 
     def plot_linkpos(self):
         print('linkpos')
         p = Plot('Link Position', 'Distance to Target')
-        for k, c in zip([4, 5, 6, 7], colors):
-        # for k, c in zip([4, 5], colors):
+        # for k, c in zip([4, 5, 6, 7], colors):
+        for k, c in zip([4, 5, 6], colors):
             for feature, label, m, ls in [
-                ('linkpos_last', 'last', 'v', 'solid'),
-                ('linkpos_actual', 'actual', 'o', 'dashed'),
-                ('linkpos_first', 'first', '^', 'solid'),
-                # ('word_count', 'article length', '', 'dotted')
+                ('linkpos_last', 'last occurrence', 'v', 'solid'),
+                ('linkpos_actual', 'click position', 'o', 'dashed'),
+                ('linkpos_first', 'first occurrence', '^', 'solid'),
+                ('word_count', 'article length', '', 'dotted')
             ]:
                 try:
                     self.data.iloc[0]['data'][feature]
@@ -157,5 +157,5 @@ if __name__ == '__main__':
     pt = Plotter('WIKTI')
     # pt = Plotter('Wikispeedia')
     pt.plot()
-    pt.plot_linkpos()
+    # pt.plot_linkpos()
 

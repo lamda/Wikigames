@@ -73,7 +73,7 @@ class NgramFrequency(object):
         base_url = 'http://weblm.research.microsoft.com/weblm/rest.svc/'
         self.base_url = base_url + corpus + 'jp?u=' + token + '&p='
         try:
-            with open('data/ngrams.obj', 'rb') as infile:
+            with open(os.path.join('data', 'ngrams.obj'), 'rb') as infile:
                     self.ngrams = pickle.load(infile)
         except (IOError, EOFError):
             self.ngrams = {}
@@ -91,7 +91,7 @@ class NgramFrequency(object):
         self.ngrams[title] = float(urllib2.urlopen(url).read())
 
     def __del__(self):
-        with open('data/ngrams.obj', 'wb') as outfile:
+        with open(os.path.join('data', 'ngrams.obj'), 'wb') as outfile:
             pickle.dump(self.ngrams, outfile, -1)
 
 
@@ -123,7 +123,7 @@ class LogisticRegressor(object):
         print('Baseline:', sum(dependent) / dependent.shape[0])
 
     def test_regression(self):
-        fname = 'data/SAheart.txt'
+        fname = os.path.join('data', 'SAheart.txt')
         df = pd.read_csv(fname, index_col=0,
                          usecols=[0, 1, 2, 3, 5, 7, 8, 9, 10])
         dummies = pd.get_dummies(df['famhist'], prefix='famhist')
@@ -173,9 +173,10 @@ class WebPageSize(PySide.QtGui.QMainWindow):
         self.curr_page = page
         self.curr_width = width
         if self.server:
-            path = self.base_url + '/' + page[0].lower() + '/' + page + '.htm'
+            path = os.path.join(self.base_url, page[0].lower(), page + '.htm')
         else:
-            path = PySide.QtCore.QUrl(page[0].lower() + '/' + page + '.htm')
+            path = PySide.QtCore.QUrl(os.path.join(page[0].lower(),
+                                                   page + '.htm'))
         self.web_view.load(path)
         self.web_view.page().setViewportSize(PySide.QtCore.QSize(width, 1))
         self.qt_application.exec_()
@@ -198,8 +199,8 @@ class Wikigame(object):
         self.label = label
         self.data = None
         self.graph = None
-        self.html_base_folder = 'data/' + label + '/wpcd/wp/'
-        self.plaintext_folder = 'data/' + label + '/wpcd/plaintext/'
+        self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
+        self.plaintext_folder = os.path.join('data', label, 'wpcd', 'plaintext')
         self.tfidf_similarity = None
         self.category_depth = None
         self.category_distance = None
@@ -304,7 +305,8 @@ class Wikigame(object):
                     print(a + '.txt', 'overwrite')
             print(unicode(i+1) + '/' + unicode(len(self.name2id)) +
                   ' ' + a + '.txt')
-            fname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
+            fname = os.path.join(self.html_base_folder + a[0].lower(),
+                                 a + '.htm')
             with io.open(fname, encoding='utf-8') as infile:
                 data = infile.read()
             data = data.split('<!-- start content -->')[1]
@@ -340,20 +342,21 @@ class Wikigame(object):
             content.append(data)
 
         # compute cosine TF-IDF similarity
-        with io.open('data/stopwords.txt', encoding='utf-8') as infile:
+        with io.open(os.path.join('data', 'stopwords.txt'), encoding='utf-8')\
+                as infile:
             stopwords = infile.read().splitlines()
         tvec = TfidfVectorizer(stop_words=stopwords)
         tfidf = tvec.fit_transform(content)
         tfidf_similarity = tfidf * tfidf.T
         tfidf_similarity = tfidf_similarity.todense()
-        tfidf_path = 'data/' + self.label + '/tfidf_similarity.obj'
-        with open(tfidf_path, 'wb') as outfile:
+        path = os.path.join('data', self.label, 'tfidf_similarity.obj')
+        with open(path, 'wb') as outfile:
             pickle.dump(tfidf_similarity, outfile, -1)
 
     def get_tfidf_similarity(self, start, target):
         if self.tfidf_similarity is None:
-            tfidf_path = 'data/' + self.label + '/tfidf_similarity.obj'
-            with open(tfidf_path, 'rb') as infile:
+            path = os.path.join('data', self.label, 'tfidf_similarity.obj')
+            with open(path, 'rb') as infile:
                 self.tfidf_similarity = pickle.load(infile)
         # subtract one because Wikipedia ids start with 1 and not 0
         return self.tfidf_similarity[start-1, target-1]
@@ -366,7 +369,8 @@ class Wikigame(object):
         for i in sorted(self.id2name.keys()):
             a = self.id2name[i]
             print(i, '/', len(self.name2id) - 1, end='\r')
-            ofname = self.html_base_folder + a[0].lower() + '/' + a + '.htm'
+            ofname = os.path.join(self.html_base_folder + a[0].lower(),
+                                  a + '.htm')
             try:
                 with io.open(ofname, encoding='utf-8') as infile:
                     data = infile.readlines()
@@ -634,7 +638,7 @@ class WIKTI(Wikigame):
         qt_application = PySide.QtGui.QApplication(sys.argv)
         # page_size = WebPageSize(qt_application, self.label)
         results = []
-        folder_logs = 'data/' + self.label + '/logfiles/'
+        folder_logs = os.path.join('data', self.label, 'logfiles')
         ngrams = NgramFrequency()
         self.load_link_positions()
         folders = ['U' + '%02d' % i for i in range(1, 10)]
@@ -644,7 +648,7 @@ class WIKTI(Wikigame):
                             if f.startswith('PLAIN')])
             for filename in files:
                 print('   ', filename)
-                fname = folder_logs + folder + '/' + filename
+                fname = os.path.join(folder_logs, folder, filename)
                 df_full = pd.read_csv(fname, sep='\t',
                                       usecols=[1, 2, 3],
                                       names=['time', 'action', 'node'])
@@ -697,7 +701,6 @@ class WIKTI(Wikigame):
                 ta = time_data.iloc[-1] / (time_data.shape[0] - 1)
                 time_average = [ta for t in range(time_data.shape[0] - 1)] +\
                                [np.NaN]
-                pdb.set_trace()
 
                 # get raw link position information
                 link_data = df_full[(df_full['action'] == 'link_data') |
@@ -857,8 +860,8 @@ class Wikispeedia(Wikigame):
     @staticmethod
     def build_database(label):
         db_connector = DbConnector('')
-        with io.open('data/' + label + '/SQL/structure.sql', encoding='utf-8') \
-                as infile:
+        path = os.path.join('data', label, 'SQL', 'structure.sql')
+        with io.open(path, encoding='utf-8') as infile:
             stmt = infile.read()
         db_connector.execute(stmt)
         db_connector.execute('USE ' + label + ';')
@@ -927,6 +930,11 @@ class Wikispeedia(Wikigame):
                             stack.append(p)
                         game.append(stack[-1])
                     node = game
+                spl = self.get_spl(self.name2id[entry[1]['start']],
+                                   self.name2id[entry[1]['target']])
+                if len(node) > 8 or spl != 3:
+                    # for now, we only consider games < 9 hops and spl of 3
+                    continue
                 try:
                     node_id = [self.name2id[n] for n in node]
                     degree_out = [self.id2deg_out[i] for i in node_id]
@@ -957,19 +965,21 @@ class Wikispeedia(Wikigame):
                         else:
                             linkpos_intro.append(l < i)
                     linkpos_intro = linkpos_intro + [np.NaN]
+                    word_count = [self.length[a] if a in self.length else np.NaN
+                                  for a in node][:-1] + [np.NaN]
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
                            ngram, spl_target, tfidf_target,
-                           category_depth, category_target, linkpos_first,
-                           linkpos_last, linkpos_intro)
+                           category_depth, category_target,
+                           linkpos_first, linkpos_last, linkpos_intro,
+                           word_count)
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
                            'ngram', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
-                           'linkpos_first', 'linkpos_last', 'linkpos_intro']
+                           'linkpos_first', 'linkpos_last', 'linkpos_intro',
+                           'word_count']
                 df = pd.DataFrame(data=data, columns=columns)
-                spl = self.get_spl(self.name2id[entry[1]['start']],
-                                   self.name2id[entry[1]['target']])
 
                 results.append({
                     'data': df,
@@ -985,8 +995,8 @@ class Wikispeedia(Wikigame):
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    w = WIKTI()
-    # w = Wikispeedia()
+    # w = WIKTI()
+    w = Wikispeedia()
     # w.compute_tfidf_similarity()
     # w.compute_category_stats()
     # w.compute_link_positions()
