@@ -18,7 +18,6 @@ import pymysql
 import PySide.QtCore
 import PySide.QtGui
 import PySide.QtWebKit
-import statsmodels.api as sm
 
 import credentials
 
@@ -93,51 +92,6 @@ class NgramFrequency(object):
     def __del__(self):
         with open(os.path.join('data', 'ngrams.obj'), 'wb') as outfile:
             pickle.dump(self.ngrams, outfile, -1)
-
-
-class LogisticRegressor(object):
-    def regress(self, dependent, independent):
-        logit = sm.Logit(dependent, independent)
-        result = logit.fit()
-        print(result.summary())
-
-        # import matplotlib.pyplot as plt
-        # plt.scatter(clicks['time'], clicks['success'])
-        # plt.xlabel('duration')
-        # plt.ylabel('success')
-        # x = np.arange(0, 1000000, 100)
-        # b1, b0 = result.params.values
-        # p = [(np.exp(b0 + i*b1))/(1+np.exp(b0 + i*b1)) for i in x]
-        # plt.plot(x, p)
-        # plt.show()
-        # pdb.set_trace()
-
-        pred = result.predict(independent)
-        correct = 0
-        for t, p in zip(dependent, pred):
-            if t == 0 and p < 0.5:
-                correct += 1
-            elif t == 1 and p > 0.5:
-                correct += 1
-        print(correct, 'correct out of', len(pred), '(', correct/len(pred), ')')
-        print('Baseline:', sum(dependent) / dependent.shape[0])
-
-    def test_regression(self):
-        fname = os.path.join('data', 'SAheart.txt')
-        df = pd.read_csv(fname, index_col=0,
-                         usecols=[0, 1, 2, 3, 5, 7, 8, 9, 10])
-        dummies = pd.get_dummies(df['famhist'], prefix='famhist')
-        cols_to_keep = ['sbp', 'tobacco', 'ldl', 'obesity', 'alcohol', 'age',
-                        'chd']
-        df = df[cols_to_keep].join(dummies.ix[:, 1:])
-        df['intercept'] = 1.0
-        regressor = LogisticRegressor()
-        regressor.regress(df['chd'],
-                          df[['intercept', 'sbp', 'tobacco', 'ldl', 'obesity',
-                              'famhist_Present', 'alcohol', 'age']])
-        regressor.regress(df['chd'],
-                          df[['intercept', 'tobacco', 'ldl', 'famhist_Present',
-                              'age']])
 
 
 class WebPageSize(PySide.QtGui.QMainWindow):
