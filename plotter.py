@@ -42,11 +42,10 @@ class Plotter(object):
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
             # ('linkpos_intro', 'Fraction of Links in Introduction', (0, 1)),
-            ('time_actual', 'Time spent on article', (0, 11000)),
-            ('time_actual_word', 'Time spent on article (per word)', (0, 11000)),
-            ('time_actual_link', 'Time spent on article (per link)', (0, 11000)),
-            ('time_actual_normalized', 'Time spent on article (normalized)', (0, 11000)),
-            ('time_average', 'uniformly distributed time spent on article', (0, 11000)),
+            ('time', 'Time per article', (0, 11000)),
+            ('time_word', 'Time per article (per word)', (0, 11000)),
+            ('time_link', 'Time per article (per link)', (0, 11000)),
+            ('time_normalized', 'Time per article (normalized)', (0, 11000)),
         ]:
             print(feature)
             try:
@@ -67,7 +66,7 @@ class Plotter(object):
                     distance = range(k)
                     distance.reverse()
                     result.append(pd.DataFrame({
-                        'condition': ['PL %d' % k] * len(d),
+                        'condition': ['GL %d' % k] * len(d),
                         'subj': [str(subj)] * len(d),
                         'distance': distance,
                         'path': d,
@@ -82,8 +81,39 @@ class Plotter(object):
 
     def plot_linkpos(self):
         print('linkpos')
-        p = Plot('Link Position', 'Distance to Target')
-        # for k, c in zip([4, 5, 6, 7], colors):
+        if self.label == 'WIKTI' and False:  # unnecessary to alway print this
+            df = self.data[(self.data.spl == 3) & self.data.successful &
+                           (self.data.pl < 9)]
+            df = pd.concat([d for d in df['data']])
+            df['linkpos_diff'] = df['linkpos_first'] - df['linkpos_last']
+            df = df[~np.isnan(df['linkpos_diff'])]
+            diff = df[df['linkpos_diff'] != 0]
+            print('multiple link positions for %.2f of %d clicked links' %
+                  (diff.shape[0] / df.shape[0], df.shape[0]))
+
+            first = diff[diff['linkpos_first'] == diff['linkpos_actual']]
+            first = first.shape[0]
+            last = diff[diff['linkpos_last'] == diff['linkpos_actual']]
+            last = last.shape[0]
+            between = diff[(diff['linkpos_last'] != diff['linkpos_actual']) &\
+                           (diff['linkpos_first'] != diff['linkpos_actual'])]
+            entire = diff.shape[0]
+            print('%.2f first, %.2f last, out of %d total' %
+                  (first/entire, last/entire, entire))
+            stats = between[['linkpos_first', 'linkpos_actual', 'linkpos_last']]
+            first = stats['linkpos_actual'] - stats['linkpos_first'].tolist()
+            last = stats['linkpos_last'] - stats['linkpos_actual'].tolist()
+            ff, ll = 0, 0
+            for f, l in zip(first, last):
+                if f < l:
+                    ff += 1
+                else:
+                    ll += 1
+            total = ff + ll
+            print(ff/total, ll/total, total)
+            pdb.set_trace()
+
+        p = Plot('word', 'Distance to Target')
         for k, c in zip([4, 5, 6], colors):
             for feature, label, m, ls in [
                 ('linkpos_last', 'last occurrence', 'v', 'solid'),
@@ -105,7 +135,7 @@ class Plotter(object):
                     distance = range(k)
                     distance.reverse()
                     df = pd.DataFrame({
-                        'condition': ['PL %d (%s)' % (k, label)] * len(d),
+                        'condition': ['GL %d (%s)' % (k, label)] * len(d),
                         'subj': [str(subj)] * len(d),
                         'distance': distance,
                         'path': d,
@@ -154,8 +184,10 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    pt = Plotter('WIKTI')
-    # pt = Plotter('Wikispeedia')
-    pt.plot()
-    # pt.plot_linkpos()
+    for pt in [
+        Plotter('WIKTI'),
+        # Plotter('Wikispeedia'),
+    ]:
+        # pt.plot()
+        pt.plot_linkpos()
 

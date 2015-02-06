@@ -44,7 +44,7 @@ class DbConnector(object):
         self.db_cursor.close()
         self.db_connection.close()
 
-    def execute(self, _statement, _args=None, _type=None):
+    def execute(self, _statement, _args=None):
         self.db_cursor.execute(_statement, _args)
 
         if _statement.lower().startswith("select"):
@@ -235,8 +235,8 @@ class Wikigame(object):
                 self.reset()
                 self.fed = []
 
-            def handle_data(self, d):
-                self.fed.append(d)
+            def handle_data(self, dat):
+                self.fed.append(dat)
 
             def get_data(self):
                 return ''.join(self.fed)
@@ -407,7 +407,7 @@ class Wikigame(object):
                 path = os.path.join('data', self.label, 'spl.obj')
                 with open(path, 'rb') as infile:
                     self.spl = pickle.load(infile)
-            except IOError:
+            except (IOError, EOFError):
                 self.spl = {}
         try:
             return self.spl[(start, target)]
@@ -424,6 +424,7 @@ class Wikigame(object):
 
     def compute_link_positions(self):
         print('computing link positions...')
+
         class MLStripper(HTMLParser.HTMLParser):
             def __init__(self):
                 HTMLParser.HTMLParser.__init__(self)
@@ -454,7 +455,7 @@ class Wikigame(object):
             try:
                 with io.open(fname, encoding='utf-8') as infile:
                     data = infile.read()
-            except UnicodeDecodeError, e:
+            except UnicodeDecodeError:
                 # there exist decoding errors for a few irrelevant pages
                 print(fname)
                 continue
@@ -558,17 +559,11 @@ class Wikigame(object):
     def print_error(self, message):
         print('        Error:', message)
 
-    def __del__(self):
-        if self.spl is not None:
-            path = os.path.join('data', self.label, 'spl.obj')
-            with open(path, 'wb') as outfile:
-                pickle.dump(self.spl, outfile, -1)
-
 
 class WIKTI(Wikigame):
     label = 'wikti'
 
-    def __init__(self, graph_tool=False):
+    def __init__(self):
         super(WIKTI, self).__init__(WIKTI.label)
 
     def create_dataframe(self):
@@ -589,7 +584,7 @@ class WIKTI(Wikigame):
         # web page size calculation disabled for now - needs a workover
         # regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
         #                r" u'size': {u'y': (\d+), u'x': (\d+)"
-        qt_application = PySide.QtGui.QApplication(sys.argv)
+        # qt_application = PySide.QtGui.QApplication(sys.argv)
         # page_size = WebPageSize(qt_application, self.label)
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
@@ -598,13 +593,12 @@ class WIKTI(Wikigame):
         folders = ['U' + '%02d' % i for i in range(1, 10)]
         for folder in folders:
             print('\n', folder)
-            files = sorted([f for f in os.listdir(folder_logs + folder)
-                            if f.startswith('PLAIN')])
+            files = sorted(os.listdir(os.path.join(folder_logs, folder)))
+            files = [f for f in files if f.startswith('PLAIN')]
             for filename in files:
                 print('   ', filename)
                 fname = os.path.join(folder_logs, folder, filename)
-                df_full = pd.read_csv(fname, sep='\t',
-                                      usecols=[1, 2, 3],
+                df_full = pd.read_csv(fname, sep='\t', usecols=[1, 2, 3],
                                       names=['time', 'action', 'node'])
 
                 # perform sanity checks
@@ -643,18 +637,15 @@ class WIKTI(Wikigame):
 
                 # get time information
                 time_data = df_full[df_full['action'] == 'load']['time']
-                time_actual = time_data.diff().shift(-1)
-                time_actual_normalized = time_actual / sum(time_actual.iloc[:-1])
+                time = time_data.diff().shift(-1)
+                time_normalized = time / sum(time.iloc[:-1])
                 word_count = [self.length[a] if a in self.length else np.NaN
                               for a in df['node']]
                 link_count = [len(self.pos2link[a])
                               if a in self.length else np.NaN
                               for a in df['node']]
-                time_actual_word = time_actual / word_count
-                time_actual_link = time_actual / link_count
-                ta = time_data.iloc[-1] / (time_data.shape[0] - 1)
-                time_average = [ta for t in range(time_data.shape[0] - 1)] +\
-                               [np.NaN]
+                time_word = time / word_count
+                time_link = time / link_count
 
                 # get raw link position information
                 link_data = df_full[(df_full['action'] == 'link_data') |
@@ -691,7 +682,7 @@ class WIKTI(Wikigame):
                     try:
                         links = [k for k, v in self.pos2link[name_start].items()
                                  if v == self.name2id[name_target]]
-                    except KeyError, e:
+                    except KeyError:
                         continue
                     if len(links) == 0:
                         link_data_correct.append(np.NaN)
@@ -730,7 +721,6 @@ class WIKTI(Wikigame):
                 #         seen_max = seen
                 #     exploration.append(seen / seen_max)
                 #     print(df.iloc[0].node, seen, seen_max)
-                #     pdb.set_trace()
                 #     TODO: This currently doesn't work
 
                 try:
@@ -746,6 +736,7 @@ class WIKTI(Wikigame):
                     try:
                         self.check_spl(df['spl_target'].tolist(), successful)
                     except AssertionError, a:
+                        print(a)
                         pdb.set_trace()
                     df['tfidf_target'] = [1 - self.get_tfidf_similarity(i, tid)
                                           for i in df['node_id']]
@@ -765,8 +756,8 @@ class WIKTI(Wikigame):
                          for a, b in zipped] + [np.NaN]
                     try:
                         df['linkpos_actual'] = link_data + [np.NaN]
-                        # click_data = link_data
-                        click_data = df['linkpos_first'].tolist()[:-1]
+                        click_data = link_data
+                        # click_data = df['linkpos_first'].tolist()[:-1]
 
                         intros = [self.intro_length[d] for d in df['node']][:-1]
                         linkpos_intro = []
@@ -779,14 +770,14 @@ class WIKTI(Wikigame):
                                 linkpos_intro.append(l < i)
                         df['linkpos_intro'] = linkpos_intro + [np.NaN]
                     except ValueError, e:
+                        print(e)
                         self.print_error('???')
                         pdb.set_trace()
 
-                    df['time_actual'] = time_actual
-                    df['time_actual_normalized'] = time_actual_normalized
-                    df['time_actual_word'] = time_actual_word
-                    df['time_actual_link'] = time_actual_link
-                    df['time_average'] = time_average
+                    df['time'] = time
+                    df['time_normalized'] = time_normalized
+                    df['time_word'] = time_word
+                    df['time_link'] = time_link
 
                     df['word_count'] = word_count[:-1] + [np.NaN]
                 except KeyError, e:
@@ -803,6 +794,10 @@ class WIKTI(Wikigame):
 
         data = pd.DataFrame(results)
         data.to_pickle(os.path.join('data', self.label, 'data.pd'))
+
+        path = os.path.join('data', self.label, 'spl.obj')
+        with open(path, 'wb') as outfile:
+            pickle.dump(self.spl, outfile, -1)
 
 
 class Wikispeedia(Wikigame):
@@ -847,7 +842,6 @@ class Wikispeedia(Wikigame):
         node_values.run()
 
     def create_dataframe(self):
-        from datetime import datetime
         # load or compute the click data as a pandas frame
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
@@ -905,8 +899,8 @@ class Wikispeedia(Wikigame):
                     zipped = zip(node, node_id[1:])
                     linkpos_first = [self.link2pos_first[a][b]
                                      for a, b in zipped] + [np.NaN]
-                    linkpos_last =[self.link2pos_last[a][b]
-                                   for a, b in zipped] + [np.NaN]
+                    linkpos_last = [self.link2pos_last[a][b]
+                                    for a, b in zipped] + [np.NaN]
 
                     click_data = linkpos_first[:-1]
                     intros = [self.intro_length[d] for d in node][:-1]
@@ -945,13 +939,16 @@ class Wikispeedia(Wikigame):
         data = pd.DataFrame(results)
         data.to_pickle(os.path.join('data', self.label, 'data.pd'))
 
+        path = os.path.join('data', self.label, 'spl.obj')
+        with open(path, 'wb') as outfile:
+            pickle.dump(self.spl, outfile, -1)
+
 
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
-    # w = WIKTI()
-    w = Wikispeedia()
-    # w.compute_tfidf_similarity()
-    # w.compute_category_stats()
-    # w.compute_link_positions()
-    w.create_dataframe()
+    for w in [
+        WIKTI(),
+        # Wikispeedia(),
+    ]:
+        w.create_dataframe()
