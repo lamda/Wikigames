@@ -68,11 +68,13 @@ class DbConnector(object):
 class NgramFrequency(object):
     def __init__(self):
         token = credentials.microsoft_token
-        corpus = 'bing-body/2013-12/5/'
+        self.corpus_type = 'title'  # body
+        corpus = 'bing-' + self.corpus_type + '/2013-12/5/'
         base_url = 'http://weblm.research.microsoft.com/weblm/rest.svc/'
         self.base_url = base_url + corpus + 'jp?u=' + token + '&p='
         try:
-            with open(os.path.join('data', 'ngrams.obj'), 'rb') as infile:
+            with open(os.path.join('data', 'ngrams_' + self.corpus_type +
+                      '.obj'), 'rb') as infile:
                     self.ngrams = pickle.load(infile)
         except (IOError, EOFError):
             self.ngrams = {}
@@ -89,8 +91,9 @@ class NgramFrequency(object):
         url = self.base_url + title_url
         self.ngrams[title] = float(urllib2.urlopen(url).read())
 
-    def __del__(self):
-        with open(os.path.join('data', 'ngrams.obj'), 'wb') as outfile:
+    def save(self):
+        with open(os.path.join('data', 'ngrams_' + self.corpus_type + '.obj'),
+                  'wb') as outfile:
             pickle.dump(self.ngrams, outfile, -1)
 
 
@@ -799,6 +802,8 @@ class WIKTI(Wikigame):
         with open(path, 'wb') as outfile:
             pickle.dump(self.spl, outfile, -1)
 
+        ngrams.save()
+
 
 class Wikispeedia(Wikigame):
     label = 'wikispeedia'
@@ -943,12 +948,14 @@ class Wikispeedia(Wikigame):
         with open(path, 'wb') as outfile:
             pickle.dump(self.spl, outfile, -1)
 
+        ngrams.save()
+
 
 if __name__ == '__main__':
     # Wikispeedia.fill_database()
 
     for w in [
         WIKTI(),
-        # Wikispeedia(),
+        Wikispeedia(),
     ]:
         w.create_dataframe()

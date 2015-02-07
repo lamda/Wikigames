@@ -186,8 +186,8 @@ class Plot(object):
 if __name__ == '__main__':
     for pt in [
         Plotter('WIKTI'),
-        # Plotter('Wikispeedia'),
+        Plotter('Wikispeedia'),
     ]:
-        # pt.plot()
+        pt.plot()
         pt.plot_linkpos()
 
