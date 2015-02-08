@@ -952,8 +952,6 @@ class Wikispeedia(Wikigame):
 
 
 if __name__ == '__main__':
-    # Wikispeedia.fill_database()
-
     for w in [
         WIKTI(),
         Wikispeedia(),

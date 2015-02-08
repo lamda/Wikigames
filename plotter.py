@@ -150,6 +150,27 @@ class Plotter(object):
         fname = 'linkpos_' + self.label.lower() + '.png'
         p.finish(os.path.join(self.plot_folder, fname), ylim=(0, 12000))
 
+    def correlation(self):
+        for feature1, feature2 in [
+            ('degree_in', 'category_depth'),
+        ]:
+            print(feature1, feature2)
+            try:
+                self.data.iloc[0]['data'][feature1]
+                self.data.iloc[0]['data'][feature2]
+            except KeyError, e:
+                print('    Feature not present')
+                continue
+            df = self.data[(self.data.pl < 9 ) & (self.data.spl == 3) &
+                           self.data.successful]
+            data1 = [d[feature1].tolist() for d in df['data']]
+            data2 = [d[feature2].tolist() for d in df['data']]
+            data1 = [d for d in data1 if '' not in d]
+            data2 = [d for d in data2 if '' not in d]
+            sns.corrplot()
+
+
+
 
 class Plot(object):
     def __init__(self, title, xlabel):
@@ -186,8 +207,9 @@ class Plot(object):
 if __name__ == '__main__':
     for pt in [
         Plotter('WIKTI'),
-        Plotter('Wikispeedia'),
+        # Plotter('Wikispeedia'),
     ]:
-        pt.plot()
-        pt.plot_linkpos()
+        # pt.plot()
+        # pt.plot_linkpos()
+        pt.correlation()
 
