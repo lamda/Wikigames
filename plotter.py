@@ -27,29 +27,29 @@ class Plotter(object):
         print('loading data...')
         self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
         print('loaded\n')
-        self.plot_folder = os.path.join('data', self.label, 'plots')
+        self.plot_folder = os.path.join('data', 'plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
     def plot(self):
         for feature, title, ylim in [
-            # ('spl_target', 'Shortest Path Length to Target'),
-            # ('tfidf_target', 'TF-IDF similarity to Target'),
-            # ('degree_out', 'Out-degree'),
-            # ('degree_in', 'In-degree'),
+            ('spl_target', 'Shortest Path Length to Target', None),
+            ('tfidf_target', 'TF-IDF similarity to Target', None),
+            ('degree_out', 'Out-degree', None),
+            ('degree_in', 'In-degree', None),
             # ('ngram_anchor', 'N-Gram Frequency (Anchor)', (-16, -2)),
             # ('ngram_body', 'N-Gram Frequency (Body)',  (-16, -2)),
-            # ('ngram_query', 'N-Gram Frequency (Query)',  (-15, -3)),
+            ('ngram_query', 'N-Gram Frequency (Query)',  (-15, -3)),
             # ('ngram_title', 'N-Gram Frequency (Title)',  (-16, -2)),
-            # ('category_depth', 'Category Depth (1...most general)'),
-            # ('category_target', 'Category Distance to target'),
-            # ('exploration', 'Explored Percentage of Page'),
+            ('category_depth', 'Category Depth (1...most general)', None),
+            ('category_target', 'Category Distance to target', None),
+            ('exploration', 'Explored Percentage of Page', None),
             ('linkpos_ib', 'Fraction of Links in Infobox', (0, 1)),
             ('linkpos_lead', 'Fraction of Links in Lead', (0, 1)),
-            # ('time', 'Time per article', (0, 11000)),
-            # ('time_word', 'Time per article (per word)', (0, 11000)),
-            # ('time_link', 'Time per article (per link)', (0, 11000)),
-            # ('time_normalized', 'Time per article (normalized)', (0, 11000)),
+            ('time', 'Time per article', (0, 11000)),
+            ('time_word', 'Time per article (per word)', (0, 11000)),
+            ('time_link', 'Time per article (per link)', (0, 11000)),
+            ('time_normalized', 'Time per article (normalized)', (0, 11000)),
         ]:
             print(feature)
             try:
@@ -57,7 +57,7 @@ class Plotter(object):
             except KeyError, e:
                 print('    Feature not present')
                 continue
-            p = Plot(title, 'Distance to Target')
+            p = Plot(title, 'Distance to-go to target')
 
             for k, m, c in zip([4, 5, 6, 7], markers, colors):
                 subj = 0
@@ -85,7 +85,7 @@ class Plotter(object):
 
     def plot_linkpos(self):
         print('linkpos')
-        if self.label == 'WIKTI' and True:  # only print this when needed
+        if self.label == 'WIKTI' and False:  # only print this when needed
             df = self.data[(self.data.spl == 3) & self.data.successful &
                            (self.data.pl < 9)]
             df = pd.concat([d for d in df['data']])
@@ -152,7 +152,7 @@ class Plotter(object):
                              condition='condition', value='path',
                              marker=m, color=c, linestyle=ls, ci=0)
         fname = 'linkpos_' + self.label.lower() + '.png'
-        p.finish(os.path.join(self.plot_folder, fname), ylim=(0, 12000))
+        p.finish(os.path.join(self.plot_folder, fname), ylim=(12000, 0))
 
     def correlation(self):
         for feature1, feature2 in [
@@ -208,10 +208,10 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        Plotter('WIKTI'),
-        # Plotter('Wikispeedia'),
+        # Plotter('WIKTI'),
+        Plotter('Wikispeedia'),
     ]:
         pt.plot()
-        # pt.plot_linkpos()
+        pt.plot_linkpos()
         # pt.correlation()
 

@@ -547,7 +547,14 @@ class Wikigame(object):
                     self.lead_length = pickle.load(infile)
 
     def load_data(self):
-        self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
+        if self.data is None:
+            path = os.path.join('data', self.label, 'data.pd')
+            self.data = pd.read_pickle(path)
+
+    def save_data(self, data=None):
+        if data is None:
+            data = self.data
+        data.to_pickle(os.path.join('data', self.label, 'data.pd'))
 
     def load_graph(self, graph_tool=False):
         # read the graph
@@ -582,6 +589,27 @@ class Wikigame(object):
 
     def print_error(self, message):
         print('        Error:', message)
+
+    def df_add_link_context(self):
+        self.load_data()
+        self.load_link_positions()
+        link_sets = {k: self.pos2link[k].keys() for k in self.pos2link}
+
+        for i in range(self.data.shape[0]):
+            df = self.data.iloc[i]['data']
+            ctxt = [link_sets[n]
+                    for n, m in zip(df['node'], df['node_id'].iloc[1:])]
+
+            links = []
+            for c, n in zip(ctxt, df['node']):
+                window = range(max(0, df['linkpos_first'] - 10),
+                               min(self.length[n]), df['linkpos_first'] + 10)
+                links.append(len(p for p in window if p in c))
+            df['link_context'] = ctxt + [np.NaN]
+            pdb.set_trace()
+
+        self.save_data()
+
 
     def close(self):
         self.db_connector.close()
@@ -837,7 +865,7 @@ class WIKTI(Wikigame):
                 })
 
         data = pd.DataFrame(results)
-        data.to_pickle(os.path.join('data', self.label, 'data.pd'))
+        self.save_data(data)
 
 
 class Wikispeedia(Wikigame):
@@ -979,7 +1007,7 @@ class Wikispeedia(Wikigame):
                 })
 
         data = pd.DataFrame(results)
-        data.to_pickle(os.path.join('data', self.label, 'data.pd'))
+        self.save_data(data)
 
 
 if __name__ == '__main__':
@@ -987,6 +1015,6 @@ if __name__ == '__main__':
         WIKTI(),
         # Wikispeedia(),
     ]:
-        w.create_dataframe()
-        # w.compute_link_positions()
+        # w.create_dataframe()
+        w.df_add_link_context()
         w.close()
