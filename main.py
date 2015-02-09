@@ -9,7 +9,6 @@ import io
 import os
 import pdb
 import re
-import sys
 import urllib2
 
 import numpy as np
@@ -40,7 +39,7 @@ class DbConnector(object):
             pymysql.cursors.SSCursor)
         self.db = db
 
-    def __exit__(self):
+    def close(self):
         self.db_cursor.close()
         self.db_connection.close()
 
@@ -67,34 +66,37 @@ class DbConnector(object):
 
 class NgramFrequency(object):
     def __init__(self):
-        token = credentials.microsoft_token
-        self.corpus_type = 'title'  # body
-        corpus = 'bing-' + self.corpus_type + '/2013-12/5/'
-        base_url = 'http://weblm.research.microsoft.com/weblm/rest.svc/'
-        self.base_url = base_url + corpus + 'jp?u=' + token + '&p='
+        self.token = credentials.microsoft_token
+        self.types = (
+            # 'anchor',
+            # 'body',
+            'query',
+            # 'title',
+        )
         try:
-            with open(os.path.join('data', 'ngrams_' + self.corpus_type +
-                      '.obj'), 'rb') as infile:
-                    self.ngrams = pickle.load(infile)
+            with open(os.path.join('data', 'ngram.obj'), 'rb') as infile:
+                    self.ngram = pickle.load(infile)
         except (IOError, EOFError):
-            self.ngrams = {}
+            self.ngram = {tp: {} for tp in self.types}
+        url_base = 'http://weblm.research.microsoft.com/rest.svc/bing-'
+        self.url = {tp: url_base + tp + '/2013-12/5/jp?u=' + self.token + '&p='
+                    for tp in self.types}
 
-    def get_frequency(self, title):
+    def get_frequency(self, ngram_type, title):
         try:
-            return self.ngrams[title]
+            return self.ngram[ngram_type][title]
         except KeyError:
-            self.retrieve_frequency(title)
-            return self.ngrams[title]
+            self.retrieve_frequency(ngram_type, title)
+            return self.ngram[ngram_type][title]
 
-    def retrieve_frequency(self, title):
+    def retrieve_frequency(self, ngram_type, title):
         title_url = title.replace(' ', '+').replace('_', '+')
-        url = self.base_url + title_url
-        self.ngrams[title] = float(urllib2.urlopen(url).read())
+        url = self.url[ngram_type] + title_url
+        self.ngram[ngram_type][title] = float(urllib2.urlopen(url).read())
 
     def save(self):
-        with open(os.path.join('data', 'ngrams_' + self.corpus_type + '.obj'),
-                  'wb') as outfile:
-            pickle.dump(self.ngrams, outfile, -1)
+        with open(os.path.join('data', 'ngram.obj'), 'wb') as outfile:
+            pickle.dump(self.ngram, outfile, -1)
 
 
 class WebPageSize(PySide.QtGui.QMainWindow):
@@ -164,6 +166,7 @@ class Wikigame(object):
         self.link2pos_first, self.link2pos_last = None, None
         self.length, self.pos2link, self.intro_length = None, None, None
         self.spl = None
+        self.ngram = NgramFrequency()
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
@@ -562,6 +565,13 @@ class Wikigame(object):
     def print_error(self, message):
         print('        Error:', message)
 
+    def close(self):
+        self.db_connector.close()
+        self.ngram.save()
+        path = os.path.join('data', self.label, 'spl.obj')
+        with open(path, 'wb') as outfile:
+            pickle.dump(self.spl, outfile, -1)
+
 
 class WIKTI(Wikigame):
     label = 'wikti'
@@ -591,7 +601,6 @@ class WIKTI(Wikigame):
         # page_size = WebPageSize(qt_application, self.label)
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
-        ngrams = NgramFrequency()
         self.load_link_positions()
         folders = ['U' + '%02d' % i for i in range(1, 10)]
         for folder in folders:
@@ -725,14 +734,17 @@ class WIKTI(Wikigame):
                 #     exploration.append(seen / seen_max)
                 #     print(df.iloc[0].node, seen, seen_max)
                 #     TODO: This currently doesn't work
+                #     TODO: add this to Wikigame.close()
 
                 try:
                     df['node_id'] = [self.name2id[n] for n in df['node']]
                     df['degree_out'] = [self.id2deg_out[i]
                                         for i in df['node_id']]
                     df['degree_in'] = [self.id2deg_in[i] for i in df['node_id']]
-                    df['ngram'] = [ngrams.get_frequency(n) for n in df['node']]
 
+                    for tp in self.ngram.types:
+                        df['ngram_' + tp] = [self.ngram.get_frequency(tp, n)
+                                             for n in df['node']]
                     tid = self.name2id[target]
                     df['spl_target'] = [self.get_spl(i, tid)
                                         for i in df['node_id']]
@@ -798,12 +810,6 @@ class WIKTI(Wikigame):
         data = pd.DataFrame(results)
         data.to_pickle(os.path.join('data', self.label, 'data.pd'))
 
-        path = os.path.join('data', self.label, 'spl.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump(self.spl, outfile, -1)
-
-        ngrams.save()
-
 
 class Wikispeedia(Wikigame):
     label = 'wikispeedia'
@@ -820,6 +826,7 @@ class Wikispeedia(Wikigame):
         db_connector.execute(stmt)
         db_connector.execute('USE ' + label + ';')
         db_connector.commit()
+        db_connector.close()
 
     @staticmethod
     def fill_database():
@@ -845,12 +852,12 @@ class Wikispeedia(Wikigame):
 
         node_values = NodeValues.NodeValues(db_connector)
         node_values.run()
+        db_connector.close()
 
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
-        ngrams = NgramFrequency()
         self.load_link_positions()
         for filename in sorted(os.listdir(folder_logs))[:1]:
             print(filename)
@@ -892,7 +899,8 @@ class Wikispeedia(Wikigame):
                     node_id = [self.name2id[n] for n in node]
                     degree_out = [self.id2deg_out[i] for i in node_id]
                     degree_in = [self.id2deg_in[i] for i in node_id]
-                    ngram = [ngrams.get_frequency(n) for n in node]
+                    ngram_query = [self.ngram.get_frequency('query', n)
+                                    for n in node]
                     tid = self.name2id[entry[1]['target']]
                     spl_target = [self.get_spl(i, tid) for i in node_id]
                     tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
@@ -923,12 +931,12 @@ class Wikispeedia(Wikigame):
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
-                           ngram, spl_target, tfidf_target,
+                           ngram_query, spl_target, tfidf_target,
                            category_depth, category_target,
                            linkpos_first, linkpos_last, linkpos_intro,
                            word_count)
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
-                           'ngram', 'spl_target', 'tfidf_target',
+                           'ngram_query', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
                            'linkpos_first', 'linkpos_last', 'linkpos_intro',
                            'word_count']
@@ -944,16 +952,11 @@ class Wikispeedia(Wikigame):
         data = pd.DataFrame(results)
         data.to_pickle(os.path.join('data', self.label, 'data.pd'))
 
-        path = os.path.join('data', self.label, 'spl.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump(self.spl, outfile, -1)
-
-        ngrams.save()
-
 
 if __name__ == '__main__':
     for w in [
-        WIKTI(),
+        # WIKTI(),
         Wikispeedia(),
     ]:
         w.create_dataframe()
+        w.close()

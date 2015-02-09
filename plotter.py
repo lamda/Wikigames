@@ -37,15 +37,18 @@ class Plotter(object):
             # ('tfidf_target', 'TF-IDF similarity to Target'),
             # ('degree_out', 'Out-degree'),
             # ('degree_in', 'In-degree'),
-            # ('ngram', 'N-Gram Occurrence Frequency (=~ familiarity)'),
+            # ('ngram_anchor', 'N-Gram Frequency (Anchor)', (-16, -2)),
+            # ('ngram_body', 'N-Gram Frequency (Body)',  (-16, -2)),
+            ('ngram_query', 'N-Gram Frequency (Query)',  (-16, -2)),
+            # ('ngram_title', 'N-Gram Frequency (Title)',  (-16, -2)),
             # ('category_depth', 'Category Depth (1...most general)'),
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
             # ('linkpos_intro', 'Fraction of Links in Introduction', (0, 1)),
-            ('time', 'Time per article', (0, 11000)),
-            ('time_word', 'Time per article (per word)', (0, 11000)),
-            ('time_link', 'Time per article (per link)', (0, 11000)),
-            ('time_normalized', 'Time per article (normalized)', (0, 11000)),
+            # ('time', 'Time per article', (0, 11000)),
+            # ('time_word', 'Time per article (per word)', (0, 11000)),
+            # ('time_link', 'Time per article (per link)', (0, 11000)),
+            # ('time_normalized', 'Time per article (normalized)', (0, 11000)),
         ]:
             print(feature)
             try:
@@ -209,7 +212,7 @@ if __name__ == '__main__':
         Plotter('WIKTI'),
         # Plotter('Wikispeedia'),
     ]:
-        # pt.plot()
+        pt.plot()
         # pt.plot_linkpos()
-        pt.correlation()
+        # pt.correlation()
 
