@@ -164,7 +164,8 @@ class Wikigame(object):
         self.category_depth = None
         self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
-        self.length, self.pos2link, self.intro_length = None, None, None
+        self.length, self.pos2link = None, None
+        self.ib_length, self.lead_length = None, None
         self.spl = None
         self.ngram = NgramFrequency()
 
@@ -453,7 +454,7 @@ class Wikigame(object):
                                  'title="[^"]+">.+?</a>)'))
         folder = os.path.join('data', self.label, 'wpcd', 'wp')
         link2pos_first, link2pos_last, pos2link = {}, {}, {}
-        length, intro_length = {}, {}
+        length, ib_length, lead_length = {}, {}, {}
         for i, a in enumerate(self.name2id.keys()):
             print(unicode(i+1), '/', unicode(len(self.name2id)), end='\r')
             lpos_first, lpos_last, posl = {}, {}, {}
@@ -476,11 +477,21 @@ class Wikigame(object):
             for link in regex_results:
                 link = [l for l in link if l]
                 data = data.replace(link[0], ' [['+link[1]+']] ')
+
+            # find infobox
+            if '<table' in data[:100]:
+                idx = data.find('</table>')
+                data = data[:idx] + ' [[[ENDIB]]] ' + data[idx:]
+            else:
+                data = ' [[[ENDIB]]] ' + data
+
+            # find lead
             idx = data.find('<span class="mw-headline"')
             if idx == -1:
-                data += ' [[[ENDINTRO]]] '
+                data += ' [[[ENDLEAD]]] '
             else:
-                data = data[:idx] + ' [[[ENDINTRO]]] ' + data[idx:]
+                data = data[:idx] + ' [[[ENDLEAD]]] ' + data[idx:]
+
             data = [d.strip() for d in data.splitlines()]
             data = [d for d in data if d]
             text = []
@@ -494,9 +505,15 @@ class Wikigame(object):
             text = text.replace(']][[', ']] [[')
             words = (re.split(': |\. |, |\? |! |\n | |\(|\)', text))
             words = [wo for wo in words if wo]
-            idx = words.index('[[[ENDINTRO]]]')
-            intro_length[a] = idx
+
+            idx = words.index('[[[ENDLEAD]]]')
+            lead_length[a] = idx
             del words[idx]
+
+            idx = words.index('[[[ENDIB]]]')
+            ib_length[a] = idx
+            del words[idx]
+
             for wi, word in enumerate(reversed(words)):
                 if word.startswith('[['):
                     try:
@@ -519,14 +536,15 @@ class Wikigame(object):
         path = os.path.join('data', self.label, 'link_positions.obj')
         with open(path, 'wb') as outfile:
             pickle.dump([link2pos_first, link2pos_last,
-                         length, pos2link, intro_length], outfile, -1)
+                         length, pos2link, ib_length, lead_length], outfile, -1)
 
     def load_link_positions(self):
         if self.link2pos_first is None:
             path = os.path.join('data', self.label, 'link_positions.obj')
             with open(path, 'rb') as infile:
                 self.link2pos_first, self.link2pos_last, self.length,\
-                    self.pos2link, self.intro_length = pickle.load(infile)
+                    self.pos2link, self.ib_length,\
+                    self.lead_length = pickle.load(infile)
 
     def load_data(self):
         self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
@@ -568,9 +586,11 @@ class Wikigame(object):
     def close(self):
         self.db_connector.close()
         self.ngram.save()
-        path = os.path.join('data', self.label, 'spl.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump(self.spl, outfile, -1)
+        pdb.set_trace()
+        if self.spl and len(self.spl) > 10:
+            path = os.path.join('data', self.label, 'spl.obj')
+            with open(path, 'wb') as outfile:
+                pickle.dump(self.spl, outfile, -1)
 
 
 class WIKTI(Wikigame):
@@ -772,18 +792,27 @@ class WIKTI(Wikigame):
                     try:
                         df['linkpos_actual'] = link_data + [np.NaN]
                         click_data = link_data
+
+                        # to substitute first possible link use the following
                         # click_data = df['linkpos_first'].tolist()[:-1]
 
-                        intros = [self.intro_length[d] for d in df['node']][:-1]
-                        linkpos_intro = []
+                        ibs = [self.ib_length[d] for d in df['node']][:-1]
+                        leads = [self.lead_length[d] for d in df['node']][:-1]
+                        linkpos_ib, linkpos_lead = [], []
                         for idx in range(len(click_data)):
-                            l = click_data[idx]
-                            i = intros[idx]
-                            if np.isnan(l) or np.isnan(i):
-                                linkpos_intro.append(np.NaN)
+                            c = click_data[idx]
+                            i = ibs[idx]
+                            l = leads[idx]
+                            if np.isnan(i):
+                                linkpos_ib.append(np.NaN)
                             else:
-                                linkpos_intro.append(l < i)
-                        df['linkpos_intro'] = linkpos_intro + [np.NaN]
+                                linkpos_ib.append(c < i)
+                            if np.isnan(l):
+                                linkpos_lead.append(np.NaN)
+                            else:
+                                linkpos_lead.append(i < c < l)
+                        df['linkpos_ib'] = linkpos_ib + [np.NaN]
+                        df['linkpos_lead'] = linkpos_lead + [np.NaN]
                     except ValueError, e:
                         print(e)
                         self.print_error('???')
@@ -916,7 +945,7 @@ class Wikispeedia(Wikigame):
                                     for a, b in zipped] + [np.NaN]
 
                     click_data = linkpos_first[:-1]
-                    intros = [self.intro_length[d] for d in node][:-1]
+                    intros = [self.intro_length[d] for d in node][:-1] # TODO
                     linkpos_intro = []
                     for idx in range(len(click_data)):
                         l = click_data[idx]
@@ -955,8 +984,9 @@ class Wikispeedia(Wikigame):
 
 if __name__ == '__main__':
     for w in [
-        # WIKTI(),
-        Wikispeedia(),
+        WIKTI(),
+        # Wikispeedia(),
     ]:
         w.create_dataframe()
+        # w.compute_link_positions()
         w.close()

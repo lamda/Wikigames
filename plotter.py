@@ -39,12 +39,13 @@ class Plotter(object):
             # ('degree_in', 'In-degree'),
             # ('ngram_anchor', 'N-Gram Frequency (Anchor)', (-16, -2)),
             # ('ngram_body', 'N-Gram Frequency (Body)',  (-16, -2)),
-            ('ngram_query', 'N-Gram Frequency (Query)',  (-16, -2)),
+            # ('ngram_query', 'N-Gram Frequency (Query)',  (-15, -3)),
             # ('ngram_title', 'N-Gram Frequency (Title)',  (-16, -2)),
             # ('category_depth', 'Category Depth (1...most general)'),
             # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
-            # ('linkpos_intro', 'Fraction of Links in Introduction', (0, 1)),
+            ('linkpos_ib', 'Fraction of Links in Infobox', (0, 1)),
+            ('linkpos_lead', 'Fraction of Links in Lead', (0, 1)),
             # ('time', 'Time per article', (0, 11000)),
             # ('time_word', 'Time per article (per word)', (0, 11000)),
             # ('time_link', 'Time per article (per link)', (0, 11000)),
@@ -84,7 +85,7 @@ class Plotter(object):
 
     def plot_linkpos(self):
         print('linkpos')
-        if self.label == 'WIKTI' and False:  # unnecessary to alway print this
+        if self.label == 'WIKTI' and True:  # only print this when needed
             df = self.data[(self.data.spl == 3) & self.data.successful &
                            (self.data.pl < 9)]
             df = pd.concat([d for d in df['data']])
@@ -171,8 +172,6 @@ class Plotter(object):
             data1 = [d for d in data1 if '' not in d]
             data2 = [d for d in data2 if '' not in d]
             sns.corrplot()
-
-
 
 
 class Plot(object):
