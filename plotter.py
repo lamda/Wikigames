@@ -32,24 +32,25 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        for feature, title, ylim in [
-            ('spl_target', 'Shortest Path Length to Target', None),
-            ('tfidf_target', 'TF-IDF similarity to Target', None),
-            ('degree_out', 'Out-degree', None),
-            ('degree_in', 'In-degree', None),
+        for feature, title, ylabel, ylim in [
+            # ('spl_target', 'Shortest Path Length to Target', None),
+            # ('tfidf_target', 'TF-IDF similarity to Target', None),
+            # ('degree_out', 'Out-degree', None),
+            # ('degree_in', 'In-degree', None),
             # ('ngram_anchor', 'N-Gram Frequency (Anchor)', (-16, -2)),
             # ('ngram_body', 'N-Gram Frequency (Body)',  (-16, -2)),
-            ('ngram_query', 'N-Gram Frequency (Query)',  (-15, -3)),
+            # ('ngram_query', 'N-Gram Frequency (Query)',  (-15, -3)),
             # ('ngram_title', 'N-Gram Frequency (Title)',  (-16, -2)),
-            ('category_depth', 'Category Depth (1...most general)', None),
-            ('category_target', 'Category Distance to target', None),
-            ('exploration', 'Explored Percentage of Page', None),
-            ('linkpos_ib', 'Fraction of Links in Infobox', (0, 1)),
-            ('linkpos_lead', 'Fraction of Links in Lead', (0, 1)),
-            ('time', 'Time per article', (0, 11000)),
-            ('time_word', 'Time per article (per word)', (0, 11000)),
-            ('time_link', 'Time per article (per link)', (0, 11000)),
-            ('time_normalized', 'Time per article (normalized)', (0, 11000)),
+            # ('category_depth', 'Category Depth (1...most general)', None),
+            # ('category_target', 'Category Distance to target', None),
+            # ('exploration', 'Explored Percentage of Page', None),
+            # ('linkpos_ib', 'Fraction of Links in Infobox', (0, 1)),
+            # ('linkpos_lead', 'Fraction of Links in Lead', (0, 1)),
+            ('time', 'Time per article', 'seconds', (0, 110)),
+            ('time_word', 'Time per article (per word)', 'seconds', (0, 1)),
+            ('time_link', 'Time per article (per link)', 'seconds', (0, 5)),
+            ('time_normalized', 'Time per article (normalized)', 'seconds',
+             (0, 1)),
         ]:
             print(feature)
             try:
@@ -175,11 +176,15 @@ class Plotter(object):
 
 
 class Plot(object):
-    def __init__(self, title, xlabel):
+    def __init__(self, title, xlabel, ylabel=''):
         """create the plot"""
         self.fig, self.ax = plt.subplots(1, figsize=(8, 5))
         self.title = title
         self.xlabel = xlabel
+        if not ylabel:
+            self.ylabel = self.title
+        else:
+            self.ylabel = ylabel
 
     def add_tsplot(self, data, time, unit, condition, value,
                    marker='o', color='black', linestyle='solid', ci=68):
@@ -208,10 +213,10 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter('WIKTI'),
-        Plotter('Wikispeedia'),
+        Plotter('WIKTI'),
+        # Plotter('Wikispeedia'),
     ]:
         pt.plot()
-        pt.plot_linkpos()
+        # pt.plot_linkpos()
         # pt.correlation()
 

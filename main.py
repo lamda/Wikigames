@@ -610,11 +610,9 @@ class Wikigame(object):
 
         self.save_data()
 
-
     def close(self):
         self.db_connector.close()
         self.ngram.save()
-        pdb.set_trace()
         if self.spl and len(self.spl) > 10:
             path = os.path.join('data', self.label, 'spl.obj')
             with open(path, 'wb') as outfile:
@@ -850,6 +848,9 @@ class WIKTI(Wikigame):
                     df['time_normalized'] = time_normalized
                     df['time_word'] = time_word
                     df['time_link'] = time_link
+                    time_cols = [k for k in df if 'time' in k]
+                    for t in time_cols:
+                        df[t] /= 1000  # convert to seconds
 
                     df['word_count'] = word_count[:-1] + [np.NaN]
                 except KeyError, e:
@@ -1015,6 +1016,6 @@ if __name__ == '__main__':
         WIKTI(),
         # Wikispeedia(),
     ]:
-        # w.create_dataframe()
-        w.df_add_link_context()
+        w.create_dataframe()
+        # w.df_add_link_context()
         w.close()
