@@ -21,25 +21,28 @@ sns.set_palette(sns.color_palette(colors))
 
 
 class Plotter(object):
-    def __init__(self, label):
-        print(label)
-        self.label = label
-        print('loading data...')
-        self.data = pd.read_pickle(os.path.join('data', self.label, 'data.obj'))
-        print('loaded\n')
+    def __init__(self, labels):
+        self.data = {}
+        self.labels = labels
+        for label in self.labels:
+            print('loading', label, 'data...')
+            path = os.path.join('data', label, 'data.obj')
+            self.data[label] = pd.read_pickle(path)
+            print('loaded\n')
         self.plot_folder = os.path.join('data', 'plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
-    def plot(self):
+    def plot_all(self):
         """configure and call the plotter"""
         # add subjects for tsplot
-        self.data['subject'] = self.data['user'] + '_' + \
-            self.data['mission'].astype('str')
+        for dataset in self.data:
+            self.data[dataset]['subject'] = self.data['user'] + '_' + \
+                self.data['mission'].astype('str')
         xlabel = 'Distance to-go to target'
 
         for feature, title, ylabel in [
-            # ('spl_target', 'Shortest Path Length to Target', None),
+            ('spl_target', 'Shortest Path Length to Target', None),
             # ('tfidf_target', 'TF-IDF similarity to Target', None),
             # ('degree_out', 'Out-degree', None),
             # ('degree_in', 'In-degree', None),
@@ -52,28 +55,25 @@ class Plotter(object):
             # ('exploration', 'Explored Percentage of Page'),
             # ('linkpos_ib', 'Fraction of Links in Infobox'),
             # ('linkpos_lead', 'Fraction of Links in Lead'),
-            ('time', 'Time per article', 'seconds'),
+            # ('time', 'Time per article', 'seconds'),
             # ('time_word', 'Time per article (per word)', 'seconds'),
             # ('time_link', 'Time per article (per link)', 'seconds'),
             # ('time_normalized', 'Time per article (normalized)', 'seconds')
         ]:
             print(feature)
-            if feature not in self.data:
-                print('    Feature not present')
-                continue
-            p = Plot(title)
-
-            for k, m, c in zip([4, 5, 6, 7], markers, colors):
-                df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
-                               self.data.successful]
-                df = df[['distance-to-go', 'subject', 'pl', feature]]
-                p.add_tsplot(df, time='distance-to-go', unit='subject',
-                             condition='pl', value=feature, marker=m, color=c,
-                             xlabel=xlabel)
-            fname = feature + '_' + self.label.lower() + '.png'
-            p.finish(os.path.join(self.plot_folder, fname))
-        # drop subjects for tsplot
-        self.data.drop('subject', axis=1, inplace=True)
+            p = Plot(x=1, y=2)
+            for dataset_name, dataset in self.data.items():
+                x = self.labels.find(dataset_name)
+                for k, m, c in zip([4, 5, 6, 7], markers, colors):
+                    df = self.data[(dataset.pl == k) & (dataset.spl == 3) &
+                                   dataset.successful]
+                    df = df[['distance-to-go', 'subject', 'pl', feature]]
+                    p.add_tsplot(df, x=x, time='distance-to-go', unit='subject',
+                                 condition='pl', value=feature, marker=m,
+                                 color=c, xlabel=xlabel)
+            fname = feature + '_' + feature.lower() + '.png'
+            # TODO: add parameter titles as an array of subplot titles
+            # p.finish(os.path.join(self.plot_folder, fname))
 
     def plot_linkpos(self):
         print('linkpos')
@@ -172,31 +172,39 @@ class Plot(object):
         self.fig, self.ax = plt.subplots(x, y, figsize=(8, 5))
 
     def add_tsplot(self, data, time, unit, condition, value, **kwargs):
+            x = kwargs.pop('x', 1)
+            y = kwargs.pop('y', 1)
+            ax = self.ax[x, y]
             self.ax.invert_xaxis()
-            sns.tsplot(data, time=time, unit=unit, condition=condition,
+            sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
                        value=value, estimator=np.nanmean, **kwargs)
 
     def finish(self, fname, **kwargs):
         """perform some beautification"""
+
+        # TODO: match ylim for rows
+        for x, y in self.ax:
+            pass  # TODO
         plt.legend(loc=0)
         offset = np.abs(0.05 * plt.xlim()[1])
         plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
         offset = np.abs(0.05 * plt.ylim()[1])
         plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
         self.ax.invert_xaxis()
-        title = kwargs.pop('title', '')
-        plt.title(title)
         plt.ylabel(kwargs.pop('ylabel', title))
         plt.xlabel(kwargs.pop('xlabel', ''))
+
+        title = kwargs.pop('title', '')
+        plt.title(title)
         plt.savefig(fname)
 
 
 if __name__ == '__main__':
     for pt in [
-        Plotter('WIKTI'),
+        Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter('Wikispeedia'),
     ]:
-        pt.plot()
+        pt.plot_all()
         # pt.plot_linkpos()
         # pt.correlation()
 
