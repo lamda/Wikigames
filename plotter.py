@@ -25,17 +25,19 @@ class Plotter(object):
         print(label)
         self.label = label
         print('loading data...')
-        self.data = pd.read_pickle(os.path.join('data', self.label, 'data.pd'))
+        self.data = pd.read_pickle(os.path.join('data', self.label, 'data.obj'))
         print('loaded\n')
         self.plot_folder = os.path.join('data', 'plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        # add a subject column
-        self.data['subject'] = self.data['user'] + '_' +\
+        """configure and call the plotter"""
+        # add subjects for tsplot
+        self.data['subject'] = self.data['user'] + '_' + \
             self.data['mission'].astype('str')
         xlabel = 'Distance to-go to target'
+
         for feature, title, ylabel in [
             # ('spl_target', 'Shortest Path Length to Target', None),
             # ('tfidf_target', 'TF-IDF similarity to Target', None),
@@ -62,13 +64,15 @@ class Plotter(object):
             p = Plot(title)
 
             for k, m, c in zip([4, 5, 6, 7], markers, colors):
-                result = self.data[(self.data.pl == k) & (self.data.spl == 3) &
-                                   self.data.successful]
-                result = result[['distance-to-go', 'subject', 'pl', feature]]
-                p.add_tsplot(result, time='distance-to-go', unit='subject',
-                             condition='pl', value=feature, marker=m, color=c)
+                df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
+                               self.data.successful]
+                df = df[['distance-to-go', 'subject', 'pl', feature]]
+                p.add_tsplot(df, time='distance-to-go', unit='subject',
+                             condition='pl', value=feature, marker=m, color=c,
+                             xlabel=xlabel)
             fname = feature + '_' + self.label.lower() + '.png'
             p.finish(os.path.join(self.plot_folder, fname))
+        # drop subjects for tsplot
         self.data.drop('subject', axis=1, inplace=True)
 
     def plot_linkpos(self):
@@ -177,21 +181,13 @@ class Plot(object):
         plt.legend(loc=0)
         offset = np.abs(0.05 * plt.xlim()[1])
         plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-        if 'ylim' in kwargs:
-            plt.ylim(kwargs['ylim'])
-        else:
-            offset = np.abs(0.05 * plt.ylim()[1])
-            plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
+        offset = np.abs(0.05 * plt.ylim()[1])
+        plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
         self.ax.invert_xaxis()
-        if 'title' in kwargs:
-            plt.title(kwargs['title'])
-            if 'ylabel' not in kwargs:
-                plt.ylabel(kwargs['title'])
-            else:
-                plt.ylabel(kwargs['ylabel'])
-        if 'xlabel' in kwargs:
-            plt.xlabel(kwargs['xlabel'])
-
+        title = kwargs.pop('title', '')
+        plt.title(title)
+        plt.ylabel(kwargs.pop('ylabel', title))
+        plt.xlabel(kwargs.pop('xlabel', ''))
         plt.savefig(fname)
 
 

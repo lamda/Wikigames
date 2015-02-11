@@ -548,13 +548,13 @@ class Wikigame(object):
 
     def load_data(self):
         if self.data is None:
-            path = os.path.join('data', self.label, 'data.pd')
+            path = os.path.join('data', self.label, 'data.obj')
             self.data = pd.read_pickle(path)
 
     def save_data(self, data=None):
         if data is None:
             data = self.data
-        data.to_pickle(os.path.join('data', self.label, 'data.pd'))
+        data.to_pickle(os.path.join('data', self.label, 'data.obj'))
 
     def load_graph(self, graph_tool=False):
         # read the graph
