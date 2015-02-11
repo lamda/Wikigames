@@ -651,9 +651,13 @@ class WIKTI(Wikigame):
         folders = ['U' + '%02d' % i for i in range(1, 10)]
         for folder in folders:
             print('\n', folder)
+            # get missions and sort them numerically
             files = sorted(os.listdir(os.path.join(folder_logs, folder)))
             files = [f for f in files if f.startswith('PLAIN')]
-            for filename in files:
+            mission2fname = {int(re.findall(r'PLAIN\_\d+\_(\d+)', m)[0]): m
+                              for m in files}
+            for mission in sorted(mission2fname.keys()):
+                filename = mission2fname[mission]
                 print('   ', filename)
                 fname = os.path.join(folder_logs, folder, filename)
                 df_full = pd.read_csv(fname, sep='\t', usecols=[1, 2, 3],
@@ -858,14 +862,16 @@ class WIKTI(Wikigame):
                     continue
                 spl = self.get_spl(self.name2id[start], self.name2id[target])
 
-                results.append({
-                    'data': df,
-                    'successful': successful,
-                    'spl': spl,
-                    'pl': len(df)
-                })
-
-        data = pd.DataFrame(results)
+                # set overall dataframe attributes
+                df['successful'] = successful
+                df['spl'] = spl
+                df['pl'] = df.shape[0]
+                df['pos'] = range(df.shape[0])
+                df['distance-to-go'] = list(reversed(range(df.shape[0])))
+                df['user'] = folder
+                df['mission'] = mission
+                results.append(df)
+        data = pd.concat(results)
         self.save_data(data)
 
 

@@ -32,57 +32,44 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot(self):
-        for feature, title, ylabel, ylim in [
+        # add a subject column
+        self.data['subject'] = self.data['user'] + '_' +\
+            self.data['mission'].astype('str')
+        xlabel = 'Distance to-go to target'
+        for feature, title, ylabel in [
             # ('spl_target', 'Shortest Path Length to Target', None),
             # ('tfidf_target', 'TF-IDF similarity to Target', None),
             # ('degree_out', 'Out-degree', None),
             # ('degree_in', 'In-degree', None),
-            # ('ngram_anchor', 'N-Gram Frequency (Anchor)', (-16, -2)),
-            # ('ngram_body', 'N-Gram Frequency (Body)',  (-16, -2)),
-            # ('ngram_query', 'N-Gram Frequency (Query)',  (-15, -3)),
-            # ('ngram_title', 'N-Gram Frequency (Title)',  (-16, -2)),
-            # ('category_depth', 'Category Depth (1...most general)', None),
-            # ('category_target', 'Category Distance to target', None),
-            # ('exploration', 'Explored Percentage of Page', None),
-            # ('linkpos_ib', 'Fraction of Links in Infobox', (0, 1)),
-            # ('linkpos_lead', 'Fraction of Links in Lead', (0, 1)),
-            ('time', 'Time per article', 'seconds', (0, 110)),
-            ('time_word', 'Time per article (per word)', 'seconds', (0, 1)),
-            ('time_link', 'Time per article (per link)', 'seconds', (0, 5)),
-            ('time_normalized', 'Time per article (normalized)', 'seconds',
-             (0, 1)),
+            # ('ngram_anchor', 'N-Gram Frequency (Anchor)'),
+            # ('ngram_body', 'N-Gram Frequency (Body)'),
+            # ('ngram_query', 'N-Gram Frequency (Query)'),
+            # ('ngram_title', 'N-Gram Frequency (Title)'),
+            # ('category_depth', 'Category Depth (1...most general)'),
+            # ('category_target', 'Category Distance to target'),
+            # ('exploration', 'Explored Percentage of Page'),
+            # ('linkpos_ib', 'Fraction of Links in Infobox'),
+            # ('linkpos_lead', 'Fraction of Links in Lead'),
+            ('time', 'Time per article', 'seconds'),
+            # ('time_word', 'Time per article (per word)', 'seconds'),
+            # ('time_link', 'Time per article (per link)', 'seconds'),
+            # ('time_normalized', 'Time per article (normalized)', 'seconds')
         ]:
             print(feature)
-            try:
-                self.data.iloc[0]['data'][feature]
-            except KeyError, e:
+            if feature not in self.data:
                 print('    Feature not present')
                 continue
-            p = Plot(title, 'Distance to-go to target')
+            p = Plot(title)
 
             for k, m, c in zip([4, 5, 6, 7], markers, colors):
-                subj = 0
-                result = []
-                df = self.data[(self.data.pl == k) & (self.data.spl == 3) &
-                               self.data.successful]
-                data = [d[feature].tolist() for d in df['data']]
-                data = [d for d in data if '' not in d]
-                for d in data:
-                    distance = range(k)
-                    distance.reverse()
-                    result.append(pd.DataFrame({
-                        'condition': ['GL %d' % k] * len(d),
-                        'subj': [str(subj)] * len(d),
-                        'distance': distance,
-                        'path': d,
-                    }, dtype=np.float))
-                    subj += 1
-                result = pd.concat(result)
-                p.add_tsplot(result, time='distance', unit='subj',
-                             condition='condition', value='path',
-                             marker=m, color=c)
+                result = self.data[(self.data.pl == k) & (self.data.spl == 3) &
+                                   self.data.successful]
+                result = result[['distance-to-go', 'subject', 'pl', feature]]
+                p.add_tsplot(result, time='distance-to-go', unit='subject',
+                             condition='pl', value=feature, marker=m, color=c)
             fname = feature + '_' + self.label.lower() + '.png'
-            p.finish(os.path.join(self.plot_folder, fname), ylim=ylim)
+            p.finish(os.path.join(self.plot_folder, fname))
+        self.data.drop('subject', axis=1, inplace=True)
 
     def plot_linkpos(self):
         print('linkpos')
@@ -176,38 +163,35 @@ class Plotter(object):
 
 
 class Plot(object):
-    def __init__(self, title, xlabel, ylabel=''):
+    def __init__(self, x=1, y=1):
         """create the plot"""
-        self.fig, self.ax = plt.subplots(1, figsize=(8, 5))
-        self.title = title
-        self.xlabel = xlabel
-        if not ylabel:
-            self.ylabel = self.title
-        else:
-            self.ylabel = ylabel
+        self.fig, self.ax = plt.subplots(x, y, figsize=(8, 5))
 
-    def add_tsplot(self, data, time, unit, condition, value,
-                   marker='o', color='black', linestyle='solid', ci=68):
-            # TODO 68 is the standard error?
+    def add_tsplot(self, data, time, unit, condition, value, **kwargs):
             self.ax.invert_xaxis()
             sns.tsplot(data, time=time, unit=unit, condition=condition,
-                       value=value, ci=ci, estimator=np.nanmean,
-                       marker=marker, color=color, linestyle=linestyle)
+                       value=value, estimator=np.nanmean, **kwargs)
 
-    def finish(self, fname, ylim=None):
+    def finish(self, fname, **kwargs):
         """perform some beautification"""
         plt.legend(loc=0)
         offset = np.abs(0.05 * plt.xlim()[1])
         plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-        if ylim:
-            plt.ylim(ylim)
+        if 'ylim' in kwargs:
+            plt.ylim(kwargs['ylim'])
         else:
             offset = np.abs(0.05 * plt.ylim()[1])
             plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
         self.ax.invert_xaxis()
-        plt.title(self.title)
-        plt.xlabel(self.xlabel)
-        plt.ylabel(self.title)
+        if 'title' in kwargs:
+            plt.title(kwargs['title'])
+            if 'ylabel' not in kwargs:
+                plt.ylabel(kwargs['title'])
+            else:
+                plt.ylabel(kwargs['ylabel'])
+        if 'xlabel' in kwargs:
+            plt.xlabel(kwargs['xlabel'])
+
         plt.savefig(fname)
 
 
