@@ -941,8 +941,8 @@ class Wikispeedia(Wikigame):
             df_full['target'] = target
             for eid, entry in enumerate(df_full.iterrows()):
                 print(eid, end='\r')
-                if eid > 2000:
-                    break
+                # if eid > 2500:
+                #     break
                 node = entry[1]['path'].split(';')
                 if '<' in node:
                     # resolve backtracks
@@ -983,31 +983,40 @@ class Wikispeedia(Wikigame):
                                     for a, b in zipped] + [np.NaN]
 
                     click_data = linkpos_first[:-1]
-                    # intros = [self.intro_length[d] for d in node][:-1]  # TODO
-                    # linkpos_intro = []
-                    # for idx in range(len(click_data)):
-                    #     l = click_data[idx]
-                    #     i = intros[idx]
-                    #     if np.isnan(l) or np.isnan(i):
-                    #         linkpos_intro.append(np.NaN)
-                    #     else:
-                    #         linkpos_intro.append(l < i)
-                    # linkpos_intro = linkpos_intro + [np.NaN]
-                    # word_count = [self.length[a] if a in self.length else np.NaN
-                    #               for a in node][:-1] + [np.NaN]
+                    # pdb.set_trace()
+
+                    ibs = [self.ib_length[d] for d in node][:-1]
+                    leads = [self.lead_length[d] for d in node][:-1]
+                    linkpos_ib, linkpos_lead = [], []
+                    for idx in range(len(click_data)):
+                        c = click_data[idx]
+                        i = ibs[idx]
+                        l = leads[idx]
+                        if np.isnan(i):
+                            linkpos_ib.append(np.NaN)
+                        else:
+                            linkpos_ib.append(c < i)
+                        if np.isnan(l):
+                            linkpos_lead.append(np.NaN)
+                        else:
+                            linkpos_lead.append(i < c < l)
+                    linkpos_ib = linkpos_ib + [np.NaN]
+                    linkpos_lead = linkpos_lead + [np.NaN]
+                    word_count = [self.length[a] if a in self.length else np.NaN
+                                  for a in node][:-1] + [np.NaN]
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
                            ngram_query, spl_target, tfidf_target,
                            category_depth, category_target,
                            linkpos_first, linkpos_last,
-                           # linkpos_intro, word_count
+                           linkpos_ib, linkpos_lead, word_count
                 )
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
                            'ngram_query', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
                            'linkpos_first', 'linkpos_last',
-                           # 'linkpos_intro', 'word_count'
+                           'linkpos_ib', 'linkpos_lead', 'word_count'
                 ]
                 df = pd.DataFrame(data=data, columns=columns)
 
@@ -1017,10 +1026,10 @@ class Wikispeedia(Wikigame):
                 df['pl'] = df.shape[0]
                 df['pos'] = range(df.shape[0])
                 df['distance-to-go'] = list(reversed(range(df.shape[0])))
+                df['subject'] = eid
                 results.append(df)
 
         data = pd.concat(results)
-        data['subject'] = range(data.shape[0])
         self.save_data(data)
 
 
@@ -1029,6 +1038,7 @@ if __name__ == '__main__':
         # WIKTI(),
         Wikispeedia(),
     ]:
+        # w.compute_link_positions()
         w.create_dataframe()
         # w.df_add_link_context()
         w.close()

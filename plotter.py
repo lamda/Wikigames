@@ -33,31 +33,31 @@ class Plotter(object):
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
-    def plot_all(self):
+    def plot_comparison(self):
         """configure and call the plotter"""
         xlabel = 'Distance to-go to target'
 
         for feature, title in [
-            ('spl_target', 'Shortest Path Length to Target'),
-            ('tfidf_target', 'TF-IDF similarity to Target'),
-            ('degree_out', 'Out-degree'),
-            ('degree_in', 'In-degree'),
+            # ('spl_target', 'Shortest Path Length to Target'),
+            # ('tfidf_target', 'TF-IDF similarity to Target'),
+            # ('degree_out', 'Out-degree'),
+            # ('degree_in', 'In-degree'),
             # ('ngram_anchor', 'N-Gram Frequency (Anchor)'),
             # ('ngram_body', 'N-Gram Frequency (Body)'),
-            ('ngram_query', 'N-Gram Frequency (Query)'),
+            # ('ngram_query', 'N-Gram Frequency (Query)'),
             # ('ngram_title', 'N-Gram Frequency (Title)'),
-            ('category_depth', 'Category Depth (1...most general)'),
-            ('category_target', 'Category Distance to target'),
+            # ('category_depth', 'Category Depth (1...most general)'),
+            # ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
-            # ('linkpos_ib', 'Fraction of Links in Infobox'),
-            # ('linkpos_lead', 'Fraction of Links in Lead'),
+            ('linkpos_ib', 'Fraction of Links in Infobox'),
+            ('linkpos_lead', 'Fraction of Links in Lead'),
             # ('time', 'Time per article', 'seconds'),
             # ('time_word', 'Time per article (per word)', 'seconds'),
             # ('time_link', 'Time per article (per link)', 'seconds'),
             # ('time_normalized', 'Time per article (normalized)', 'seconds')
         ]:
             print(feature)
-            p = Plot(nrows=1, ncols=2)
+            p = Plot(nrows=1, ncols=len(self.data))
             for dataset_name, dataset in self.data.items():
                 x = self.labels.index(dataset_name)
                 for k, m, c in zip([4, 5, 6, 7], markers, colors):
@@ -68,9 +68,41 @@ class Plotter(object):
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
-            fname = feature + '_' + feature.lower() + '.png'
+            fname = feature + '.png'
             titles = np.array([self.labels])
             p.finish(os.path.join(self.plot_folder, fname), suptitle=title,
+                     titles=titles, xlabel=xlabel)
+
+    def plot_wikti(self):
+        """configure and call the plotter"""
+        xlabel = 'Distance to-go to target'
+        dataset = self.data['WIKTI']
+        for config in [
+            [
+                ('linkpos_ib', 'linkpos_lead'),
+                ('Fraction of Links in Infobox', 'Fraction of Links in Lead'),
+                'linkpos_ib_lead'
+
+            ],
+            # ('exploration', 'Explored Percentage of Page'),
+            # ('time', 'Time per article', 'seconds'),
+            # ('time_word', 'Time per article (per word)', 'seconds'),
+            # ('time_link', 'Time per article (per link)', 'seconds'),
+            # ('time_normalized', 'Time per article (normalized)', 'seconds')
+        ]:
+            p = Plot(nrows=1, ncols=len(config[0]))
+            for idx, feature in enumerate(config[0]):
+                for k, m, c in zip([4, 5, 6, 7], markers, colors):
+                    df = dataset[(dataset['pl'] == k) & (dataset['spl'] == 3) &
+                                 dataset['successful']]
+                    df = df[['distance-to-go', 'subject', 'pl', feature]]
+                    df.rename(columns={'pl': 'Game length'}, inplace=True)
+                    p.add_tsplot(df, col=idx, time='distance-to-go',
+                                 unit='subject', condition='Game length',
+                                 value=feature, marker=m, color=c)
+            fname = config[2] + '.png'
+            titles = np.array([config[1]])
+            p.finish(os.path.join(self.plot_folder, fname),
                      titles=titles, xlabel=xlabel)
 
     def plot_linkpos(self):
@@ -167,7 +199,7 @@ class Plotter(object):
 class Plot(object):
     def __init__(self, nrows=1, ncols=1):
         """create the plot"""
-        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=(14, 5),
+        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=(2+6*ncols, 5),
                                            squeeze=False)
 
     def add_tsplot(self, data, time, unit, condition, value, **kwargs):
@@ -228,10 +260,12 @@ class Plot(object):
 if __name__ == '__main__':
     for pt in [
         Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'WIKTI2']),
-        # Plotter('Wikispeedia'),
+        # Plotter(['Wikispeedia']),
     ]:
-        pt.plot_all()
+        pt.plot_comparison()
+        # pt.plot_wikti()
         # pt.plot_linkpos()
         # pt.correlation()
 
