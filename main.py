@@ -870,6 +870,7 @@ class WIKTI(Wikigame):
                 df['distance-to-go'] = list(reversed(range(df.shape[0])))
                 df['user'] = folder
                 df['mission'] = mission
+                df['subject'] = df['user'] + '_' + df['mission'].astype('str')
                 results.append(df)
         data = pd.concat(results)
         self.save_data(data)
@@ -940,6 +941,8 @@ class Wikispeedia(Wikigame):
             df_full['target'] = target
             for eid, entry in enumerate(df_full.iterrows()):
                 print(eid, end='\r')
+                if eid > 2000:
+                    break
                 node = entry[1]['path'].split(';')
                 if '<' in node:
                     # resolve backtracks
@@ -980,47 +983,51 @@ class Wikispeedia(Wikigame):
                                     for a, b in zipped] + [np.NaN]
 
                     click_data = linkpos_first[:-1]
-                    intros = [self.intro_length[d] for d in node][:-1] # TODO
-                    linkpos_intro = []
-                    for idx in range(len(click_data)):
-                        l = click_data[idx]
-                        i = intros[idx]
-                        if np.isnan(l) or np.isnan(i):
-                            linkpos_intro.append(np.NaN)
-                        else:
-                            linkpos_intro.append(l < i)
-                    linkpos_intro = linkpos_intro + [np.NaN]
-                    word_count = [self.length[a] if a in self.length else np.NaN
-                                  for a in node][:-1] + [np.NaN]
+                    # intros = [self.intro_length[d] for d in node][:-1]  # TODO
+                    # linkpos_intro = []
+                    # for idx in range(len(click_data)):
+                    #     l = click_data[idx]
+                    #     i = intros[idx]
+                    #     if np.isnan(l) or np.isnan(i):
+                    #         linkpos_intro.append(np.NaN)
+                    #     else:
+                    #         linkpos_intro.append(l < i)
+                    # linkpos_intro = linkpos_intro + [np.NaN]
+                    # word_count = [self.length[a] if a in self.length else np.NaN
+                    #               for a in node][:-1] + [np.NaN]
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
                            ngram_query, spl_target, tfidf_target,
                            category_depth, category_target,
-                           linkpos_first, linkpos_last, linkpos_intro,
-                           word_count)
+                           linkpos_first, linkpos_last,
+                           # linkpos_intro, word_count
+                )
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
                            'ngram_query', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
-                           'linkpos_first', 'linkpos_last', 'linkpos_intro',
-                           'word_count']
+                           'linkpos_first', 'linkpos_last',
+                           # 'linkpos_intro', 'word_count'
+                ]
                 df = pd.DataFrame(data=data, columns=columns)
 
-                results.append({
-                    'data': df,
-                    'successful': successful,
-                    'spl': spl,
-                    'pl': len(entry[1]['path'].split(';'))
-                })
+                # set overall dataframe attributes
+                df['successful'] = successful
+                df['spl'] = spl
+                df['pl'] = df.shape[0]
+                df['pos'] = range(df.shape[0])
+                df['distance-to-go'] = list(reversed(range(df.shape[0])))
+                results.append(df)
 
-        data = pd.DataFrame(results)
+        data = pd.concat(results)
+        data['subject'] = range(data.shape[0])
         self.save_data(data)
 
 
 if __name__ == '__main__':
     for w in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
         w.create_dataframe()
         # w.df_add_link_context()

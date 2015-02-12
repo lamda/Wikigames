@@ -35,23 +35,19 @@ class Plotter(object):
 
     def plot_all(self):
         """configure and call the plotter"""
-        # add subjects for tsplot
-        for dataset in self.data:
-            self.data[dataset]['subject'] = self.data['user'] + '_' + \
-                self.data['mission'].astype('str')
         xlabel = 'Distance to-go to target'
 
-        for feature, title, ylabel in [
-            ('spl_target', 'Shortest Path Length to Target', None),
-            # ('tfidf_target', 'TF-IDF similarity to Target', None),
-            # ('degree_out', 'Out-degree', None),
-            # ('degree_in', 'In-degree', None),
+        for feature, title in [
+            ('spl_target', 'Shortest Path Length to Target'),
+            ('tfidf_target', 'TF-IDF similarity to Target'),
+            ('degree_out', 'Out-degree'),
+            ('degree_in', 'In-degree'),
             # ('ngram_anchor', 'N-Gram Frequency (Anchor)'),
             # ('ngram_body', 'N-Gram Frequency (Body)'),
-            # ('ngram_query', 'N-Gram Frequency (Query)'),
+            ('ngram_query', 'N-Gram Frequency (Query)'),
             # ('ngram_title', 'N-Gram Frequency (Title)'),
-            # ('category_depth', 'Category Depth (1...most general)'),
-            # ('category_target', 'Category Distance to target'),
+            ('category_depth', 'Category Depth (1...most general)'),
+            ('category_target', 'Category Distance to target'),
             # ('exploration', 'Explored Percentage of Page'),
             # ('linkpos_ib', 'Fraction of Links in Infobox'),
             # ('linkpos_lead', 'Fraction of Links in Lead'),
@@ -61,19 +57,21 @@ class Plotter(object):
             # ('time_normalized', 'Time per article (normalized)', 'seconds')
         ]:
             print(feature)
-            p = Plot(x=1, y=2)
+            p = Plot(nrows=1, ncols=2)
             for dataset_name, dataset in self.data.items():
-                x = self.labels.find(dataset_name)
+                x = self.labels.index(dataset_name)
                 for k, m, c in zip([4, 5, 6, 7], markers, colors):
-                    df = self.data[(dataset.pl == k) & (dataset.spl == 3) &
-                                   dataset.successful]
+                    df = dataset[(dataset['pl'] == k) & (dataset['spl'] == 3) &
+                                 dataset['successful']]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
-                    p.add_tsplot(df, x=x, time='distance-to-go', unit='subject',
-                                 condition='pl', value=feature, marker=m,
-                                 color=c, xlabel=xlabel)
+                    df.rename(columns={'pl': 'Game length'}, inplace=True)
+                    p.add_tsplot(df, col=x, time='distance-to-go',
+                                 unit='subject', condition='Game length',
+                                 value=feature, marker=m, color=c)
             fname = feature + '_' + feature.lower() + '.png'
-            # TODO: add parameter titles as an array of subplot titles
-            # p.finish(os.path.join(self.plot_folder, fname))
+            titles = np.array([self.labels])
+            p.finish(os.path.join(self.plot_folder, fname), suptitle=title,
+                     titles=titles, xlabel=xlabel)
 
     def plot_linkpos(self):
         print('linkpos')
@@ -167,41 +165,70 @@ class Plotter(object):
 
 
 class Plot(object):
-    def __init__(self, x=1, y=1):
+    def __init__(self, nrows=1, ncols=1):
         """create the plot"""
-        self.fig, self.ax = plt.subplots(x, y, figsize=(8, 5))
+        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=(14, 5),
+                                           squeeze=False)
 
     def add_tsplot(self, data, time, unit, condition, value, **kwargs):
-            x = kwargs.pop('x', 1)
-            y = kwargs.pop('y', 1)
-            ax = self.ax[x, y]
-            self.ax.invert_xaxis()
+            row = kwargs.pop('row', 0)
+            col = kwargs.pop('col', 0)
+            ax = self.axes[row, col]
+            if not ax.xaxis_inverted():
+                ax.invert_xaxis()
             sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
                        value=value, estimator=np.nanmean, **kwargs)
 
+    def match_ylim(self):
+        for row in range(self.axes.shape[0]):
+            ylim_lower = min(a.get_ylim()[0] for a in self.axes[row])
+            ylim_upper = max(a.get_ylim()[1] for a in self.axes[row])
+            for col in range(self.axes.shape[1]):
+                ax = self.axes[row, col]
+                ax.set_ylim(ylim_lower, ylim_upper)
+
+    def add_margin(self, margin=0.05):
+        for row in range(self.axes.shape[0]):
+            for col in range(self.axes.shape[1]):
+                ax = self.axes[row, col]
+                ylim = ax.get_ylim()
+                length = ylim[1] - ylim[0]
+                ax.set_ylim(ylim[0] - np.abs(0.05 * length),
+                            ylim[1] + np.abs(0.05 * length))
+                xlim = ax.get_xlim()
+                length = xlim[1] - xlim[0]
+                ax.set_xlim(xlim[0] - np.abs(0.05 * length),
+                            xlim[1] + np.abs(0.05 * length))
+
     def finish(self, fname, **kwargs):
         """perform some beautification"""
+        titles = kwargs.pop('titles', '')
+        xlabel = kwargs.pop('xlabel', '')
+        ylabel = kwargs.pop('ylabel', '')
+        self.match_ylim()
+        self.add_margin()
+        for row in range(self.axes.shape[0]):
+            for col in range(self.axes.shape[1]):
+                ax = self.axes[row, col]
+                if not ax.xaxis_inverted():
+                    ax.invert_xaxis()
+                try:
+                    ax.set_title(titles[row, col])
+                except (IndexError, TypeError):
+                    ax.set_title('')
+                ax.set_xlabel(xlabel)
+                ax.set_ylabel(ylabel)
 
-        # TODO: match ylim for rows
-        for x, y in self.ax:
-            pass  # TODO
-        plt.legend(loc=0)
-        offset = np.abs(0.05 * plt.xlim()[1])
-        plt.xlim((plt.xlim()[0] - offset, plt.xlim()[1] + offset))
-        offset = np.abs(0.05 * plt.ylim()[1])
-        plt.ylim((plt.ylim()[0] - offset, plt.ylim()[1] + offset))
-        self.ax.invert_xaxis()
-        plt.ylabel(kwargs.pop('ylabel', title))
-        plt.xlabel(kwargs.pop('xlabel', ''))
-
-        title = kwargs.pop('title', '')
-        plt.title(title)
+        plt.suptitle(kwargs.pop('suptitle', ''), size='xx-large')
+        self.fig.subplots_adjust(left=0.05, bottom=0.1, right=0.95, top=0.9,
+                                 wspace=0.15, hspace=0.15)
         plt.savefig(fname)
 
 
 if __name__ == '__main__':
     for pt in [
         Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter('Wikispeedia'),
     ]:
         pt.plot_all()
