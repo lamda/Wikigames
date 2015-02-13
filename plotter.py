@@ -13,7 +13,6 @@ import seaborn as sns
 # set a few options
 pd.options.mode.chained_assignment = None
 colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
-markers = ['o', 'h', 'd', 'v', 's', 'x']
 sns.set_palette(sns.color_palette(colors))
 
 # import warnings
@@ -22,77 +21,79 @@ sns.set_palette(sns.color_palette(colors))
 
 class Plotter(object):
     def __init__(self, labels):
+        self.markers = ['o', 'h', 'd', 'v', 's', 'x']
+        self.colors = colors
         self.data = {}
         self.labels = labels
         for label in self.labels:
+            # load datasets
             print('loading', label, 'data...')
             path = os.path.join('data', label, 'data.obj')
             self.data[label] = pd.read_pickle(path)
+            # filter to include only games with shortest possible solutions of 3
+            self.data[label] = self.data[label][(self.data[label]['spl'] == 3)]
             print('loaded\n')
-        self.plot_folder = os.path.join('data', 'plots')
+        self.plot_folder = os.path.join('plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
     def plot_comparison(self):
-        """configure and call the plotter"""
+        """draw comparison plots for multiple datasets"""
         xlabel = 'Distance to-go to target'
-
-        for feature, title in [
-            # ('spl_target', 'Shortest Path Length to Target'),
-            # ('tfidf_target', 'TF-IDF similarity to Target'),
-            # ('degree_out', 'Out-degree'),
-            # ('degree_in', 'In-degree'),
-            # ('ngram_anchor', 'N-Gram Frequency (Anchor)'),
-            # ('ngram_body', 'N-Gram Frequency (Body)'),
-            # ('ngram_query', 'N-Gram Frequency (Query)'),
-            # ('ngram_title', 'N-Gram Frequency (Title)'),
-            # ('category_depth', 'Category Depth (1...most general)'),
-            # ('category_target', 'Category Distance to target'),
-            # ('exploration', 'Explored Percentage of Page'),
-            ('linkpos_ib', 'Fraction of Links in Infobox'),
-            ('linkpos_lead', 'Fraction of Links in Lead'),
-            # ('time', 'Time per article', 'seconds'),
-            # ('time_word', 'Time per article (per word)', 'seconds'),
-            # ('time_link', 'Time per article (per link)', 'seconds'),
-            # ('time_normalized', 'Time per article (normalized)', 'seconds')
+        titles = np.array([self.labels])
+        for feature, title, ylabel in [
+            ('spl_target', 'Shortest Path Length to Target', ''),
+            ('tfidf_target', 'TF-IDF similarity to Target', ''),
+            ('degree_out', 'Out-degree', ''),
+            ('degree_in', 'In-degree', ''),
+            ('ngram_query', 'N-Gram Frequency (Query)', ''),
+            ('category_depth', 'Category Depth', ''),
+            ('category_target', 'Category Distance to target', ''),
+            ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of Links in Lead', 'Fraction of links'),
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(self.data))
-            for dataset_name, dataset in self.data.items():
-                x = self.labels.index(dataset_name)
-                for k, m, c in zip([4, 5, 6, 7], markers, colors):
-                    df = dataset[(dataset['pl'] == k) & (dataset['spl'] == 3) &
-                                 dataset['successful']]
+            for label, dataset in self.data.items():
+                x = self.labels.index(label)
+                for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
+                    # filter the dataset
+                    df = dataset[(dataset['pl'] == k) & dataset['successful']]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
-            fname = feature + '.png'
-            titles = np.array([self.labels])
-            p.finish(os.path.join(self.plot_folder, fname), suptitle=title,
-                     titles=titles, xlabel=xlabel)
+            p.finish(os.path.join(self.plot_folder, feature + '.png'),
+                     suptitle=title, titles=titles,
+                     xlabel=xlabel, ylabel=ylabel, invert_xaxis=True)
 
     def plot_wikti(self):
-        """configure and call the plotter"""
+        """draw plots for features within the WIKTI dataset"""
         xlabel = 'Distance to-go to target'
         dataset = self.data['WIKTI']
-        for config in [
+        for features, titles, suptitle, ylabel in [
             [
-                ('linkpos_ib', 'linkpos_lead'),
-                ('Fraction of Links in Infobox', 'Fraction of Links in Lead'),
-                'linkpos_ib_lead'
-
+                ['linkpos_ib', 'linkpos_lead'],
+                ['Fraction of Links in Infobox', 'Fraction of Links in Lead'],
+                'Fractions of links in Infobox and Lead',
+                'Fraction of links'
             ],
-            # ('exploration', 'Explored Percentage of Page'),
-            # ('time', 'Time per article', 'seconds'),
-            # ('time_word', 'Time per article (per word)', 'seconds'),
-            # ('time_link', 'Time per article (per link)', 'seconds'),
-            # ('time_normalized', 'Time per article (normalized)', 'seconds')
+            # [
+            #     ['exploration'],
+            #     ['Explored Percentage of Page'],
+            #     ['']
+            # ],
+            [
+                ['time', 'time_word', 'time_link'],
+                ['Time per article', 'Time per word', 'Time per link'],
+                'Time spent',
+                'seconds'
+            ]
         ]:
-            p = Plot(nrows=1, ncols=len(config[0]))
-            for idx, feature in enumerate(config[0]):
-                for k, m, c in zip([4, 5, 6, 7], markers, colors):
+            p = Plot(nrows=1, ncols=len(features))
+            for idx, feature in enumerate(features):
+                for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
                     df = dataset[(dataset['pl'] == k) & (dataset['spl'] == 3) &
                                  dataset['successful']]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
@@ -100,10 +101,10 @@ class Plotter(object):
                     p.add_tsplot(df, col=idx, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
-            fname = config[2] + '.png'
-            titles = np.array([config[1]])
-            p.finish(os.path.join(self.plot_folder, fname),
-                     titles=titles, xlabel=xlabel)
+            titles = np.array([titles])
+            path = os.path.join(self.plot_folder, '_'.join(features) + '.png')
+            p.finish(path, titles=titles, xlabel=xlabel, ylabel=ylabel,
+                     invert_xaxis=True, suptitle=suptitle)
 
     def plot_linkpos(self):
         print('linkpos')
@@ -199,7 +200,7 @@ class Plotter(object):
 class Plot(object):
     def __init__(self, nrows=1, ncols=1):
         """create the plot"""
-        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=(2+6*ncols, 5),
+        self.fig, self.axes = plt.subplots(nrows, ncols, figsize=(2+6*ncols, 6),
                                            squeeze=False)
 
     def add_tsplot(self, data, time, unit, condition, value, **kwargs):
@@ -235,25 +236,27 @@ class Plot(object):
     def finish(self, fname, **kwargs):
         """perform some beautification"""
         titles = kwargs.pop('titles', '')
+        suptitle = kwargs.pop('suptitle', '')
         xlabel = kwargs.pop('xlabel', '')
-        ylabel = kwargs.pop('ylabel', '')
+        ylabel = kwargs.pop('ylabel', suptitle)
+        invert_xaxis = kwargs.pop('invert_xaxis', False)
         self.match_ylim()
         self.add_margin()
         for row in range(self.axes.shape[0]):
             for col in range(self.axes.shape[1]):
                 ax = self.axes[row, col]
-                if not ax.xaxis_inverted():
+                if invert_xaxis:
                     ax.invert_xaxis()
+                ax.set_xlabel(xlabel)
+                ax.set_ylabel(ylabel)
                 try:
                     ax.set_title(titles[row, col])
                 except (IndexError, TypeError):
                     ax.set_title('')
-                ax.set_xlabel(xlabel)
-                ax.set_ylabel(ylabel)
-
-        plt.suptitle(kwargs.pop('suptitle', ''), size='xx-large')
+        plt.suptitle(suptitle, size='xx-large')
         self.fig.subplots_adjust(left=0.05, bottom=0.1, right=0.95, top=0.9,
                                  wspace=0.15, hspace=0.15)
+        # pdb.set_trace()
         plt.savefig(fname)
 
 
@@ -261,11 +264,11 @@ if __name__ == '__main__':
     for pt in [
         Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI']),
-        # Plotter(['WIKTI', 'WIKTI2']),
+        # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
         # Plotter(['Wikispeedia']),
     ]:
-        pt.plot_comparison()
-        # pt.plot_wikti()
+        # pt.plot_comparison()
+        pt.plot_wikti()
         # pt.plot_linkpos()
         # pt.correlation()
 
