@@ -106,76 +106,65 @@ class Plotter(object):
             p.finish(path, titles=titles, xlabel=xlabel, ylabel=ylabel,
                      invert_xaxis=True, suptitle=suptitle)
 
+    def print_stats(self):
+        print('Statistics for WIKTI')
+        dataset = self.data['WIKTI']
+        df = dataset[dataset['successful'] & (dataset['pl'] < 9)]
+        df = df[['linkpos_first', 'linkpos_last', 'linkpos_actual']]
+        df['linkpos_diff'] = df['linkpos_first'] - df['linkpos_last']
+        df = df[~np.isnan(df['linkpos_diff'])]
+        diff = df[df['linkpos_diff'] != 0]
+        print('multiple link positions for %.2f of %d clicked links' %
+              (diff.shape[0] / df.shape[0], df.shape[0]))
+
+        first = diff[diff['linkpos_first'] == diff['linkpos_actual']]
+        first = first.shape[0]
+        last = diff[diff['linkpos_last'] == diff['linkpos_actual']]
+        last = last.shape[0]
+        between = diff[(diff['linkpos_last'] != diff['linkpos_actual']) &\
+                       (diff['linkpos_first'] != diff['linkpos_actual'])]
+        entire = diff.shape[0]
+        print('%.2f first, %.2f last, out of %d total' %
+              (first/entire, last/entire, entire))
+        stats = between[['linkpos_first', 'linkpos_actual', 'linkpos_last']]
+        first = stats['linkpos_actual'] - stats['linkpos_first'].tolist()
+        last = stats['linkpos_last'] - stats['linkpos_actual'].tolist()
+        ff, ll = 0, 0
+        for f, l in zip(first, last):
+            if f < l:
+                ff += 1
+            else:
+                ll += 1
+        total = ff + ll
+        print(ff/total, ll/total, total)
+
     def plot_linkpos(self):
         print('linkpos')
-        if self.label == 'WIKTI' and False:  # only print this when needed
-            df = self.data[(self.data.spl == 3) & self.data.successful &
-                           (self.data.pl < 9)]
-            df = pd.concat([d for d in df['data']])
-            df['linkpos_diff'] = df['linkpos_first'] - df['linkpos_last']
-            df = df[~np.isnan(df['linkpos_diff'])]
-            diff = df[df['linkpos_diff'] != 0]
-            print('multiple link positions for %.2f of %d clicked links' %
-                  (diff.shape[0] / df.shape[0], df.shape[0]))
-
-            first = diff[diff['linkpos_first'] == diff['linkpos_actual']]
-            first = first.shape[0]
-            last = diff[diff['linkpos_last'] == diff['linkpos_actual']]
-            last = last.shape[0]
-            between = diff[(diff['linkpos_last'] != diff['linkpos_actual']) &\
-                           (diff['linkpos_first'] != diff['linkpos_actual'])]
-            entire = diff.shape[0]
-            print('%.2f first, %.2f last, out of %d total' %
-                  (first/entire, last/entire, entire))
-            stats = between[['linkpos_first', 'linkpos_actual', 'linkpos_last']]
-            first = stats['linkpos_actual'] - stats['linkpos_first'].tolist()
-            last = stats['linkpos_last'] - stats['linkpos_actual'].tolist()
-            ff, ll = 0, 0
-            for f, l in zip(first, last):
-                if f < l:
-                    ff += 1
-                else:
-                    ll += 1
-            total = ff + ll
-            print(ff/total, ll/total, total)
-            pdb.set_trace()
-
-        p = Plot('word', 'Distance to Target')
-        for k, c in zip([4, 5, 6], colors):
-            for feature, label, m, ls in [
-                ('linkpos_last', 'last occurrence', 'v', 'solid'),
-                ('linkpos_actual', 'click position', 'o', 'dashed'),
-                ('linkpos_first', 'first occurrence', '^', 'solid'),
-                ('word_count', 'article length', '', 'dotted')
-            ]:
-                try:
-                    self.data.iloc[0]['data'][feature]
-                except KeyError, e:
+        xlabel = 'Distance to-go to target'
+        titles = np.array([self.labels])
+        p = Plot(1, len(self.data))
+        for feature, ylabel, m, ls in [
+            ('linkpos_last', 'last occurrence', 'v', 'solid'),
+            ('linkpos_actual', 'click position', 'o', 'dashed'),
+            ('linkpos_first', 'first occurrence', '^', 'solid'),
+            ('word_count', 'article length', '', 'dotted')
+        ]:
+            for label, dataset in self.data.items():
+                if feature not in dataset:
+                    print(feature, 'not present')
                     continue
-                subj = 0
-                result = []
-                df_raw = self.data[(self.data.pl == k) & (self.data.spl == 3) &
-                                   self.data.successful]
-                data = [d[feature].tolist() for d in df_raw['data']]
-                data = [d for d in data if '' not in d]
-                for d in data:
-                    distance = range(k)
-                    distance.reverse()
-                    df = pd.DataFrame({
-                        'condition': ['GL %d (%s)' % (k, label)] * len(d),
-                        'subj': [str(subj)] * len(d),
-                        'distance': distance,
-                        'path': d,
-                    }, dtype=np.float)
-                    df = df[~np.isnan(df['path'])]
-                    result.append(df)
-                    subj += 1
-                result = pd.concat(result)
-                p.add_tsplot(result, time='distance', unit='subj',
-                             condition='condition', value='path',
-                             marker=m, color=c, linestyle=ls, ci=0)
-        fname = 'linkpos_' + self.label.lower() + '.png'
-        p.finish(os.path.join(self.plot_folder, fname), ylim=(12000, 0))
+                x = self.labels.index(label)
+                for k, c in zip([4, 5, 6], self.colors):
+                    df = dataset[(dataset['pl'] == k) & dataset['successful']]
+                    df = df[['distance-to-go', 'subject', 'pl', feature]]
+                    df.rename(columns={'pl': 'Game length'}, inplace=True)
+                    p.add_tsplot(df, col=x, time='distance-to-go',
+                                 unit='subject', condition='Game length', ci=0,
+                                 value=feature, marker=m, color=c, linestyle=ls,
+                                 legend=False)
+        p.finish(os.path.join(self.plot_folder, 'linkpos.png'),
+                 suptitle='Link Position', titles=titles, xlabel=xlabel,
+                 ylabel='word', invert_xaxis=True)
 
     def correlation(self):
         for feature1, feature2 in [
@@ -256,19 +245,20 @@ class Plot(object):
         plt.suptitle(suptitle, size='xx-large')
         self.fig.subplots_adjust(left=0.05, bottom=0.1, right=0.95, top=0.9,
                                  wspace=0.15, hspace=0.15)
-        # pdb.set_trace()
+        pdb.set_trace()
         plt.savefig(fname)
 
 
 if __name__ == '__main__':
     for pt in [
-        Plotter(['WIKTI', 'Wikispeedia']),
-        # Plotter(['WIKTI']),
+        # Plotter(['WIKTI', 'Wikispeedia']),
+        Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
         # Plotter(['Wikispeedia']),
     ]:
         # pt.plot_comparison()
-        pt.plot_wikti()
-        # pt.plot_linkpos()
+        # pt.plot_wikti()
+        # pt.print_stats()
+        pt.plot_linkpos()
         # pt.correlation()
 
