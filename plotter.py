@@ -143,25 +143,27 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         titles = np.array([self.labels])
         p = Plot(1, len(self.data))
-        for feature, ylabel, m, ls in [
-            ('linkpos_last', 'last occurrence', 'v', 'solid'),
-            ('linkpos_actual', 'click position', 'o', 'dashed'),
-            ('linkpos_first', 'first occurrence', '^', 'solid'),
-            ('word_count', 'article length', '', 'dotted')
-        ]:
-            for label, dataset in self.data.items():
-                if feature not in dataset:
-                    print(feature, 'not present')
-                    continue
-                x = self.labels.index(label)
-                for k, c in zip([4, 5, 6], self.colors):
+        for k, c in zip([4, 5, 6], self.colors):
+            for feature, ylabel, m, ls in [
+                ('linkpos_last', 'last occurrence', 'v', 'solid'),
+                ('linkpos_actual', 'click position', 'o', 'dashed'),
+                ('linkpos_first', 'first occurrence', '^', 'solid'),
+                ('word_count', 'article length', '', 'dotted')
+            ]:
+                for label, dataset in self.data.items():
+                    if feature not in dataset:
+                        print(feature, 'not present')
+                        continue
+                    x = self.labels.index(label)
                     df = dataset[(dataset['pl'] == k) & dataset['successful']]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
+                    df['pl'] = df['pl'].apply(lambda l: str(l) +
+                                              ' (' + ylabel + ')')
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length', ci=0,
                                  value=feature, marker=m, color=c, linestyle=ls,
-                                 legend=False)
+                                 legend=True)
         p.finish(os.path.join(self.plot_folder, 'linkpos.png'),
                  suptitle='Link Position', titles=titles, xlabel=xlabel,
                  ylabel='word', invert_xaxis=True)
@@ -243,16 +245,15 @@ class Plot(object):
                 except (IndexError, TypeError):
                     ax.set_title('')
         plt.suptitle(suptitle, size='xx-large')
-        self.fig.subplots_adjust(left=0.05, bottom=0.1, right=0.95, top=0.9,
+        self.fig.subplots_adjust(left=0.1, bottom=0.1, right=0.95, top=0.9,
                                  wspace=0.15, hspace=0.15)
-        pdb.set_trace()
         plt.savefig(fname)
 
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['WIKTI', 'Wikispeedia']),
-        Plotter(['WIKTI']),
+        Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
         # Plotter(['Wikispeedia']),
     ]:
