@@ -169,23 +169,20 @@ class Plotter(object):
                  ylabel='word', invert_xaxis=True)
 
     def correlation(self):
-        for feature1, feature2 in [
-            ('degree_in', 'category_depth'),
+        for features in [
+            ['degree_in', 'degree_out'],
+            ['degree_in', 'category_depth'],
+            ['degree_in', 'ngram_query'],
+            ['category_depth', 'ngram_query'],
         ]:
-            print(feature1, feature2)
-            try:
-                self.data.iloc[0]['data'][feature1]
-                self.data.iloc[0]['data'][feature2]
-            except KeyError, e:
-                print('    Feature not present')
-                continue
-            df = self.data[(self.data.pl < 9 ) & (self.data.spl == 3) &
-                           self.data.successful]
-            data1 = [d[feature1].tolist() for d in df['data']]
-            data2 = [d[feature2].tolist() for d in df['data']]
-            data1 = [d for d in data1 if '' not in d]
-            data2 = [d for d in data2 if '' not in d]
-            sns.corrplot()
+            for label, dataset in self.data.items():
+                df = dataset[(dataset['pl'] < 9) & dataset['successful']]
+                df = df[features]
+                sns.jointplot(features[0], features[1], df)
+                fname = 'corr_' + features[0] + '_' + features[1] + '_'\
+                        + label + '.png'
+                plt.title(label)
+                plt.savefig(os.path.join(self.plot_folder, fname))
 
 
 class Plot(object):
@@ -195,13 +192,13 @@ class Plot(object):
                                            squeeze=False)
 
     def add_tsplot(self, data, time, unit, condition, value, **kwargs):
-            row = kwargs.pop('row', 0)
-            col = kwargs.pop('col', 0)
-            ax = self.axes[row, col]
-            if not ax.xaxis_inverted():
-                ax.invert_xaxis()
-            sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
-                       value=value, estimator=np.nanmean, **kwargs)
+        row = kwargs.pop('row', 0)
+        col = kwargs.pop('col', 0)
+        ax = self.axes[row, col]
+        if not ax.xaxis_inverted():
+            ax.invert_xaxis()
+        sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
+                   value=value, estimator=np.nanmean, **kwargs)
 
     def match_ylim(self):
         for row in range(self.axes.shape[0]):
@@ -254,12 +251,13 @@ if __name__ == '__main__':
     for pt in [
         Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI']),
+        # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
         # Plotter(['Wikispeedia']),
     ]:
-        # pt.plot_comparison()
-        # pt.plot_wikti()
-        # pt.print_stats()
+        pt.plot_comparison()
+        pt.plot_wikti()
+        pt.print_stats()
         pt.plot_linkpos()
-        # pt.correlation()
+        pt.correlation()
 
