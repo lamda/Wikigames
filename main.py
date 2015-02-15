@@ -167,6 +167,7 @@ class Wikigame(object):
         self.length, self.pos2link = None, None
         self.ib_length, self.lead_length = None, None
         self.spl = None
+        self.link_context, self.link_sets = None, None
         self.ngram = NgramFrequency()
 
         # build some mappings from the database
@@ -546,6 +547,29 @@ class Wikigame(object):
                     self.pos2link, self.ib_length,\
                     self.lead_length = pickle.load(infile)
 
+    def get_link_context(self, start, pos):
+        if self.link_context is None:
+            try:
+                path = os.path.join('data', self.label, 'link_context.obj')
+                with open(path, 'rb') as infile:
+                    self.link_context = pickle.load(infile)
+            except (IOError, EOFError):
+                self.link_context = {}
+        if self.link_sets is None:
+            self.link_sets = {k: sorted(self.pos2link[k].keys())
+                              for k in self.pos2link}
+        try:
+            return self.link_context[(start, pos)]
+        except KeyError:
+            if np.isnan(pos):
+                self.link_context[(start, pos)] = np.NaN
+            else:
+                ctxt = sum(pos - 10 <= l <= pos + 10
+                           for l in self.link_sets[start])
+                self.link_context[(start, pos)] = ctxt
+
+        return self.link_context[(start, pos)]
+
     def load_data(self):
         if self.data is None:
             path = os.path.join('data', self.label, 'data.obj')
@@ -590,26 +614,6 @@ class Wikigame(object):
     def print_error(self, message):
         print('        Error:', message)
 
-    def df_add_link_context(self):
-        self.load_data()
-        self.load_link_positions()
-        link_sets = {k: self.pos2link[k].keys() for k in self.pos2link}
-
-        for i in range(self.data.shape[0]):
-            df = self.data.iloc[i]['data']
-            ctxt = [link_sets[n]
-                    for n, m in zip(df['node'], df['node_id'].iloc[1:])]
-
-            links = []
-            for c, n in zip(ctxt, df['node']):
-                window = range(max(0, df['linkpos_first'] - 10),
-                               min(self.length[n]), df['linkpos_first'] + 10)
-                links.append(len(p for p in window if p in c))
-            df['link_context'] = ctxt + [np.NaN]
-            pdb.set_trace()
-
-        self.save_data()
-
     def close(self):
         self.db_connector.close()
         self.ngram.save()
@@ -617,6 +621,10 @@ class Wikigame(object):
             path = os.path.join('data', self.label, 'spl.obj')
             with open(path, 'wb') as outfile:
                 pickle.dump(self.spl, outfile, -1)
+        if self.link_context and len(self.link_context) > 10:
+            path = os.path.join('data', self.label, 'link_context.obj')
+            with open(path, 'wb') as outfile:
+                pickle.dump(self.link_context, outfile, -1)
 
 
 class WIKTI(Wikigame):
@@ -655,7 +663,7 @@ class WIKTI(Wikigame):
             files = sorted(os.listdir(os.path.join(folder_logs, folder)))
             files = [f for f in files if f.startswith('PLAIN')]
             mission2fname = {int(re.findall(r'PLAIN\_\d+\_(\d+)', m)[0]): m
-                              for m in files}
+                             for m in files}
             for mission in sorted(mission2fname.keys()):
                 filename = mission2fname[mission]
                 print('   ', filename)
@@ -821,7 +829,9 @@ class WIKTI(Wikigame):
                          for a, b in zipped] + [np.NaN]
                     try:
                         df['linkpos_actual'] = link_data + [np.NaN]
-                        click_data = link_data
+                        zipped2 = zip(df['node'], df['linkpos_actual'])[:-1]
+                        df['link_context'] = [self.get_link_context(a, b)
+                                              for a, b in zipped2] + [np.NaN]
 
                         # to substitute first possible link use the following
                         # click_data = df['linkpos_first'].tolist()[:-1]
@@ -829,8 +839,8 @@ class WIKTI(Wikigame):
                         ibs = [self.ib_length[d] for d in df['node']][:-1]
                         leads = [self.lead_length[d] for d in df['node']][:-1]
                         linkpos_ib, linkpos_lead = [], []
-                        for idx in range(len(click_data)):
-                            c = click_data[idx]
+                        for idx in range(len(link_data)):
+                            c = link_data[idx]
                             i = ibs[idx]
                             l = leads[idx]
                             if np.isnan(i):
@@ -847,7 +857,6 @@ class WIKTI(Wikigame):
                         print(e)
                         self.print_error('???')
                         pdb.set_trace()
-
                     df['time'] = time
                     df['time_normalized'] = time_normalized
                     df['time_word'] = time_word
@@ -941,8 +950,8 @@ class Wikispeedia(Wikigame):
             df_full['target'] = target
             for eid, entry in enumerate(df_full.iterrows()):
                 print(eid, end='\r')
-                # if eid > 2500:
-                #     break
+                if eid > 2500:
+                    break
                 node = entry[1]['path'].split(';')
                 if '<' in node:
                     # resolve backtracks
@@ -981,9 +990,10 @@ class Wikispeedia(Wikigame):
                                      for a, b in zipped] + [np.NaN]
                     linkpos_last = [self.link2pos_last[a][b]
                                     for a, b in zipped] + [np.NaN]
-
+                    zipped2 = zip(node, linkpos_first)[:-1]
+                    link_context = [self.get_link_context(a, b)
+                                    for a, b in zipped2] + [np.NaN]
                     click_data = linkpos_first[:-1]
-                    # pdb.set_trace()
 
                     ibs = [self.ib_length[d] for d in node][:-1]
                     leads = [self.lead_length[d] for d in node][:-1]
@@ -1009,13 +1019,13 @@ class Wikispeedia(Wikigame):
                 data = zip(node, node_id, degree_out, degree_in,
                            ngram_query, spl_target, tfidf_target,
                            category_depth, category_target,
-                           linkpos_first, linkpos_last,
+                           linkpos_first, linkpos_last, link_context,
                            linkpos_ib, linkpos_lead, word_count
                 )
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
                            'ngram_query', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
-                           'linkpos_first', 'linkpos_last',
+                           'linkpos_first', 'linkpos_last', 'link_context',
                            'linkpos_ib', 'linkpos_lead', 'word_count'
                 ]
                 df = pd.DataFrame(data=data, columns=columns)
@@ -1038,7 +1048,5 @@ if __name__ == '__main__':
         # WIKTI(),
         Wikispeedia(),
     ]:
-        # w.compute_link_positions()
         w.create_dataframe()
-        # w.df_add_link_context()
         w.close()

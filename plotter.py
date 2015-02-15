@@ -42,15 +42,16 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         titles = np.array([self.labels])
         for feature, title, ylabel in [
-            ('spl_target', 'Shortest Path Length to Target', ''),
-            ('tfidf_target', 'TF-IDF similarity to Target', ''),
-            ('degree_out', 'Out-degree', ''),
-            ('degree_in', 'In-degree', ''),
-            ('ngram_query', 'N-Gram Frequency (Query)', ''),
-            ('category_depth', 'Category Depth', ''),
-            ('category_target', 'Category Distance to target', ''),
-            ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),
-            ('linkpos_lead', 'Fraction of Links in Lead', 'Fraction of links'),
+            # ('spl_target', 'Shortest Path Length to Target', ''),
+            # ('tfidf_target', 'TF-IDF similarity to Target', ''),
+            # ('degree_out', 'Out-degree', ''),
+            # ('degree_in', 'In-degree', ''),
+            # ('ngram_query', 'N-Gram Frequency (Query)', ''),
+            # ('category_depth', 'Category Depth', ''),
+            # ('category_target', 'Category Distance to target', ''),
+            # ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),
+            # ('linkpos_lead', 'Fraction of Links in Lead', 'Fraction of links'),
+            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(self.data))
@@ -256,8 +257,8 @@ if __name__ == '__main__':
         # Plotter(['Wikispeedia']),
     ]:
         pt.plot_comparison()
-        pt.plot_wikti()
-        pt.print_stats()
-        pt.plot_linkpos()
-        pt.correlation()
+        # pt.plot_wikti()
+        # pt.print_stats()
+        # pt.plot_linkpos()
+        # pt.correlation()
 
