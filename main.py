@@ -11,6 +11,7 @@ import pdb
 import re
 import urllib2
 
+import joblib
 import numpy as np
 import pandas as pd
 import pymysql
@@ -159,7 +160,12 @@ class Wikigame(object):
         self.data = None
         self.graph = None
         self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
-        self.plaintext_folder = os.path.join('data', label, 'wpcd', 'plaintext')
+        self.plaintext_folder = os.path.join(self.html_base_folder, 'plaintext')
+        self.cache_folder = os.path.join('data', label, 'cache')
+
+        self.cache = joblib.Memory(cachedir=self.cache_folder)
+        self.get_spl = self.cache.cache(self.get_spl)
+
         self.tfidf_similarity = None
         self.category_depth = None
         self.category_distance = None
@@ -193,6 +199,9 @@ class Wikigame(object):
                                                     SUM(amount) as links
                                              FROM links GROUP BY page_id;''')
         self.id2links = {p['page_id']: int(p['links']) for p in links}
+
+    def __enter__(self):
+        return self
 
     def read_edge_list_gt(self, filename, directed=True, parallel_edges=False):
         if gt is None:
@@ -410,6 +419,22 @@ class Wikigame(object):
         if this is too slow, add an index to the table as follows:
         ALTER TABLE path_lengths ADD INDEX page_id (page_id);
         """
+        # query = '''SELECT path_length FROM path_lengths
+        #            WHERE page_id=%d AND target_page_id=%d'''\
+        #         % (start, target)
+        # length = self.db_connector.execute(query)
+        # if not length:
+        #     return np.NaN
+        # else:
+        #     return length[0]['path_length']
+        return 1
+
+
+    def get_spl_alt(self, start, target):
+        """ get the shortest path length for two nodes from the database
+        if this is too slow, add an index to the table as follows:
+        ALTER TABLE path_lengths ADD INDEX page_id (page_id);
+        """
         if self.spl is None:
             try:
                 path = os.path.join('data', self.label, 'spl.obj')
@@ -614,7 +639,7 @@ class Wikigame(object):
     def print_error(self, message):
         print('        Error:', message)
 
-    def close(self):
+    def __exit__(self, type, value, traceback):
         self.db_connector.close()
         self.ngram.save()
         if self.spl and len(self.spl) > 10:
@@ -1044,9 +1069,14 @@ class Wikispeedia(Wikigame):
 
 
 if __name__ == '__main__':
-    for w in [
-        # WIKTI(),
-        Wikispeedia(),
+    for wg in [
+        WIKTI(),
+        # Wikispeedia(),
     ]:
-        w.create_dataframe()
-        w.close()
+        with wg:
+            # print(wg.get_category_depth(50))
+            wg.get_spl(10, 15)
+            pdb.set_trace()
+
+            wg.get_spl
+
