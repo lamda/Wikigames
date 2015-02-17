@@ -11,7 +11,6 @@ import pdb
 import re
 import urllib2
 
-import joblib
 import numpy as np
 import pandas as pd
 import pymysql
@@ -19,6 +18,7 @@ import PySide.QtCore
 import PySide.QtGui
 import PySide.QtWebKit
 
+from decorators import Cached
 import credentials
 
 
@@ -162,9 +162,6 @@ class Wikigame(object):
         self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
         self.plaintext_folder = os.path.join(self.html_base_folder, 'plaintext')
         self.cache_folder = os.path.join('data', label, 'cache')
-
-        self.cache = joblib.Memory(cachedir=self.cache_folder)
-        self.get_spl = self.cache.cache(self.get_spl)
 
         self.tfidf_similarity = None
         self.category_depth = None
@@ -414,46 +411,19 @@ class Wikigame(object):
             return self.category_distance[target][start]
         return self.category_distance[start][target]
 
+    @Cached
     def get_spl(self, start, target):
         """ get the shortest path length for two nodes from the database
         if this is too slow, add an index to the table as follows:
         ALTER TABLE path_lengths ADD INDEX page_id (page_id);
         """
-        # query = '''SELECT path_length FROM path_lengths
-        #            WHERE page_id=%d AND target_page_id=%d'''\
-        #         % (start, target)
-        # length = self.db_connector.execute(query)
-        # if not length:
-        #     return np.NaN
-        # else:
-        #     return length[0]['path_length']
-        return 1
-
-
-    def get_spl_alt(self, start, target):
-        """ get the shortest path length for two nodes from the database
-        if this is too slow, add an index to the table as follows:
-        ALTER TABLE path_lengths ADD INDEX page_id (page_id);
-        """
-        if self.spl is None:
-            try:
-                path = os.path.join('data', self.label, 'spl.obj')
-                with open(path, 'rb') as infile:
-                    self.spl = pickle.load(infile)
-            except (IOError, EOFError):
-                self.spl = {}
-        try:
-            return self.spl[(start, target)]
-        except KeyError:
-            query = '''SELECT path_length FROM path_lengths
-                       WHERE page_id=%d AND target_page_id=%d'''\
-                    % (start, target)
-            length = self.db_connector.execute(query)
+        query = '''SELECT path_length FROM path_lengths
+                   WHERE page_id=%d AND target_page_id=%d''' % (start, target)
+        length = self.db_connector.execute(query)
         if not length:
-            self.spl[(start, target)] = np.NaN
+            return np.NaN
         else:
-            self.spl[(start, target)] = length[0]['path_length']
-        return self.spl[(start, target)]
+            return length[0]['path_length']
 
     def compute_link_positions(self):
         print('computing link positions...')
@@ -1069,14 +1039,13 @@ class Wikispeedia(Wikigame):
 
 
 if __name__ == '__main__':
+
+    # Cached.clear_cache()
+
     for wg in [
         WIKTI(),
         # Wikispeedia(),
     ]:
         with wg:
-            # print(wg.get_category_depth(50))
-            wg.get_spl(10, 15)
-            pdb.set_trace()
-
-            wg.get_spl
+            wg.create_dataframe()
 
