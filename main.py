@@ -160,10 +160,11 @@ class Wikigame(object):
         self.data = None
         self.graph = None
         self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
-        self.plaintext_folder = os.path.join(self.html_base_folder, 'plaintext')
+        self.plaintext_folder = os.path.join('data', label, 'wpcd', 'plaintext')
         self.cache_folder = os.path.join('data', label, 'cache')
 
         self.tfidf_similarity = None
+
         self.category_depth = None
         self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
@@ -293,41 +294,15 @@ class Wikigame(object):
             with io.open(ofname, 'w', encoding='utf-8') as outfile:
                 outfile.write(text)
 
-    def compute_tfidf_similarity(self):
-        """compute the TF-IDF cosine similarity between articles
-
-        articles are sorted by their ID as in the MySQL database
-        """
-        print('computing TF-IDF similarity...')
-        from sklearn.feature_extraction.text import TfidfVectorizer
-
-        # read plaintext files
-        content = []
-        for i, title in self.id2name.items():
-            with io.open(self.plaintext_folder + title + '.txt',
-                         encoding='utf-8') as infile:
-                data = infile.read()
-            content.append(data)
-
-        # compute cosine TF-IDF similarity
-        with io.open(os.path.join('data', 'stopwords.txt'), encoding='utf-8')\
-                as infile:
-            stopwords = infile.read().splitlines()
-        tvec = TfidfVectorizer(stop_words=stopwords)
-        tfidf = tvec.fit_transform(content)
-        tfidf_similarity = tfidf * tfidf.T
-        tfidf_similarity = tfidf_similarity.todense()
-        path = os.path.join('data', self.label, 'tfidf_similarity.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump(tfidf_similarity, outfile, -1)
-
+    @Cached
     def get_tfidf_similarity(self, start, target):
-        if self.tfidf_similarity is None:
-            path = os.path.join('data', self.label, 'tfidf_similarity.obj')
-            with open(path, 'rb') as infile:
-                self.tfidf_similarity = pickle.load(infile)
-        # subtract one because Wikipedia ids start with 1 and not 0
-        return self.tfidf_similarity[start-1, target-1]
+        if start < target:
+            start, target = target, start
+
+        query = '''SELECT similarity FROM tfidf_similarity
+                   WHERE page_id=%d AND target_page_id=%d''' % (start, target)
+        similarity = self.db_connector.execute(query)
+        return similarity[0]['similarity']
 
     def compute_category_stats(self):
         print('computing category stats...')
@@ -628,6 +603,16 @@ class WIKTI(Wikigame):
     def __init__(self):
         super(WIKTI, self).__init__(WIKTI.label)
 
+    def fill_database(self):
+        from modules import TfidfCalculator
+
+        db_connector = DbConnector('wikti')
+
+        path_calculator = TfidfCalculator.TfidfCalculator(db_connector,
+                                                          self.plaintext_folder)
+        path_calculator.run()
+        db_connector.close()
+
     def create_dataframe(self):
         """compute the click data as a pandas frame"""
         print('creating dataframe...')
@@ -897,30 +882,35 @@ class Wikispeedia(Wikigame):
         db_connector.commit()
         db_connector.close()
 
-    @staticmethod
-    def fill_database():
+    def fill_database(self):
         from modules import PageExtractor
         from modules import LinkExtractor
         from modules import LinkCleaner
         from modules import PathCalculator
         from modules import NodeValues
+        from modules import TfidfCalculator
 
         db_connector = DbConnector('wikispeedia')
 
-        page_extractor = PageExtractor.PageExtractor(db_connector)
-        page_extractor.run()
+        # page_extractor = PageExtractor.PageExtractor(db_connector)
+        # page_extractor.run()
+        #
+        # link_extractor = LinkExtractor.LinkExtractor(db_connector)
+        # link_extractor.run()
+        #
+        # link_cleaner = LinkCleaner.LinkCleaner(db_connector)
+        # link_cleaner.run()
+        #
+        # path_calculator = PathCalculator.PathCalculator(db_connector)
+        # path_calculator.run()
+        #
+        # node_values = NodeValues.NodeValues(db_connector)
+        # node_values.run()
 
-        link_extractor = LinkExtractor.LinkExtractor(db_connector)
-        link_extractor.run()
-
-        link_cleaner = LinkCleaner.LinkCleaner(db_connector)
-        link_cleaner.run()
-
-        path_calculator = PathCalculator.PathCalculator(db_connector)
+        path_calculator = TfidfCalculator.TfidfCalculator(db_connector,
+                                                          self.plaintext_folder)
         path_calculator.run()
 
-        node_values = NodeValues.NodeValues(db_connector)
-        node_values.run()
         db_connector.close()
 
     def create_dataframe(self):
@@ -1047,5 +1037,8 @@ if __name__ == '__main__':
         # Wikispeedia(),
     ]:
         with wg:
-            wg.create_dataframe()
+            # wg.create_dataframe()
+            # wg.compute_tfidf_similarity()
+            # wg.fill_database()
+            wg.get_tfidf_similarity(1, 10)
 

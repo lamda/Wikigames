@@ -31,6 +31,7 @@ class Cached(object):
                 self.cache = {}
 
         key = hashlib.sha1(str(args[1:]) + str(kwargs)).hexdigest()
+        # TODO: hash the string-pickled version
         try:
             return self.cache[key]
         except KeyError:
@@ -42,7 +43,6 @@ class Cached(object):
         return functools.partial(self.__call__, inst)
 
     def save(self):
-        # import pdb; pdb.set_trace()
         if not self.cache:
             return
         if not os.path.exists(CACHE_FOLDER):
