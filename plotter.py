@@ -46,7 +46,7 @@ class Plotter(object):
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Out-degree', ''),
             # ('degree_in', 'In-degree', ''),
-            # ('ngram_query', 'N-Gram Frequency (Query)', ''),
+            # ('ngram', 'N-Gram Frequency (Query)', ''),
             # ('category_depth', 'Category Depth', ''),
             # ('category_target', 'Category Distance to target', ''),
             # ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),

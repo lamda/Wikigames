@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division, print_function
+import atexit
 import bisect
 from collections import defaultdict
 import cPickle as pickle
@@ -9,7 +10,6 @@ import io
 import os
 import pdb
 import re
-import urllib2
 
 import numpy as np
 import pandas as pd
@@ -19,8 +19,7 @@ import PySide.QtGui
 import PySide.QtWebKit
 
 from decorators import Cached
-import credentials
-
+import ngram
 
 # set a few options
 pd.options.mode.chained_assignment = None
@@ -39,6 +38,7 @@ class DbConnector(object):
         self.db_cursor_nobuff = self.db_connection.cursor(
             pymysql.cursors.SSCursor)
         self.db = db
+        # atexit.register(self.close())
 
     def close(self):
         self.db_cursor.close()
@@ -63,41 +63,6 @@ class DbConnector(object):
     def fetch_cursor_nobuff(self, _statement, _args):
         self.db_cursor_nobuff.execute(_statement, _args)
         return self.db_cursor_nobuff
-
-
-class NgramFrequency(object):
-    def __init__(self):
-        self.token = credentials.microsoft_token
-        self.types = (
-            # 'anchor',
-            # 'body',
-            'query',
-            # 'title',
-        )
-        try:
-            with open(os.path.join('data', 'ngram.obj'), 'rb') as infile:
-                    self.ngram = pickle.load(infile)
-        except (IOError, EOFError):
-            self.ngram = {tp: {} for tp in self.types}
-        url_base = 'http://weblm.research.microsoft.com/rest.svc/bing-'
-        self.url = {tp: url_base + tp + '/2013-12/5/jp?u=' + self.token + '&p='
-                    for tp in self.types}
-
-    def get_frequency(self, ngram_type, title):
-        try:
-            return self.ngram[ngram_type][title]
-        except KeyError:
-            self.retrieve_frequency(ngram_type, title)
-            return self.ngram[ngram_type][title]
-
-    def retrieve_frequency(self, ngram_type, title):
-        title_url = title.replace(' ', '+').replace('_', '+')
-        url = self.url[ngram_type] + title_url
-        self.ngram[ngram_type][title] = float(urllib2.urlopen(url).read())
-
-    def save(self):
-        with open(os.path.join('data', 'ngram.obj'), 'wb') as outfile:
-            pickle.dump(self.ngram, outfile, -1)
 
 
 class WebPageSize(PySide.QtGui.QMainWindow):
@@ -162,17 +127,12 @@ class Wikigame(object):
         self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
         self.plaintext_folder = os.path.join('data', label, 'wpcd', 'plaintext')
         self.cache_folder = os.path.join('data', label, 'cache')
+        self.ngram = ngram.ngram_frequency
 
-        self.tfidf_similarity = None
-
-        self.category_depth = None
-        self.category_distance = None
         self.link2pos_first, self.link2pos_last = None, None
         self.length, self.pos2link = None, None
         self.ib_length, self.lead_length = None, None
-        self.spl = None
         self.link_context, self.link_sets = None, None
-        self.ngram = NgramFrequency()
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
@@ -198,8 +158,13 @@ class Wikigame(object):
                                              FROM links GROUP BY page_id;''')
         self.id2links = {p['page_id']: int(p['links']) for p in links}
 
-    def __enter__(self):
-        return self
+    def load_graph(self, graph_tool=False):
+        # read the graph
+        path = os.path.join('data', self.label, 'links.txt')
+        if graph_tool:
+            self.graph = self.read_edge_list_gt(path)
+        else:
+            self.graph = self.read_edge_list_nx(path)
 
     def read_edge_list_gt(self, filename, directed=True, parallel_edges=False):
         if gt is None:
@@ -452,28 +417,17 @@ class Wikigame(object):
                     self.pos2link, self.ib_length,\
                     self.lead_length = pickle.load(infile)
 
+    @Cached
     def get_link_context(self, start, pos):
-        if self.link_context is None:
-            try:
-                path = os.path.join('data', self.label, 'link_context.obj')
-                with open(path, 'rb') as infile:
-                    self.link_context = pickle.load(infile)
-            except (IOError, EOFError):
-                self.link_context = {}
         if self.link_sets is None:
             self.link_sets = {k: sorted(self.pos2link[k].keys())
                               for k in self.pos2link}
-        try:
-            return self.link_context[(start, pos)]
-        except KeyError:
-            if np.isnan(pos):
-                self.link_context[(start, pos)] = np.NaN
-            else:
-                ctxt = sum(pos - 10 <= l <= pos + 10
-                           for l in self.link_sets[start])
-                self.link_context[(start, pos)] = ctxt
-
-        return self.link_context[(start, pos)]
+        if np.isnan(pos):
+                return np.NaN
+        else:
+            ctxt = sum(pos - 10 <= l <= pos + 10
+                       for l in self.link_sets[start])
+            return ctxt
 
     def load_data(self):
         if self.data is None:
@@ -484,27 +438,6 @@ class Wikigame(object):
         if data is None:
             data = self.data
         data.to_pickle(os.path.join('data', self.label, 'data.obj'))
-
-    def load_graph(self, graph_tool=False):
-        # read the graph
-        path = os.path.join('data', self.label, 'links.txt')
-        if graph_tool:
-            self.graph = self.read_edge_list_gt(path)
-        else:
-            self.graph = self.read_edge_list_nx(path)
-
-    def plot_link_amount_distribution(self):
-        import seaborn as sns
-        import matplotlib.pyplot as plt
-        sns.set_palette(sns.color_palette(["#9b59b6", "#3498db", "#95a5a6",
-                                   "#e74c3c", "#34495e", "#2ecc71"]))
-        query = 'SELECT amount, COUNT(*) FROM links GROUP BY amount;'
-        df = pd.io.sql.read_sql(query, self.db_connector.db_connection)
-        df.index = df.amount
-        df.plot(kind='bar')
-        plt.show()
-        frac = df.iloc[1:]['COUNT(*)'].sum() / df['COUNT(*)'].sum()
-        print('links with multiple occurrences:', frac)
 
     # dataframe preparation helpers ----
 
@@ -518,18 +451,6 @@ class Wikigame(object):
 
     def print_error(self, message):
         print('        Error:', message)
-
-    def __exit__(self, type, value, traceback):
-        self.db_connector.close()
-        self.ngram.save()
-        if self.spl and len(self.spl) > 10:
-            path = os.path.join('data', self.label, 'spl.obj')
-            with open(path, 'wb') as outfile:
-                pickle.dump(self.spl, outfile, -1)
-        if self.link_context and len(self.link_context) > 10:
-            path = os.path.join('data', self.label, 'link_context.obj')
-            with open(path, 'wb') as outfile:
-                pickle.dump(self.link_context, outfile, -1)
 
 
 class WIKTI(Wikigame):
@@ -720,9 +641,8 @@ class WIKTI(Wikigame):
                                         for i in df['node_id']]
                     df['degree_in'] = [self.id2deg_in[i] for i in df['node_id']]
 
-                    for tp in self.ngram.types:
-                        df['ngram_' + tp] = [self.ngram.get_frequency(tp, n)
-                                             for n in df['node']]
+                    df['ngram'] = [self.ngram.get_frequency(n)
+                                   for n in df['node']]
                     tid = self.name2id[target]
                     df['spl_target'] = [self.get_spl(i, tid)
                                         for i in df['node_id']]
@@ -848,13 +768,12 @@ class Wikispeedia(Wikigame):
         # node_values = NodeValues(db_connector)
         # node_values.run()
 
-        # path_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
-        # path_calculator.run()
+        path_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
+        path_calculator.run()
 
         cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
                                             self.label)
         cat_calculator.run()
-
 
         db_connector.close()
 
@@ -905,8 +824,7 @@ class Wikispeedia(Wikigame):
                     node_id = [self.name2id[n] for n in node]
                     degree_out = [self.id2deg_out[i] for i in node_id]
                     degree_in = [self.id2deg_in[i] for i in node_id]
-                    ngram_query = [self.ngram.get_frequency('query', n)
-                                    for n in node]
+                    ngram = [self.ngram.get_frequency(n) for n in node]
                     tid = self.name2id[entry[1]['target']]
                     spl_target = [self.get_spl(i, tid) for i in node_id]
                     tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
@@ -947,13 +865,13 @@ class Wikispeedia(Wikigame):
                 except KeyError:
                     continue
                 data = zip(node, node_id, degree_out, degree_in,
-                           ngram_query, spl_target, tfidf_target,
+                           ngram, spl_target, tfidf_target,
                            category_depth, category_target,
                            linkpos_first, linkpos_last, link_context,
                            linkpos_ib, linkpos_lead, word_count
                 )
                 columns = ['node', 'node_id', 'degree_out', 'degree_in',
-                           'ngram_query', 'spl_target', 'tfidf_target',
+                           'ngram', 'spl_target', 'tfidf_target',
                            'category_depth', 'category_target',
                            'linkpos_first', 'linkpos_last', 'link_context',
                            'linkpos_ib', 'linkpos_lead', 'word_count'
@@ -978,12 +896,9 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        # WIKTI(),
-        Wikispeedia(),
+        WIKTI(),
+        # Wikispeedia(),
     ]:
-        with wg:
-            # wg.create_dataframe()
-            # wg.compute_tfidf_similarity()
-            wg.fill_database()
-            # wg.get_tfidf_similarity(1, 10)
+        # wg.create_dataframe()
+        wg.fill_database()
 

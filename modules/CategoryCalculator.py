@@ -39,11 +39,12 @@ class CategoryCalculator:
                 "INSERT INTO node_data_new"
                 "     (id, node_id, degree, in_degree, out_degree, pagerank)"
                 "    SELECT * FROM node_data",
-                "RENAME TABLE node_data TO node_data_old,"
-                "             node_data_new TO node_data",
+                "RENAME TABLE node_data TO node_data_old",
+                "RENAME TABLE node_data_new TO node_data",
                 "DROP TABLE node_data_old"
             ]
             for query in queries:
+                print(query)
                 self.db_connection.execute(query)
             self.db_connection.commit()
 
@@ -104,13 +105,13 @@ class CategoryCalculator:
                         category_distance[i][j] = sum(min_dists) / num_cats
                     else:
                         # pages do not have categories
-                        category_distance[i][j] = np.NaN
+                        category_distance[i][j] = 'NULL'
 
         query = """CREATE TABLE IF NOT EXISTS `category_distances` (
                    `id` int(11) NOT NULL AUTO_INCREMENT,
                    `page_id` int(11) NOT NULL,
                    `target_page_id` int(11) NOT NULL,
-                   `distance` float NOT NULL,
+                   `distance` float,
                    PRIMARY KEY (`id`),
                    KEY `page_id` (`page_id`)
                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin;"""
