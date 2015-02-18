@@ -19,7 +19,8 @@ class TfidfCalculator:
     def run(self):
         print("RUNNING TFIDF-CALCULATOR")
         # read plaintext files
-        pages = self.db_connection.execute('SELECT * FROM pages')
+        query = """SELECT * FROM pages ORDER BY id ASC"""
+        pages = self.db_connection.execute(query)
         pids = [p['id'] for p in pages]
         pages = [re.findall(r'\\([^\\]*?)\.htm', p['link'])[0] for p in pages]
 
@@ -39,7 +40,7 @@ class TfidfCalculator:
         tfidf_similarity = tfidf * tfidf.T
         tfidf_similarity = tfidf_similarity.todense()
 
-        query = """CREATE TABLE IF NOT EXISTS `tfidf_similarity` (
+        query = """CREATE TABLE IF NOT EXISTS `tfidf_similarities` (
                    `id` int(11) NOT NULL AUTO_INCREMENT,
                    `page_id` int(11) NOT NULL,
                    `target_page_id` int(11) NOT NULL,
@@ -55,10 +56,16 @@ class TfidfCalculator:
             for j in pids:
                 if j > i:
                     continue
-                query = """INSERT INTO tfidf_similarity
+                query = """INSERT INTO tfidf_similarities
                                        (page_id, target_page_id, similarity)
                            VALUES (%s, %s, %s)"""\
                            % (i, j, tfidf_similarity[i-1, j-1])
                 self.db_connection.execute(query)
         self.db_connection.commit()
+
+        query = """SELECT DISTINCT COLUMN_NAME
+                   FROM information_schema.COLUMNS
+                   WHERE TABLE_SCHEMA = 'wikti' AND TABLE_NAME = 'node_data';"""
+        columns = self.db_connection.execute(query)
+        import pdb; pdb.set_trace()
 

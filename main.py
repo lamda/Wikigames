@@ -299,92 +299,27 @@ class Wikigame(object):
         if start < target:
             start, target = target, start
 
-        query = '''SELECT similarity FROM tfidf_similarity
+        query = '''SELECT similarity FROM tfidf_similarities
                    WHERE page_id=%d AND target_page_id=%d''' % (start, target)
         similarity = self.db_connector.execute(query)
         return similarity[0]['similarity']
 
-    def compute_category_stats(self):
-        print('computing category stats...')
-        category = defaultdict(list)
-        category_depth = defaultdict(float)
-
-        for i in sorted(self.id2name.keys()):
-            a = self.id2name[i]
-            print(i, '/', len(self.name2id) - 1, end='\r')
-            ofname = os.path.join(self.html_base_folder + a[0].lower(),
-                                  a + '.htm')
-            try:
-                with io.open(ofname, encoding='utf-8') as infile:
-                    data = infile.readlines()
-            except UnicodeDecodeError:
-                with io.open(ofname) as infile:
-                    data = infile.readlines()
-
-            for line in data:
-                m = re.findall(r'subject\.(.+?)\.ht', line)
-                if m:
-                    category_depth[i] = np.mean([(p.count('.') + 1) for p in m])
-                    category[i] = [p.split('.') for p in m]
-                    break
-
-        category_distance = {}
-        for i in sorted(self.id2name.keys()):
-            print(i, '/', len(self.name2id) - 1, end='\r')
-            category_distance[i] = {}
-            for j in sorted(self.id2name.keys()):
-                if i == j:
-                    category_distance[i][j] = 0
-                elif i < j:
-                    min_dists = []
-                    for p in category[i]:
-                        min_dist = 1000
-                        for q in category[j]:
-                            shared = 2 * sum([a == b for a, b in zip(p, q)])
-                            d = len(p) + len(q) - shared
-                            if d < min_dist:
-                                min_dist = d
-                        min_dists.append(min_dist)
-
-                    for q in category[j]:
-                        min_dist = 1000
-                        for p in category[i]:
-                            shared = 2 * sum([a == b for a, b in zip(p, q)])
-                            d = len(p) + len(q) - shared
-                            if d < min_dist:
-                                min_dist = d
-                        min_dists.append(min_dist)
-
-                    num_cats = len(category[i]) + len(category[j])
-                    if num_cats > 0:
-                        category_distance[i][j] = sum(min_dists) / num_cats
-                    else:
-                        # pages do not have categories
-                        category_distance[i][j] = np.NaN
-
-        path = os.path.join('data', self.label, 'category_depth.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump(category_depth, outfile, -1)
-
-        path = os.path.join('data', self.label, 'category_distance.obj')
-        with open(path, 'wb') as outfile:
-            pickle.dump(category_distance, outfile, -1)
-
+    @Cached
     def get_category_depth(self, node):
-        if self.category_depth is None:
-            path = os.path.join('data', self.label, 'category_depth.obj')
-            with open(path, 'rb') as infile:
-                self.category_depth = pickle.load(infile)
-        return self.category_depth[node]
+        query = '''SELECT category_depth FROM node_data
+                   WHERE id=%d''' % node
+        depth = self.db_connector.execute(query)
+        return depth[0]['depth']
 
+    @Cached
     def get_category_distance(self, start, target):
-        if self.category_distance is None:
-            path = os.path.join('data', self.label, 'category_distance.obj')
-            with open(path, 'rb') as infile:
-                self.category_distance = pickle.load(infile)
-        elif start > target:
-            return self.category_distance[target][start]
-        return self.category_distance[start][target]
+        if start < target:
+            start, target = target, start
+
+        query = '''SELECT distance FROM category_distance
+                   WHERE page_id=%d AND target_page_id=%d''' % (start, target)
+        distance = self.db_connector.execute(query)
+        return distance[0]['distance']
 
     @Cached
     def get_spl(self, start, target):
@@ -604,13 +539,18 @@ class WIKTI(Wikigame):
         super(WIKTI, self).__init__(WIKTI.label)
 
     def fill_database(self):
-        from modules import TfidfCalculator
+        from modules.TfidfCalculator import TfidfCalculator
+        from modules.CategoryCalculator import CategoryCalculator
 
         db_connector = DbConnector('wikti')
 
-        path_calculator = TfidfCalculator.TfidfCalculator(db_connector,
-                                                          self.plaintext_folder)
-        path_calculator.run()
+        # path_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
+        # path_calculator.run()
+
+        cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
+                                            self.label)
+        cat_calculator.run()
+
         db_connector.close()
 
     def create_dataframe(self):
@@ -883,33 +823,38 @@ class Wikispeedia(Wikigame):
         db_connector.close()
 
     def fill_database(self):
-        from modules import PageExtractor
-        from modules import LinkExtractor
-        from modules import LinkCleaner
-        from modules import PathCalculator
-        from modules import NodeValues
-        from modules import TfidfCalculator
+        from modules.PageExtractor import PageExtractor
+        from modules.LinkExtractor import LinkExtractor
+        from modules.LinkCleaner import LinkCleaner
+        from modules.PathCalculator import PathCalculator
+        from modules.NodeValues import NodeValues
+        from modules.TfidfCalculator import TfidfCalculator
+        from modules.CategoryCalculator import CategoryCalculator
 
         db_connector = DbConnector('wikispeedia')
 
-        # page_extractor = PageExtractor.PageExtractor(db_connector)
+        # page_extractor = PageExtractor(db_connector)
         # page_extractor.run()
         #
-        # link_extractor = LinkExtractor.LinkExtractor(db_connector)
+        # link_extractor = LinkExtractor(db_connector)
         # link_extractor.run()
         #
-        # link_cleaner = LinkCleaner.LinkCleaner(db_connector)
+        # link_cleaner = LinkCleaner(db_connector)
         # link_cleaner.run()
         #
-        # path_calculator = PathCalculator.PathCalculator(db_connector)
+        # path_calculator = PathCalculator(db_connector)
         # path_calculator.run()
         #
-        # node_values = NodeValues.NodeValues(db_connector)
+        # node_values = NodeValues(db_connector)
         # node_values.run()
 
-        path_calculator = TfidfCalculator.TfidfCalculator(db_connector,
-                                                          self.plaintext_folder)
-        path_calculator.run()
+        # path_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
+        # path_calculator.run()
+
+        cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
+                                            self.label)
+        cat_calculator.run()
+
 
         db_connector.close()
 
@@ -1033,12 +978,12 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
         with wg:
             # wg.create_dataframe()
             # wg.compute_tfidf_similarity()
-            # wg.fill_database()
-            wg.get_tfidf_similarity(1, 10)
+            wg.fill_database()
+            # wg.get_tfidf_similarity(1, 10)
 
