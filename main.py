@@ -38,7 +38,7 @@ class DbConnector(object):
         self.db_cursor_nobuff = self.db_connection.cursor(
             pymysql.cursors.SSCursor)
         self.db = db
-        # atexit.register(self.close())
+        atexit.register(self.close)
 
     def close(self):
         self.db_cursor.close()
@@ -136,6 +136,7 @@ class Wikigame(object):
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
+        pdb.set_trace()
         pages = self.db_connector.execute('SELECT * FROM pages')
         self.id2title = {p['id']: p['name'] for p in pages}
         self.id2name = {p['id']: re.findall(r'\\([^\\]*?)\.htm', p['link'])[0]
