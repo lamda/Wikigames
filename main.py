@@ -14,9 +14,6 @@ import re
 import numpy as np
 import pandas as pd
 import pymysql
-import PySide.QtCore
-import PySide.QtGui
-import PySide.QtWebKit
 
 from decorators import Cached
 import ngram
@@ -65,59 +62,6 @@ class DbConnector(object):
         return self.db_cursor_nobuff
 
 
-class WebPageSize(PySide.QtGui.QMainWindow):
-    def __init__(self, qt_application, label):
-        self.qt_application = qt_application
-        PySide.QtGui.QMainWindow.__init__(self)
-        self.web_view = PySide.QtWebKit.QWebView()
-        self.setCentralWidget(self.web_view)
-        self.web_view.loadFinished.connect(self._load_finished)
-        self.pickle_path = os.path.join('data', label, 'webpagesizes.obj')
-        try:
-            with open(self.pickle_path, 'rb') as infile:
-                    self.size = pickle.load(infile)
-        except (IOError, EOFError):
-            self.size = {}
-        self.curr_page = ''
-        self.curr_width = 0
-        self.server = True
-        if self.server:
-            self.base_url = 'http://localhost:8000/wp/'
-        else:
-            self.base_url = 'file:///C:/PhD/Code/Wikigames/data/' + label +\
-                            '/wpcd/wp/'
-
-    def get_size(self, page, width):
-        try:
-            return self.size[(page, width)]
-        except KeyError:
-            self.compute_size(page, width)
-            return self.size[(page, width)]
-
-    def compute_size(self, page, width):
-        self.curr_page = page
-        self.curr_width = width
-        if self.server:
-            path = os.path.join(self.base_url, page[0].lower(), page + '.htm')
-        else:
-            path = PySide.QtCore.QUrl(os.path.join(page[0].lower(),
-                                                   page + '.htm'))
-        self.web_view.load(path)
-        self.web_view.page().setViewportSize(PySide.QtCore.QSize(width, 1))
-        self.qt_application.exec_()
-
-    def _load_finished(self):
-        frame = self.web_view.page().mainFrame()
-        html_data = frame.toHtml()
-        result = (frame.contentsSize().width(), frame.contentsSize().height())
-        self.size[(self.curr_page, self.curr_width)] = result
-        self.close()
-
-    def __del__(self):
-        with open(self.pickle_path, 'wb') as outfile:
-            pickle.dump(self.size, outfile, -1)
-
-
 class Wikigame(object):
     def __init__(self, label):
         print(label)
@@ -136,7 +80,6 @@ class Wikigame(object):
 
         # build some mappings from the database
         self.db_connector = DbConnector(self.label)
-        pdb.set_trace()
         pages = self.db_connector.execute('SELECT * FROM pages')
         self.id2title = {p['id']: p['name'] for p in pages}
         self.id2name = {p['id']: re.findall(r'\\([^\\]*?)\.htm', p['link'])[0]
@@ -466,8 +409,8 @@ class WIKTI(Wikigame):
 
         db_connector = DbConnector('wikti')
 
-        # path_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
-        # path_calculator.run()
+        tfidf_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
+        tfidf_calculator.run()
 
         cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
                                             self.label)
@@ -769,8 +712,8 @@ class Wikispeedia(Wikigame):
         # node_values = NodeValues(db_connector)
         # node_values.run()
 
-        path_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
-        path_calculator.run()
+        tfidf_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
+        tfidf_calculator.run()
 
         cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
                                             self.label)
@@ -902,4 +845,7 @@ if __name__ == '__main__':
     ]:
         # wg.create_dataframe()
         wg.fill_database()
+
+        TODO: run the TFIDF calculator for WIKI
+            then run everythin for Wikispeedia
 

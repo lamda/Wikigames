@@ -39,8 +39,8 @@ class CategoryCalculator:
                 "INSERT INTO node_data_new"
                 "     (id, node_id, degree, in_degree, out_degree, pagerank)"
                 "    SELECT * FROM node_data",
-                "RENAME TABLE node_data TO node_data_old",
-                "RENAME TABLE node_data_new TO node_data",
+                "RENAME TABLE node_data TO node_data_old",  # takes forever
+                "RENAME TABLE node_data_new TO node_data",  # not sure why
                 "DROP TABLE node_data_old"
             ]
             for query in queries:
