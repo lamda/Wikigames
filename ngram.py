@@ -16,7 +16,7 @@ class NgramFrequency(object):
                    'bing-query/2013-12/5/jp?u=' + self.token + '&p='
 
     @Cached
-    def get_frequency(self, ngram_type, title):
+    def get_frequency(self, title):
         return self.retrieve_frequency(title)
 
     def retrieve_frequency(self, title):

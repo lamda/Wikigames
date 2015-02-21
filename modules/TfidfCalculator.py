@@ -54,7 +54,7 @@ class TfidfCalculator:
         for i in pids:
             print(i, '/', len(pids), end='\r')
             for j in pids:
-                if j > i:
+                if i > j:
                     continue
                 query = """INSERT INTO tfidf_similarities
                                        (page_id, target_page_id, similarity)
@@ -62,10 +62,3 @@ class TfidfCalculator:
                            % (i, j, tfidf_similarity[i-1, j-1])
                 self.db_connection.execute(query)
         self.db_connection.commit()
-
-        query = """SELECT DISTINCT COLUMN_NAME
-                   FROM information_schema.COLUMNS
-                   WHERE TABLE_SCHEMA = 'wikti' AND TABLE_NAME = 'node_data';"""
-        columns = self.db_connection.execute(query)
-        import pdb; pdb.set_trace()
-

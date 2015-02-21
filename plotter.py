@@ -43,15 +43,15 @@ class Plotter(object):
         titles = np.array([self.labels])
         for feature, title, ylabel in [
             ('spl_target', 'Shortest Path Length to Target', ''),
-            # ('tfidf_target', 'TF-IDF similarity to Target', ''),
-            # ('degree_out', 'Out-degree', ''),
-            # ('degree_in', 'In-degree', ''),
-            # ('ngram', 'N-Gram Frequency (Query)', ''),
-            # ('category_depth', 'Category Depth', ''),
-            # ('category_target', 'Category Distance to target', ''),
-            # ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),
-            # ('linkpos_lead', 'Fraction of Links in Lead', 'Fraction of links'),
-            # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
+            ('tfidf_target', 'TF-IDF similarity to Target', ''),
+            ('degree_out', 'Out-degree', ''),
+            ('degree_in', 'In-degree', ''),
+            ('ngram', 'N-Gram Frequency (Query)', ''),
+            ('category_depth', 'Category Depth', ''),
+            ('category_target', 'Category Distance to target', ''),
+            ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of Links in Lead', 'Fraction of links'),
+            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(self.data))
@@ -173,8 +173,8 @@ class Plotter(object):
         for features in [
             ['degree_in', 'degree_out'],
             ['degree_in', 'category_depth'],
-            ['degree_in', 'ngram_query'],
-            ['category_depth', 'ngram_query'],
+            ['degree_in', 'ngram'],
+            ['category_depth', 'ngram'],
         ]:
             for label, dataset in self.data.items():
                 df = dataset[(dataset['pl'] < 9) & dataset['successful']]
@@ -250,9 +250,9 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['WIKTI', 'Wikispeedia']),
+        Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI']),
-        Plotter(['WIKTI', 'WIKTI2']),
+        # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
         # Plotter(['Wikispeedia']),
     ]:

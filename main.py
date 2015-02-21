@@ -205,7 +205,7 @@ class Wikigame(object):
 
     @Cached
     def get_tfidf_similarity(self, start, target):
-        if start < target:
+        if start > target:
             start, target = target, start
 
         query = '''SELECT similarity FROM tfidf_similarities
@@ -216,16 +216,16 @@ class Wikigame(object):
     @Cached
     def get_category_depth(self, node):
         query = '''SELECT category_depth FROM node_data
-                   WHERE id=%d''' % node
+                   WHERE node_id=%d''' % node
         depth = self.db_connector.execute(query)
-        return depth[0]['depth']
+        return depth[0]['category_depth']
 
     @Cached
     def get_category_distance(self, start, target):
-        if start < target:
+        if start > target:
             start, target = target, start
 
-        query = '''SELECT distance FROM category_distance
+        query = '''SELECT distance FROM category_distances
                    WHERE page_id=%d AND target_page_id=%d''' % (start, target)
         distance = self.db_connector.execute(query)
         return distance[0]['distance']
@@ -415,8 +415,6 @@ class WIKTI(Wikigame):
         cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
                                             self.label)
         cat_calculator.run()
-
-        db_connector.close()
 
     def create_dataframe(self):
         """compute the click data as a pandas frame"""
@@ -684,7 +682,6 @@ class Wikispeedia(Wikigame):
         db_connector.execute(stmt)
         db_connector.execute('USE ' + label + ';')
         db_connector.commit()
-        db_connector.close()
 
     def fill_database(self):
         from modules.PageExtractor import PageExtractor
@@ -715,11 +712,9 @@ class Wikispeedia(Wikigame):
         tfidf_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
         tfidf_calculator.run()
 
-        cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
-                                            self.label)
-        cat_calculator.run()
-
-        db_connector.close()
+        # cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
+        #                                     self.label)
+        # cat_calculator.run()
 
     def create_dataframe(self):
         # load or compute the click data as a pandas frame
@@ -743,8 +738,8 @@ class Wikispeedia(Wikigame):
             df_full['target'] = target
             for eid, entry in enumerate(df_full.iterrows()):
                 print(eid, end='\r')
-                if eid > 2500:
-                    break
+                # if eid > 2500:
+                #     break
                 node = entry[1]['path'].split(';')
                 if '<' in node:
                     # resolve backtracks
@@ -840,12 +835,8 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
-        # wg.create_dataframe()
-        wg.fill_database()
-
-        TODO: run the TFIDF calculator for WIKI
-            then run everythin for Wikispeedia
-
+        wg.create_dataframe()
+        # wg.fill_database()
