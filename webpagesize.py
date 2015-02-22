@@ -47,3 +47,42 @@ class WebPageSize(PySide.QtGui.QMainWindow):
         result = (frame.contentsSize().width(), frame.contentsSize().height())
         self.size[(self.curr_page, self.curr_width)] = result
         self.close()
+
+"""
+use as follows (needs testing):
+
+    regex_scroll = r"u'scroll': {u'y': (\d+), u'x': \d+}," \
+                   r" u'size': {u'y': (\d+), u'x': (\d+)"
+    qt_application = PySide.QtGui.QApplication(sys.argv)
+    page_size = WebPageSize(qt_application, self.label)
+
+    # get scrolling range
+    idx = list(df_full[df_full['action'] == 'load'].index)
+    df_groups = [df_full.loc[a:b, :]
+                 for a, b in zip(idx, idx[1:])]
+    exploration = [np.nan]
+    for i, g in enumerate(df_groups):
+        print('            ', df.iloc[i]['node'])
+        slct = (g['action'] == 'scroll') | (g['action'] == 'resize')
+        if len(g[slct]) == 0:
+            from_index = None
+            print('            ', 'from_index is None')
+        else:
+            from_index = g[slct].index[0]
+        df_scroll = g.loc[from_index:]
+        df_scroll = df_scroll.node.str.extract(regex_scroll)
+        df_scroll = df_scroll.dropna()
+        df_scroll.columns = ['scrolled', 'height', 'width']
+        df_scroll['scrolled'] = df_scroll['scrolled'].apply(int)
+        df_scroll['height'] = df_scroll['height'].apply(int)
+        df_scroll['width'] = df_scroll['width'].apply(int)
+        seen_log = df_scroll.loc[df_scroll['scrolled'].idxmax()]
+        seen_max = page_size.get_size(df.iloc[i].node, seen_log[2])[1]
+        seen = seen_log['scrolled'] + seen_log['height']
+        if from_index is None:
+            seen_max = seen
+        exploration.append(seen / seen_max)
+        print(df.iloc[0].node, seen, seen_max)
+
+    df['exploration'] = exploration
+"""
