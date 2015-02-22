@@ -395,15 +395,26 @@ class Wikigame(object):
         self.load_data()
         self.load_link_positions()
         df = self.data
+
         df['node_id'] = df['node'].apply(lambda n: self.name2id[n])
         df['degree_out'] = df['node_id'].apply(lambda n: self.id2deg_out[n])
         df['degree_in'] = df['node_id'].apply(lambda n: self.id2deg_in[n])
         df['ngram'] = df['node'].apply(lambda n: self.ngram.get_frequency(n))
-        df['spl_target'] = df.apply(lambda d: self.get_spl(d['node_id'], d['target_id']), axis=1)
-        df['tfidf_target'] = df.apply(lambda d: 1 - self.get_tfidf_similarity(d['node_id'], d['target_id']), axis=1)
-        df['category_depth'] = df['node_id'].apply(lambda n: self.get_category_depth(n))
-        df['category_target'] = df.apply(lambda d: self.get_category_distance(d['node_id'], d['target_id']), axis=1)
         df['word_count'] = df['node'].apply(lambda n: self.length[n])
+
+        spl_target = lambda d: self.get_spl(d['node_id'], d['target_id'])
+        df['spl_target'] = df.apply(spl_target, axis=1)
+
+        tidf_target = lambda d: 1 - self.get_tfidf_similarity(d['node_id'],
+                                                              d['target_id'])
+        df['tfidf_target'] = df.apply(tidf_target, axis=1)
+
+        category_depth = lambda n: self.get_category_depth(n)
+        df['category_depth'] = df['node_id'].apply(category_depth)
+
+        category_target = lambda d: self.get_category_distance(d['node_id'],
+                                                               d['target_id'])
+        df['category_target'] = df.apply(category_target, axis=1)
 
         # get link positions
         first, last = [], []
@@ -490,8 +501,7 @@ class WIKTI(Wikigame):
             m = regex_parse_node_link.findall(node_string)
             return int(m[0]) if m else np.NaN
 
-        prefix = "u'current_page': " \
-                 "u'http://85.127.21.222/wikigame/wiki-schools/wp/"
+        prefix = "u'current_page': u'http://0.0.0.0/wikigame/wiki-schools/wp/"
 
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
@@ -544,7 +554,8 @@ class WIKTI(Wikigame):
                                                         last_node]
                     if last != target:
                         # in some cases, the target is entirely missing
-                        target_node = last_node = prefix + target[0].lower() + '/' + target + ".htm'"
+                        target_node = last_node = prefix + target[0].lower() +\
+                                                  '/' + target + ".htm'"
                         df_full.loc[df_full.index[-1] + 1] = [last_time, 'load',
                                                               target_node]
 
@@ -577,8 +588,8 @@ class WIKTI(Wikigame):
                                     'action': 'link_data',
                                     'time': df.iloc[i+1]['time'],
                                     'node': prefix + nodes[1][0].lower() + '/' +
-                                            nodes[1] +
-                                            ".htm', u'offset': " + str(first + 30),  # TODO check
+                                            nodes[1] + ".htm', u'offset': " +
+                                            str(first + 30),  # TODO check
                                     'node_parsed': nodes[1]
                                 })
                                 df_new.append(link)
