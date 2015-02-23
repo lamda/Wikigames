@@ -27,12 +27,12 @@ class Plotter(object):
         self.labels = labels
         for label in self.labels:
             # load datasets
-            print('loading', label, 'data...')
+            print('loading', label, 'data...', end='\r')
             path = os.path.join('data', label, 'data.obj')
             self.data[label] = pd.read_pickle(path)
             # filter to include only games with shortest possible solutions of 3
             self.data[label] = self.data[label][(self.data[label]['spl'] == 3)]
-            print('loaded\n')
+            print(label, 'data loaded\n')
         self.plot_folder = os.path.join('plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
@@ -49,8 +49,8 @@ class Plotter(object):
             # ('ngram', 'N-Gram Frequency (Query)', ''),
             # ('category_depth', 'Category Depth', ''),
             # ('category_target', 'Category Distance to target', ''),
-            # ('linkpos_ib', 'Fraction of Links in Infobox', 'Fraction of links'),
-            # ('linkpos_lead', 'Fraction of Links in Lead', 'Fraction of links'),
+            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
             ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
@@ -62,6 +62,7 @@ class Plotter(object):
                     df = dataset[(dataset['pl'] == k) & dataset['successful']]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
+                    # pdb.set_trace()
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
@@ -74,21 +75,33 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         dataset = self.data['WIKTI']
         for features, titles, suptitle, ylabel in [
-            [
-                ['linkpos_ib', 'linkpos_lead'],
-                ['Fraction of Links in Infobox', 'Fraction of Links in Lead'],
-                'Fractions of links in Infobox and Lead',
-                'Fraction of links'
-            ],
+            # [
+            #     ['linkpos_ib', 'linkpos_lead'],
+            #     ['Fraction of Links in Infobox', 'Fraction of Links in Lead'],
+            #     'Fractions of links in Infobox and Lead',
+            #     'Fraction of links'
+            # ],
             # [
             #     ['exploration'],
             #     ['Explored Percentage of Page'],
             #     ['']
             # ],
             [
-                ['time', 'time_word', 'time_link'],
-                ['Time per article', 'Time per word', 'Time per link'],
-                'Time spent',
+                ['time'],
+                ['Time per article'],
+                '',
+                'seconds'
+            ],
+            [
+                ['time_word'],
+                ['Time per word'],
+                '',
+                'seconds'
+            ],
+            [
+                ['time_link'],
+                ['Time per link'],
+                '',
                 'seconds'
             ]
         ]:
@@ -115,29 +128,30 @@ class Plotter(object):
         df['linkpos_diff'] = df['linkpos_first'] - df['linkpos_last']
         df = df[~np.isnan(df['linkpos_diff'])]
         diff = df[df['linkpos_diff'] != 0]
-        print('multiple link positions for %.2f of %d clicked links' %
-              (diff.shape[0] / df.shape[0], df.shape[0]))
+        print('multiple link positions for %.2f%% of %d clicked links' %
+              (100 * diff.shape[0] / df.shape[0], df.shape[0]))
 
         first = diff[diff['linkpos_first'] == diff['linkpos_actual']]
         first = first.shape[0]
         last = diff[diff['linkpos_last'] == diff['linkpos_actual']]
         last = last.shape[0]
-        between = diff[(diff['linkpos_last'] != diff['linkpos_actual']) &\
+        between = diff[(diff['linkpos_last'] != diff['linkpos_actual']) &
                        (diff['linkpos_first'] != diff['linkpos_actual'])]
         entire = diff.shape[0]
-        print('%.2f first, %.2f last, out of %d total' %
-              (first/entire, last/entire, entire))
+        print('of those with multiple positions, %.2f%% first, %.2f%% last, %.2f%% inbetween out of %d total' %
+              (100 * first/entire, 100 * last/entire, 100 - 100 * (first + last) / entire, entire))
         stats = between[['linkpos_first', 'linkpos_actual', 'linkpos_last']]
         first = stats['linkpos_actual'] - stats['linkpos_first'].tolist()
         last = stats['linkpos_last'] - stats['linkpos_actual'].tolist()
         ff, ll = 0, 0
         for f, l in zip(first, last):
-            if f < l:
+            if f <= l:
                 ff += 1
             else:
                 ll += 1
         total = ff + ll
-        print(ff/total, ll/total, total)
+        print('of those inbetween, %.2f%% closer to first, %.2f%% closer to last out of %d total' %
+              (100 * ff/total, 100 * ll/total, total))
 
     def plot_linkpos(self):
         print('linkpos')
@@ -251,13 +265,13 @@ class Plot(object):
 if __name__ == '__main__':
     for pt in [
         # Plotter(['Wikispeedia']),
-        # Plotter(['WIKTI']),
-        Plotter(['WIKTI', 'Wikispeedia']),
+        Plotter(['WIKTI']),
+        # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_comparison()
-        # pt.plot_wikti()
+        # pt.plot_comparison()
+        pt.plot_wikti()
         # pt.print_stats()
         # pt.plot_linkpos()
         # pt.correlation()

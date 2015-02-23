@@ -392,6 +392,7 @@ class Wikigame(object):
         print('        Error:', message)
 
     def complete_dataframe(self):
+        print('complete_dataframe()')
         self.load_data()
         self.load_link_positions()
         df = self.data
@@ -399,16 +400,20 @@ class Wikigame(object):
         df['node_id'] = df['node'].apply(lambda n: self.name2id[n])
         df['degree_out'] = df['node_id'].apply(lambda n: self.id2deg_out[n])
         df['degree_in'] = df['node_id'].apply(lambda n: self.id2deg_in[n])
-        df['ngram'] = df['node'].apply(lambda n: self.ngram.get_frequency(n))
-        df['word_count'] = df['node'].apply(lambda n: self.length[n])
 
+        print('    ', 1)
+        df['ngram'] = df['node'].apply(lambda n: self.ngram.get_frequency(n))
+        print('    ', 2)
+        df['word_count'] = df['node'].apply(lambda n: self.length[n])
         spl_target = lambda d: self.get_spl(d['node_id'], d['target_id'])
         df['spl_target'] = df.apply(spl_target, axis=1)
 
+        print('    ', 3)
         tidf_target = lambda d: 1 - self.get_tfidf_similarity(d['node_id'],
                                                               d['target_id'])
         df['tfidf_target'] = df.apply(tidf_target, axis=1)
 
+        print('    ', 4)
         category_depth = lambda n: self.get_category_depth(n)
         df['category_depth'] = df['node_id'].apply(category_depth)
 
@@ -417,8 +422,10 @@ class Wikigame(object):
         df['category_target'] = df.apply(category_target, axis=1)
 
         # get link positions
+        print('getting link positions...')
         first, last = [], []
         for i in range(df.shape[0] - 1):
+            print('    ', i+1, '/', df.shape[0], end='\r')
             if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
                     df.iloc[i]['backtrack']:
                     # if data belongs to different missions or is a backtrack
@@ -435,26 +442,38 @@ class Wikigame(object):
         df['linkpos_last'] = last
 
         # find out whether the linkposition was in the infobx or the lead
+        print('getting infobox and lead positions...')
         lp = 'linkpos_actual' if 'linkpos_actual' in df else 'linkpos_first'
         ibs = [self.ib_length[d] for d in df['node']]
         leads = [self.lead_length[d] for d in df['node']]
         linkpos_ib, linkpos_lead = [], []
         for p, i, l in zip(df[lp], ibs, leads):
+            print('    ', i+1, '/', df.shape[0], end='\r')
             if np.isnan(p):
                 linkpos_ib.append(np.NaN)
                 linkpos_lead.append(np.NaN)
             elif np.isnan(i):
                 linkpos_ib.append(np.NaN)
-                linkpos_lead.append(p < l)
+                linkpos_lead.append(int(p < l))
             else:
-                linkpos_ib.append(p < i)
-                linkpos_lead.append(i < p < l)
+                linkpos_ib.append(int(p < i))
+                linkpos_lead.append(int(i < p < l))
         df['linkpos_ib'] = linkpos_ib
         df['linkpos_lead'] = linkpos_lead
+
+        self.save_data()
+
+    def add_link_context(self):
+        print('add_link_context()')
+        self.load_data()
+        self.load_link_positions()
+        df = self.data
+        lp = 'linkpos_actual' if 'linkpos_actual' in df else 'linkpos_first'
 
         # get link context
         context = []
         for i in range(df.shape[0] - 1):
+            print('    ', i+1, '/', df.shape[0], end='\r')
             if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
                     df.iloc[i]['backtrack']:
                     # if data belongs to different missions or is a backtrack
@@ -463,8 +482,8 @@ class Wikigame(object):
                 a = df.iloc[i]['node']
                 b = df.iloc[i+1][lp]
                 context.append(self.get_link_context(a, b))
-        context.append(np.NaN)
-        df['link_context'] = context
+        df['link_context'] = context + [np.NaN]
+        self.save_data()
 
 
 class WIKTI(Wikigame):
@@ -490,26 +509,22 @@ class WIKTI(Wikigame):
         """compute the click data as a pandas frame"""
         print('creating dataframe...')
 
-        regex_parse_node = re.compile(r'/([^/]*?)\.htm')
-        regex_parse_node_link = re.compile(r"offset': (\d+)")
-
         def parse_node(node_string):
-            m = regex_parse_node.findall(node_string)
+            m = re.findall(r'/([^/]*?)\.htm', node_string)
             return m[0].replace('%25', '%') if m else ''
 
         def parse_node_link(node_string):
-            m = regex_parse_node_link.findall(node_string)
+            m = re.findall(r"offset': (\d+)", node_string)
             return int(m[0]) if m else np.NaN
 
+        self.load_link_positions()
         prefix = "u'current_page': u'http://0.0.0.0/wikigame/wiki-schools/wp/"
-
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
-        self.load_link_positions()
         folders = ['U' + '%02d' % i for i in range(1, 10)]
         for folder in folders:
             print('\n', folder)
-            # get missions and sort them numerically
+
             files = sorted(os.listdir(os.path.join(folder_logs, folder)))
             files = [f for f in files if f.startswith('PLAIN')]
             mission2fname = {int(re.findall(r'PLAIN_\d+_(\d+)', m)[0]): m
@@ -537,8 +552,7 @@ class WIKTI(Wikigame):
                 df = df_full[df_full['action'] == 'load'][['node']]
                 df['node'] = df['node'].apply(parse_node)
                 if not all(n in self.name2id for n in df['node']):
-                    self.print_error('one or more node not in articles,'
-                                     ' dropping mission')
+                    self.print_error('node outside article node set, dropping')
                     continue
                 if not df.iloc[0]['node'] == start:
                     self.print_error('start node does not match mission start')
@@ -546,16 +560,16 @@ class WIKTI(Wikigame):
                 if successful and not target == df.iloc[-1]['node']:
                     # insert the target if the load event is not present
                     # this is the case for some of the earlier log files
-                    last = df_full[df_full['action'] == 'link_data']
-                    last = parse_node(last.iloc[-1]['node'])
+                    last = df_full[df_full['action'] == 'link_data'].iloc[-1]
+                    last = parse_node(last['node'])
                     last_time = df_full.iloc[-2]['time']
                     last_node = prefix + last[0].lower() + '/' + last + ".htm'"
-                    df_full.loc[df_full.index[-1]+1] = [last_time, 'load',
-                                                        last_node]
+                    df_full.loc[df_full.index[-1] + 1] = [last_time, 'load',
+                                                          last_node]
                     if last != target:
                         # in some cases, the target is entirely missing
-                        target_node = last_node = prefix + target[0].lower() +\
-                                                  '/' + target + ".htm'"
+                        target_node = prefix + target[0].lower() + '/' +\
+                            target + ".htm'"
                         df_full.loc[df_full.index[-1] + 1] = [last_time, 'load',
                                                               target_node]
 
@@ -566,8 +580,8 @@ class WIKTI(Wikigame):
                 df['node_parsed'] = df['node'].apply(parse_node)
                 df_new = []
                 for i in range(df.shape[0] - 1):
-                    actions = df.iloc[i: i+2]['action'].tolist()
                     df_new.append(df.iloc[i])
+                    actions = df.iloc[i: i+2]['action'].tolist()
                     if actions == ['link_data', 'load']:
                         nodes = df.iloc[i: i+2]['node_parsed'].tolist()
                         if nodes[0] != nodes[1]:
@@ -583,18 +597,20 @@ class WIKTI(Wikigame):
 
                             nodes_1 = self.name2id[nodes[1]]
                             try:
+                                # use the first link position in this case
+                                # fast click --> first position likely
                                 first = self.link2pos_first[nodes[0]][nodes_1]
                                 link = pd.Series(data={
                                     'action': 'link_data',
                                     'time': df.iloc[i+1]['time'],
                                     'node': prefix + nodes[1][0].lower() + '/' +
                                             nodes[1] + ".htm', u'offset': " +
-                                            str(first + 30),  # TODO check
+                                            str(first + 30),
                                     'node_parsed': nodes[1]
                                 })
                                 df_new.append(link)
                             except KeyError:
-                                # backtrack occurred
+                                # no quick click but a quick backtrack
                                 backtrack = pd.Series(data={
                                     'action': 'load',
                                     'time': df.iloc[i+1]['time'],
@@ -625,11 +641,10 @@ class WIKTI(Wikigame):
                 df['node'] = df['node_parsed']
                 df = df[df['action'] == 'load']
                 df = df[['time', 'action', 'node']]
-
                 df['backtrack'] = [True if np.isnan(l) else False
                                    for l in link_data] + [False]
 
-                # correct the link position from the logs to the our metric
+                # correct the link position from the logs to our metric
                 link_data_correct = []
                 zipped = zip(df['node'], df['node'].iloc[1:], link_data)
                 for s, t, pos in zipped:
@@ -647,8 +662,7 @@ class WIKTI(Wikigame):
                 link_data = link_data_correct
                 df['linkpos_actual'] = link_data + [np.NaN]
 
-                # debug
-                # see if the link is actually present for all cases
+                # make sure a link from the log actually exists in the articles
                 for i in range(df.shape[0] - 1):
                     if df.iloc[i]['backtrack']:
                         continue
@@ -656,7 +670,7 @@ class WIKTI(Wikigame):
                     b = df.iloc[i+1]['node']
                     links = self.get_link_possibilities(a, b)
                     if len(links) == 0:
-                        print('        ', a, b)
+                        print('        link does not exist:', a, b)
 
                 # get time information
                 time = df['time'].diff().shift(-1)
@@ -689,8 +703,6 @@ class WIKTI(Wikigame):
                 results.append(df)
         data = pd.concat(results)
         self.save_data(data)
-        self.data = data
-        self.complete_dataframe()
 
 
 class Wikispeedia(Wikigame):
@@ -720,39 +732,39 @@ class Wikispeedia(Wikigame):
 
         db_connector = DbConnector('wikispeedia')
 
-        # page_extractor = PageExtractor(db_connector)
-        # page_extractor.run()
-        #
-        # link_extractor = LinkExtractor(db_connector)
-        # link_extractor.run()
-        #
-        # link_cleaner = LinkCleaner(db_connector)
-        # link_cleaner.run()
-        #
-        # path_calculator = PathCalculator(db_connector)
-        # path_calculator.run()
-        #
-        # node_values = NodeValues(db_connector)
-        # node_values.run()
+        page_extractor = PageExtractor(db_connector)
+        page_extractor.run()
+
+        link_extractor = LinkExtractor(db_connector)
+        link_extractor.run()
+
+        link_cleaner = LinkCleaner(db_connector)
+        link_cleaner.run()
+
+        path_calculator = PathCalculator(db_connector)
+        path_calculator.run()
+
+        node_values = NodeValues(db_connector)
+        node_values.run()
 
         tfidf_calculator = TfidfCalculator(db_connector, self.plaintext_folder)
         tfidf_calculator.run()
 
-        # cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
-        #                                     self.label)
-        # cat_calculator.run()
+        cat_calculator = CategoryCalculator(db_connector, self.html_base_folder,
+                                            self.label)
+        cat_calculator.run()
 
     def create_dataframe(self):
-        # load or compute the click data as a pandas frame
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
         self.load_link_positions()
-        for filename in sorted(os.listdir(folder_logs))[:1]:
-            print(filename)
+        for filename in sorted(os.listdir(folder_logs))[:1]:  # only successful
+            print('    ', filename)
             fname = os.path.join(folder_logs, filename)
             successful = False if 'unfinished' in filename else True
             df_full = pd.read_csv(fname, sep='\t', comment='#',
                                   usecols=[3], names=['path'])
+            # df_full = df_full.iloc[:10000]
             paths = df_full['path'].str.split(';').tolist()
             start = pd.DataFrame([t[0] for t in paths])
             df_full['start'] = start
@@ -762,95 +774,64 @@ class Wikispeedia(Wikigame):
                 target = pd.read_csv(fname, sep='\t', comment='#',
                                      usecols=[4], names=['target'])
             df_full['target'] = target
+            df_full['target_id'] = df_full['target'].apply(lambda n: self.name2id[n])
+            spl = lambda d: self.get_spl(self.name2id[d['start']], d['target_id'])
+            df_full['spl'] = df_full.apply(spl, axis=1)
+
+            def resolve_backtracks(path):
+                path = path.split(';')
+                backtrack = [False] * len(path)
+                if '<' not in path:
+                    return path, backtrack
+
+                path.reverse()
+                path_resolved = [path[-1]]
+                stack = [path.pop()]
+                i = 0
+                while path:
+                    i += 1
+                    p = path.pop()
+                    if p == '<':
+                        stack.pop()
+                        backtrack[i-1] = True
+                    else:
+                        stack.append(p)
+                    path_resolved.append(stack[-1])
+                return path_resolved, backtrack
+
+            result = map(resolve_backtracks, df_full['path'])
+            path = [r[0] for r in result]
+            backtrack = [r[1] for r in result]
+            df_full['path'], df_full['backtrack'] = path, backtrack
+
+            df_full['pl'] = df_full['path'].apply(lambda p: len(p))
+            df_full = df_full[(df_full.spl == 3) & (df_full['pl'] < 9)]
+
             for eid, entry in enumerate(df_full.iterrows()):
-                print(eid, end='\r')
-                # if eid > 2500:
-                #     break
-                node = entry[1]['path'].split(';')
-                if '<' in node:
-                    # resolve backtracks
-                    node.reverse()
-                    game = [node[-1]]
-                    stack = [node.pop()]
-                    while node:
-                        p = node.pop()
-                        if p == '<':
-                            stack.pop()
-                        else:
-                            stack.append(p)
-                        game.append(stack[-1])
-                    node = game
-                spl = self.get_spl(self.name2id[entry[1]['start']],
-                                   self.name2id[entry[1]['target']])
-                if len(node) > 8 or spl != 3:
-                    # for now, we only consider games < 9 hops and spl of 3
-                    continue
-                try:
-                    node_id = [self.name2id[n] for n in node]
-                    degree_out = [self.id2deg_out[i] for i in node_id]
-                    degree_in = [self.id2deg_in[i] for i in node_id]
-                    ngram = [self.ngram.get_frequency(n) for n in node]
-                    tid = self.name2id[entry[1]['target']]
-                    spl_target = [self.get_spl(i, tid) for i in node_id]
-                    tfidf_target = [1 - self.get_tfidf_similarity(i, tid)
-                                    for i in node_id]
-                    category_depth = [self.get_category_depth(i)
-                                      for i in node_id]
-                    category_target = [self.get_category_distance(i, tid)
-                                       for i in node_id]
-                    zipped = zip(node, node_id[1:])
-                    linkpos_first = [self.link2pos_first[a][b]
-                                     for a, b in zipped] + [np.NaN]
-                    linkpos_last = [self.link2pos_last[a][b]
-                                    for a, b in zipped] + [np.NaN]
-                    zipped2 = zip(node, linkpos_first)[:-1]
-                    link_context = [self.get_link_context(a, b)
-                                    for a, b in zipped2] + [np.NaN]
-                    click_data = linkpos_first[:-1]
-
-                    ibs = [self.ib_length[d] for d in node][:-1]
-                    leads = [self.lead_length[d] for d in node][:-1]
-                    linkpos_ib, linkpos_lead = [], []
-                    for idx in range(len(click_data)):
-                        c = click_data[idx]
-                        i = ibs[idx]
-                        l = leads[idx]
-                        if np.isnan(i):
-                            linkpos_ib.append(np.NaN)
-                        else:
-                            linkpos_ib.append(c < i)
-                        if np.isnan(l):
-                            linkpos_lead.append(np.NaN)
-                        else:
-                            linkpos_lead.append(i < c < l)
-                    linkpos_ib = linkpos_ib + [np.NaN]
-                    linkpos_lead = linkpos_lead + [np.NaN]
-                    word_count = [self.length[a] if a in self.length else np.NaN
-                                  for a in node][:-1] + [np.NaN]
-                except KeyError:
-                    continue
-                data = zip(node, node_id, degree_out, degree_in,
-                           ngram, spl_target, tfidf_target,
-                           category_depth, category_target,
-                           linkpos_first, linkpos_last, link_context,
-                           linkpos_ib, linkpos_lead, word_count
-                )
-                columns = ['node', 'node_id', 'degree_out', 'degree_in',
-                           'ngram', 'spl_target', 'tfidf_target',
-                           'category_depth', 'category_target',
-                           'linkpos_first', 'linkpos_last', 'link_context',
-                           'linkpos_ib', 'linkpos_lead', 'word_count'
-                ]
-                df = pd.DataFrame(data=data, columns=columns)
-
-                # set overall dataframe attributes
+                print('    ', eid + 1, '/', df_full.shape[0], end='\r')
+                entry = entry[1]
+                df = pd.DataFrame(data=entry['path'], columns=['node'])
+                df['backtrack'] = entry['backtrack']
                 df['successful'] = successful
-                df['spl'] = spl
-                df['pl'] = df.shape[0]
-                df['pos'] = range(df.shape[0])
+                df['spl'] = entry['spl']
+                df['pl'] = entry['pl']
+                df['step'] = range(df.shape[0])
                 df['distance-to-go'] = list(reversed(range(df.shape[0])))
                 df['subject'] = eid
-                results.append(df)
+                df['target'] = entry['target']
+                df['target_id'] = entry['target_id']
+                # make sure a link from the log actually exists in the articles
+                for i in range(df.shape[0] - 1):
+                    if df.iloc[i]['backtrack']:
+                        continue
+                    a = df.iloc[i]['node']
+                    b = df.iloc[i+1]['node']
+                    links = self.get_link_possibilities(a, b)
+                    if len(links) == 0:
+                        print('        link does not exist:', a, b)
+                        break
+                else:
+                    results.append(df)
 
         data = pd.concat(results)
         self.save_data(data)
@@ -861,9 +842,10 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
         # wg.create_dataframe()
         wg.complete_dataframe()
+        # wg.add_link_context()
         # wg.fill_database()
