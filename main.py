@@ -369,8 +369,8 @@ class Wikigame(object):
     @Cached
     def get_link_context(self, start, pos):
         if self.link_sets is None:
-            self.link_sets = {k: sorted(self.pos2link[k].keys())
-                              for k in self.pos2link}
+            self.link_sets = {k: sorted(v.keys())
+                              for k, v in self.pos2link.iteritems()}
         if np.isnan(pos):
                 return np.NaN
         else:
@@ -401,19 +401,19 @@ class Wikigame(object):
         df['degree_out'] = df['node_id'].apply(lambda n: self.id2deg_out[n])
         df['degree_in'] = df['node_id'].apply(lambda n: self.id2deg_in[n])
 
-        print('    ', 1)
+        print('     getting ngram frequencies...')
         df['ngram'] = df['node'].apply(lambda n: self.ngram.get_frequency(n))
-        print('    ', 2)
+        print('     getting word counts and shortest paths...')
         df['word_count'] = df['node'].apply(lambda n: self.length[n])
         spl_target = lambda d: self.get_spl(d['node_id'], d['target_id'])
         df['spl_target'] = df.apply(spl_target, axis=1)
 
-        print('    ', 3)
+        print('     getting TF-IDF similarities...')
         tidf_target = lambda d: 1 - self.get_tfidf_similarity(d['node_id'],
                                                               d['target_id'])
         df['tfidf_target'] = df.apply(tidf_target, axis=1)
 
-        print('    ', 4)
+        print('     getting category statistics...')
         category_depth = lambda n: self.get_category_depth(n)
         df['category_depth'] = df['node_id'].apply(category_depth)
 
@@ -422,10 +422,10 @@ class Wikigame(object):
         df['category_target'] = df.apply(category_target, axis=1)
 
         # get link positions
-        print('getting link positions...')
+        print('     getting link positions...')
         first, last = [], []
         for i in range(df.shape[0] - 1):
-            print('    ', i+1, '/', df.shape[0], end='\r')
+            print('         ', i+1, '/', df.shape[0], end='\r')
             if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
                     df.iloc[i]['backtrack']:
                     # if data belongs to different missions or is a backtrack
@@ -442,13 +442,13 @@ class Wikigame(object):
         df['linkpos_last'] = last
 
         # find out whether the linkposition was in the infobx or the lead
-        print('getting infobox and lead positions...')
+        print('     getting infobox and lead positions...')
         lp = 'linkpos_actual' if 'linkpos_actual' in df else 'linkpos_first'
         ibs = [self.ib_length[d] for d in df['node']]
         leads = [self.lead_length[d] for d in df['node']]
         linkpos_ib, linkpos_lead = [], []
         for p, i, l in zip(df[lp], ibs, leads):
-            print('    ', i+1, '/', df.shape[0], end='\r')
+            print('         ', i+1, '/', df.shape[0], end='\r')
             if np.isnan(p):
                 linkpos_ib.append(np.NaN)
                 linkpos_lead.append(np.NaN)
@@ -473,15 +473,17 @@ class Wikigame(object):
         # get link context
         context = []
         for i in range(df.shape[0] - 1):
-            print('    ', i+1, '/', df.shape[0], end='\r')
-            if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
+            # print('         ', i+1, '/', df.shape[0], end='\r')
+            if (df.iloc[i]['subject'] != df.iloc[i+1]['subject']) or\
                     df.iloc[i]['backtrack']:
                     # if data belongs to different missions or is a backtrack
                 context.append(np.NaN)
             else:
                 a = df.iloc[i]['node']
-                b = df.iloc[i+1][lp]
+                b = df.iloc[i][lp]
                 context.append(self.get_link_context(a, b))
+                if np.isnan(self.get_link_context(a, b)):
+                    pdb.set_trace()
         df['link_context'] = context + [np.NaN]
         self.save_data()
 
@@ -698,6 +700,8 @@ class WIKTI(Wikigame):
                 df['user'] = folder
                 df['mission'] = mission
                 df['subject'] = df['user'] + '_' + df['mission'].astype('str')
+                df['start'] = start
+                df['start_id'] = df['start'].apply(lambda n: self.name2id[n])
                 df['target'] = target
                 df['target_id'] = df['target'].apply(lambda n: self.name2id[n])
                 results.append(df)
@@ -768,14 +772,18 @@ class Wikispeedia(Wikigame):
             paths = df_full['path'].str.split(';').tolist()
             start = pd.DataFrame([t[0] for t in paths])
             df_full['start'] = start
+            df_full['start_id'] = df_full['start'].apply(lambda n:
+                                                         self.name2id[n])
             if successful:
                 target = pd.DataFrame([t[-1] for t in paths])
             else:
                 target = pd.read_csv(fname, sep='\t', comment='#',
                                      usecols=[4], names=['target'])
             df_full['target'] = target
-            df_full['target_id'] = df_full['target'].apply(lambda n: self.name2id[n])
-            spl = lambda d: self.get_spl(self.name2id[d['start']], d['target_id'])
+            df_full['target_id'] = df_full['target'].apply(lambda n:
+                                                           self.name2id[n])
+            spl = lambda d: self.get_spl(self.name2id[d['start']],
+                                         d['target_id'])
             df_full['spl'] = df_full.apply(spl, axis=1)
 
             def resolve_backtracks(path):
@@ -818,6 +826,8 @@ class Wikispeedia(Wikigame):
                 df['step'] = range(df.shape[0])
                 df['distance-to-go'] = list(reversed(range(df.shape[0])))
                 df['subject'] = eid
+                df['start'] = entry['start']
+                df['start_id'] = entry['start_id']
                 df['target'] = entry['target']
                 df['target_id'] = entry['target_id']
                 # make sure a link from the log actually exists in the articles
@@ -842,10 +852,9 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        # WIKTI(),
+        WIKTI(),
         Wikispeedia(),
     ]:
-        # wg.create_dataframe()
+        wg.create_dataframe()
         wg.complete_dataframe()
-        # wg.add_link_context()
-        # wg.fill_database()
+        wg.add_link_context()

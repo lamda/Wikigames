@@ -45,13 +45,13 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Out-degree', ''),
-            # ('degree_in', 'In-degree', ''),
+            ('degree_in', 'In-degree', ''),
             # ('ngram', 'N-Gram Frequency (Query)', ''),
             # ('category_depth', 'Category Depth', ''),
             # ('category_target', 'Category Distance to target', ''),
-            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
-            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
+            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(self.data))
@@ -62,7 +62,6 @@ class Plotter(object):
                     df = dataset[(dataset['pl'] == k) & dataset['successful']]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
-                    # pdb.set_trace()
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
@@ -120,7 +119,7 @@ class Plotter(object):
             p.finish(path, titles=titles, xlabel=xlabel, ylabel=ylabel,
                      invert_xaxis=True, suptitle=suptitle)
 
-    def print_stats(self):
+    def print_click_stats(self):
         print('Statistics for WIKTI')
         dataset = self.data['WIKTI']
         df = dataset[dataset['successful'] & (dataset['pl'] < 9)]
@@ -152,6 +151,13 @@ class Plotter(object):
         total = ff + ll
         print('of those inbetween, %.2f%% closer to first, %.2f%% closer to last out of %d total' %
               (100 * ff/total, 100 * ll/total, total))
+
+    def print_game_stats(self):
+        for label, dataset in self.data.items():
+            df = dataset[(dataset['spl'] == 3) & (dataset['successful']) &
+                (dataset['distance-to-go'] == 0)]
+            df['mission'] = df['start'] + '-' + df['target']
+            print(df['mission'].value_counts(), df.shape)
 
     def plot_linkpos(self):
         print('linkpos')
@@ -265,14 +271,14 @@ class Plot(object):
 if __name__ == '__main__':
     for pt in [
         # Plotter(['Wikispeedia']),
-        Plotter(['WIKTI']),
-        # Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI']),
+        Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        # pt.plot_comparison()
-        pt.plot_wikti()
-        # pt.print_stats()
+        pt.plot_comparison()
+        # pt.plot_wikti()
+        # pt.print_game_stats()
         # pt.plot_linkpos()
         # pt.correlation()
 
