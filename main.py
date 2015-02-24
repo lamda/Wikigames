@@ -5,6 +5,7 @@ import atexit
 import bisect
 from collections import defaultdict
 import cPickle as pickle
+import datetime
 import HTMLParser
 import io
 import os
@@ -675,6 +676,7 @@ class WIKTI(Wikigame):
                         print('        link does not exist:', a, b)
 
                 # get time information
+                df['duration'] = df['time'].iloc[-1] / 1000
                 time = df['time'].diff().shift(-1)
                 time_normalized = time / sum(time.iloc[:-1])
                 word_count = [self.length[a] if a in self.length else np.NaN
@@ -766,9 +768,16 @@ class Wikispeedia(Wikigame):
             print('    ', filename)
             fname = os.path.join(folder_logs, filename)
             successful = False if 'unfinished' in filename else True
-            df_full = pd.read_csv(fname, sep='\t', comment='#',
-                                  usecols=[3], names=['path'])
-            # df_full = df_full.iloc[:10000]
+            df_full = pd.read_csv(fname, sep='\t', comment='#', index_col=False,
+                                  names=['user', 'timestamp', 'duration',
+                                         'path'])
+            df_full = df_full.iloc[:1000]
+
+            def convert_time(t):
+                tm = datetime.datetime.fromtimestamp(t)
+                return tm.strftime('%Y-%m-%d %H:%M:%S')
+
+            df_full['timestamp'] = df_full['timestamp'].apply(convert_time)
             paths = df_full['path'].str.split(';').tolist()
             start = pd.DataFrame([t[0] for t in paths])
             df_full['start'] = start
@@ -826,6 +835,9 @@ class Wikispeedia(Wikigame):
                 df['step'] = range(df.shape[0])
                 df['distance-to-go'] = list(reversed(range(df.shape[0])))
                 df['subject'] = eid
+                df['user'] = entry['user']
+                df['timestamp'] = entry['timestamp']
+                df['duration'] = entry['duration']
                 df['start'] = entry['start']
                 df['start_id'] = entry['start_id']
                 df['target'] = entry['target']
@@ -853,8 +865,8 @@ if __name__ == '__main__':
 
     for wg in [
         WIKTI(),
-        Wikispeedia(),
+        # Wikispeedia(),
     ]:
         wg.create_dataframe()
-        wg.complete_dataframe()
-        wg.add_link_context()
+        # wg.complete_dataframe()
+        # wg.add_link_context()
