@@ -792,7 +792,7 @@ class Wikispeedia(Wikigame):
             df_full = pd.read_csv(fname, sep='\t', comment='#', index_col=False,
                                   names=['user', 'timestamp', 'duration',
                                          'path'])
-            # df_full = df_full.iloc[:10000]
+            # df_full = df_full.iloc[:1000]
 
             def convert_time(t):
                 tm = datetime.datetime.fromtimestamp(t)

@@ -15,7 +15,7 @@ pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
 colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
 sns.set_palette(sns.color_palette(colors))
-sns.set_style("whitegrid")
+sns.set_style("white")
 # sns.set_style("ticks")
 sns.set_context("notebook", font_scale=1.125, rc={"lines.linewidth": 1.5})
 
@@ -42,6 +42,7 @@ class Plotter(object):
             os.makedirs(self.plot_folder)
 
     def plot_linkpos(self, data=None, labels=None, fname_suffix=''):
+        fontsize_old = plt.rcParams['legend.fontsize']
         plt.rcParams['legend.fontsize'] = 7.5
         if data is None:
             data = self.data
@@ -53,9 +54,9 @@ class Plotter(object):
         p = Plot(1, len(data), rowsize=6, colsize=6)
         for k, c in zip([4, 5, 6], self.colors):
             for feature, ylabel, m, ls in [
-                ('linkpos_last', 'last occurrence', 'v', 'solid'),
+                ('linkpos_first', 'first occurrence', 'v', 'solid'),
                 ('linkpos_actual', 'click position', 'o', 'dashed'),
-                ('linkpos_first', 'first occurrence', '^', 'solid'),
+                ('linkpos_last', 'last occurrence', '^', 'solid'),
                 ('word_count', 'article length', '', 'dotted')
             ]:
                 for label, dataset in data.items():
@@ -74,8 +75,8 @@ class Plotter(object):
                                  legend=True)
         path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
         p.finish(path, suptitle='Link Position', titles=titles, xlabel=xlabel,
-                 ylabel='word', invert_xaxis=True)
-        plt.rcParams['legend.fontsize'] = 12.5
+                 ylabel='word', invert_xaxis=True, invert_yaxis=True)
+        plt.rcParams['legend.fontsize'] = fontsize_old
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
         """draw comparison plots for multiple datasets"""
@@ -239,6 +240,8 @@ class Plotter(object):
 class Plot(object):
     def __init__(self, nrows=1, ncols=1, rowsize=4.25, colsize=4.5):
         """create the plot"""
+        if ncols == 1:
+            rowsize += 0.5
         self.fig, self.axes = plt.subplots(nrows, ncols, squeeze=False,
                                            figsize=(0.5 + rowsize * ncols,
                                                     colsize))
@@ -280,6 +283,7 @@ class Plot(object):
         xlabel = kwargs.pop('xlabel', '')
         ylabel = kwargs.pop('ylabel', suptitle)
         invert_xaxis = kwargs.pop('invert_xaxis', False)
+        invert_yaxis = kwargs.pop('invert_yaxis', False)
         self.match_ylim()
         self.add_margin()
         for row in range(self.axes.shape[0]):
@@ -287,6 +291,8 @@ class Plot(object):
                 ax = self.axes[row, col]
                 if invert_xaxis:
                     ax.invert_xaxis()
+                if invert_yaxis:
+                    ax.invert_yaxis()
                 ax.set_xlabel(xlabel)
                 ax.set_ylabel(ylabel)
                 try:
@@ -297,6 +303,8 @@ class Plot(object):
         sns.despine(fig=self.fig)
         self.fig.subplots_adjust(left=0.1, bottom=0.15, right=0.95, top=0.85,
                                  wspace=0.3, hspace=0.2)
+        if self.axes.shape[1] == 1:
+            self.fig.subplots_adjust(left=0.15)
         # plt.show()
         plt.savefig(fname)
 
@@ -309,10 +317,10 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
+        pt.plot_linkpos()
         pt.plot_comparison()
         pt.plot_wikti()
         # pt.print_game_stats()
-        pt.plot_linkpos()
-        pt.plot_games_users()
+        # pt.plot_games_users()
         # pt.correlation()
 
