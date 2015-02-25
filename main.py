@@ -23,6 +23,7 @@ import ngram
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
 
+
 class DbConnector(object):
     def __init__(self, db):
         self.db_host = '127.0.0.1'
@@ -842,7 +843,7 @@ class Wikispeedia(Wikigame):
             df_full['path'], df_full['backtrack'] = path, backtrack
 
             df_full['pl'] = df_full['path'].apply(lambda p: len(p))
-            df_full = df_full[(df_full.spl == 3) & (df_full['pl'] < 9)]
+            df_full = df_full[(df_full['spl'] == 3) & (df_full['pl'] < 9)]
 
             def nonexisting_links_present(dtfr):
                 # make sure a link from the log actually exists in the articles
