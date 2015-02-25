@@ -12,6 +12,7 @@ import seaborn as sns
 
 # set a few options
 pd.options.mode.chained_assignment = None
+pd.set_option('display.width', 1000)
 colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
 sns.set_palette(sns.color_palette(colors))
 
@@ -37,26 +38,64 @@ class Plotter(object):
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
-    def plot_comparison(self):
-        """draw comparison plots for multiple datasets"""
+    def plot_linkpos(self, data=None, labels=None, fname_suffix=''):
+        if data is None:
+            data = self.data
+        if labels is None:
+            labels = self.labels
+        print('linkpos()')
         xlabel = 'Distance to-go to target'
-        titles = np.array([self.labels])
+        titles = np.array([labels])
+        p = Plot(1, len(data))
+        for k, c in zip([4, 5, 6], self.colors):
+            for feature, ylabel, m, ls in [
+                ('linkpos_last', 'last occurrence', 'v', 'solid'),
+                ('linkpos_actual', 'click position', 'o', 'dashed'),
+                ('linkpos_first', 'first occurrence', '^', 'solid'),
+                ('word_count', 'article length', '', 'dotted')
+            ]:
+                for label, dataset in data.items():
+                    if feature not in dataset:
+                        print(feature, 'not present')
+                        continue
+                    x = labels.index(label)
+                    df = dataset[(dataset['pl'] == k) & dataset['successful']]
+                    df = df[['distance-to-go', 'subject', 'pl', feature]]
+                    df['pl'] = df['pl'].apply(lambda l: str(l) +
+                                              ' (' + ylabel + ')')
+                    df.rename(columns={'pl': 'Game length'}, inplace=True)
+                    p.add_tsplot(df, col=x, time='distance-to-go',
+                                 unit='subject', condition='Game length', ci=0,
+                                 value=feature, marker=m, color=c, linestyle=ls,
+                                 legend=True)
+        path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
+        p.finish(path, suptitle='Link Position', titles=titles, xlabel=xlabel,
+                 ylabel='word', invert_xaxis=True)
+
+    def plot_comparison(self, data=None, labels=None, fname_suffix=''):
+        """draw comparison plots for multiple datasets"""
+        if data is None:
+            data = self.data
+        if labels is None:
+            labels = self.labels
+        xlabel = 'Distance to-go to target'
+        titles = np.array([labels])
         for feature, title, ylabel in [
-            # ('spl_target', 'Shortest Path Length to Target', ''),
-            # ('tfidf_target', 'TF-IDF similarity to Target', ''),
-            # ('degree_out', 'Out-degree', ''),
+            ('spl_target', 'Shortest Path Length to Target', ''),
+            ('tfidf_target', 'TF-IDF similarity to Target', ''),
+            ('degree_out', 'Out-degree', ''),
             ('degree_in', 'In-degree', ''),
-            # ('ngram', 'N-Gram Frequency (Query)', ''),
-            # ('category_depth', 'Category Depth', ''),
-            # ('category_target', 'Category Distance to target', ''),
-            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
-            # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
+            ('ngram', 'N-Gram Frequency (Query)', ''),
+            ('category_depth', 'Category Depth', ''),
+            ('category_target', 'Category Distance to target', ''),
+            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
-            p = Plot(nrows=1, ncols=len(self.data))
-            for label, dataset in self.data.items():
-                x = self.labels.index(label)
+            p = Plot(nrows=1, ncols=len(data))
+            for label, dataset in data.items():
+                x = labels.index(label)
                 for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
                     # filter the dataset
                     df = dataset[(dataset['pl'] == k) & dataset['successful']]
@@ -65,9 +104,9 @@ class Plotter(object):
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
-            p.finish(os.path.join(self.plot_folder, feature + '.png'),
-                     suptitle=title, titles=titles,
-                     xlabel=xlabel, ylabel=ylabel, invert_xaxis=True)
+            path = os.path.join(self.plot_folder, feature+fname_suffix+'.png')
+            p.finish(path, suptitle=title, titles=titles, xlabel=xlabel,
+                     ylabel=ylabel, invert_xaxis=True)
 
     def plot_wikti(self):
         """draw plots for features within the WIKTI dataset"""
@@ -155,39 +194,25 @@ class Plotter(object):
     def print_game_stats(self):
         for label, dataset in self.data.items():
             df = dataset[(dataset['spl'] == 3) & (dataset['successful']) &
-                (dataset['distance-to-go'] == 0)]
+                         (dataset['distance-to-go'] == 0)]
             df['mission'] = df['start'] + '-' + df['target']
             print(df['mission'].value_counts(), df.shape)
 
-    def plot_linkpos(self):
-        print('linkpos')
-        xlabel = 'Distance to-go to target'
-        titles = np.array([self.labels])
-        p = Plot(1, len(self.data))
-        for k, c in zip([4, 5, 6], self.colors):
-            for feature, ylabel, m, ls in [
-                ('linkpos_last', 'last occurrence', 'v', 'solid'),
-                ('linkpos_actual', 'click position', 'o', 'dashed'),
-                ('linkpos_first', 'first occurrence', '^', 'solid'),
-                ('word_count', 'article length', '', 'dotted')
-            ]:
-                for label, dataset in self.data.items():
-                    if feature not in dataset:
-                        print(feature, 'not present')
-                        continue
-                    x = self.labels.index(label)
-                    df = dataset[(dataset['pl'] == k) & dataset['successful']]
-                    df = df[['distance-to-go', 'subject', 'pl', feature]]
-                    df['pl'] = df['pl'].apply(lambda l: str(l) +
-                                              ' (' + ylabel + ')')
-                    df.rename(columns={'pl': 'Game length'}, inplace=True)
-                    p.add_tsplot(df, col=x, time='distance-to-go',
-                                 unit='subject', condition='Game length', ci=0,
-                                 value=feature, marker=m, color=c, linestyle=ls,
-                                 legend=True)
-        p.finish(os.path.join(self.plot_folder, 'linkpos.png'),
-                 suptitle='Link Position', titles=titles, xlabel=xlabel,
-                 ylabel='word', invert_xaxis=True)
+    def plot_games_users(self):
+        print('plot_games_users()')
+        df = self.data['Wikispeedia']
+        data = {
+            'novice users': df[df['above_pl_user_mean']],
+            'proficient users': df[~df['above_pl_user_mean']],
+            'easy games': df[df['above_pl_mission_mean']],
+            'hard games': df[~df['above_pl_mission_mean']],
+            }
+        labels = ['novice users', 'proficient users',
+                  'easy games', 'hard games']
+        for label, dataset in data.items():
+            print(label, dataset.shape[0])
+        self.plot_linkpos(data, labels, fname_suffix='_split')
+        self.plot_comparison(data, labels, fname_suffix='_split')
 
     def correlation(self):
         for features in [
@@ -270,15 +295,16 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['Wikispeedia']),
+        Plotter(['Wikispeedia']),
         # Plotter(['WIKTI']),
-        Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_comparison()
+        # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.plot_linkpos()
+        pt.plot_games_users()
         # pt.correlation()
 

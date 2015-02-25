@@ -21,7 +21,7 @@ import ngram
 
 # set a few options
 pd.options.mode.chained_assignment = None
-
+pd.set_option('display.width', 1000)
 
 class DbConnector(object):
     def __init__(self, db):
@@ -422,7 +422,6 @@ class Wikigame(object):
                                                                d['target_id'])
         df['category_target'] = df.apply(category_target, axis=1)
 
-        # get link positions
         print('     getting link positions...')
         first, last = [], []
         for i in range(df.shape[0] - 1):
@@ -462,19 +461,21 @@ class Wikigame(object):
         df['linkpos_ib'] = linkpos_ib
         df['linkpos_lead'] = linkpos_lead
 
+        self.data = df
         self.save_data()
 
     def add_link_context(self):
         print('add_link_context()')
         self.load_data()
         self.load_link_positions()
+
         df = self.data
         lp = 'linkpos_actual' if 'linkpos_actual' in df else 'linkpos_first'
 
         # get link context
         context = []
         for i in range(df.shape[0] - 1):
-            # print('         ', i+1, '/', df.shape[0], end='\r')
+            print('         ', i+1, '/', df.shape[0], end='\r')
             if (df.iloc[i]['subject'] != df.iloc[i+1]['subject']) or\
                     df.iloc[i]['backtrack']:
                     # if data belongs to different missions or is a backtrack
@@ -485,7 +486,26 @@ class Wikigame(object):
                 context.append(self.get_link_context(a, b))
                 if np.isnan(self.get_link_context(a, b)):
                     pdb.set_trace()
+
         df['link_context'] = context + [np.NaN]
+        self.save_data()
+
+    def add_means(self):
+        print('add_means()')
+        self.load_data()
+        self.data['mission'] = self.data['start'] + '-' + self.data['target']
+        df = self.data
+
+        df = df.join(df.groupby('mission')['pl'].mean(), on='mission',
+                     rsuffix='_mission_mean')
+        mission_mean_mean= df['pl_mission_mean'].mean()
+        df['above_pl_mission_mean'] = df['pl_mission_mean'] > mission_mean_mean
+
+        df = df.join(df.groupby('user')['pl'].mean(), on='user',
+                     rsuffix='_user_mean')
+        user_mean_mean = df['pl_user_mean'].mean()
+        df['above_pl_user_mean'] = df['pl_user_mean'] > user_mean_mean
+        self.data = df
         self.save_data()
 
 
@@ -771,7 +791,7 @@ class Wikispeedia(Wikigame):
             df_full = pd.read_csv(fname, sep='\t', comment='#', index_col=False,
                                   names=['user', 'timestamp', 'duration',
                                          'path'])
-            df_full = df_full.iloc[:1000]
+            # df_full = df_full.iloc[:10000]
 
             def convert_time(t):
                 tm = datetime.datetime.fromtimestamp(t)
@@ -824,11 +844,27 @@ class Wikispeedia(Wikigame):
             df_full['pl'] = df_full['path'].apply(lambda p: len(p))
             df_full = df_full[(df_full.spl == 3) & (df_full['pl'] < 9)]
 
+            def nonexisting_links_present(dtfr):
+                # make sure a link from the log actually exists in the articles
+                for i in range(dtfr.shape[0] - 1):
+                    if dtfr.iloc[i]['backtrack']:
+                        continue
+                    a = dtfr.iloc[i]['node']
+                    b = dtfr.iloc[i+1]['node']
+                    links = self.get_link_possibilities(a, b)
+                    if len(links) == 0:
+                        print('        link does not exist:', a, b)
+                        return True
+                return False
+
             for eid, entry in enumerate(df_full.iterrows()):
                 print('    ', eid + 1, '/', df_full.shape[0], end='\r')
                 entry = entry[1]
-                df = pd.DataFrame(data=entry['path'], columns=['node'])
-                df['backtrack'] = entry['backtrack']
+                df = pd.DataFrame(data=zip(entry['path'], entry['backtrack']),
+                                  columns=['node', 'backtrack'])
+                if nonexisting_links_present(df):
+                    continue
+
                 df['successful'] = successful
                 df['spl'] = entry['spl']
                 df['pl'] = entry['pl']
@@ -842,31 +878,20 @@ class Wikispeedia(Wikigame):
                 df['start_id'] = entry['start_id']
                 df['target'] = entry['target']
                 df['target_id'] = entry['target_id']
-                # make sure a link from the log actually exists in the articles
-                for i in range(df.shape[0] - 1):
-                    if df.iloc[i]['backtrack']:
-                        continue
-                    a = df.iloc[i]['node']
-                    b = df.iloc[i+1]['node']
-                    links = self.get_link_possibilities(a, b)
-                    if len(links) == 0:
-                        print('        link does not exist:', a, b)
-                        break
-                else:
-                    results.append(df)
+                results.append(df)
 
         data = pd.concat(results)
         self.save_data(data)
-
 
 if __name__ == '__main__':
 
     # Cached.clear_cache()
 
     for wg in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
         wg.create_dataframe()
-        # wg.complete_dataframe()
-        # wg.add_link_context()
+        wg.complete_dataframe()
+        wg.add_link_context()
+        wg.add_means()
