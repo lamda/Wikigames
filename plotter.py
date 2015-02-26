@@ -14,7 +14,9 @@ import seaborn as sns
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
 colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
+# colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2", "#CCB974", "#64B5CD"]
 sns.set_palette(sns.color_palette(colors))
+
 sns.set_style("white")
 # sns.set_style("ticks")
 sns.set_context("notebook", font_scale=1.125, rc={"lines.linewidth": 1.5})
@@ -74,7 +76,7 @@ class Plotter(object):
                                  value=feature, marker=m, color=c, linestyle=ls,
                                  legend=True)
         path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
-        p.finish(path, suptitle='Link Position', titles=titles, xlabel=xlabel,
+        p.finish(path, suptitle='Clicked Link Position', titles=titles, xlabel=xlabel,
                  ylabel='word', invert_xaxis=True, invert_yaxis=True)
         plt.rcParams['legend.fontsize'] = fontsize_old
 
@@ -92,6 +94,7 @@ class Plotter(object):
             ('degree_out', 'Out-degree', ''),
             ('degree_in', 'In-degree', ''),
             ('ngram', 'N-Gram Frequency (Query)', ''),
+            ('view_count', 'Wikipedia article views', ''),
             ('category_depth', 'Category Depth', ''),
             ('category_target', 'Category Distance to target', ''),
             ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
@@ -305,8 +308,8 @@ class Plot(object):
                                  wspace=0.3, hspace=0.2)
         if self.axes.shape[1] == 1:
             self.fig.subplots_adjust(left=0.15)
-        # plt.show()
         plt.savefig(fname)
+        plt.close(self.fig)
 
 
 if __name__ == '__main__':
@@ -317,10 +320,10 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_linkpos()
+        # pt.plot_linkpos()
         pt.plot_comparison()
-        pt.plot_wikti()
+        # pt.plot_wikti()
         # pt.print_game_stats()
-        # pt.plot_games_users()
+        pt.plot_games_users()
         # pt.correlation()
 

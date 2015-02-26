@@ -18,6 +18,7 @@ import pymysql
 
 from decorators import Cached
 import ngram
+import viewcounts
 
 # set a few options
 pd.options.mode.chained_assignment = None
@@ -73,7 +74,6 @@ class Wikigame(object):
         self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
         self.plaintext_folder = os.path.join('data', label, 'wpcd', 'plaintext')
         self.cache_folder = os.path.join('data', label, 'cache')
-        self.ngram = ngram.ngram_frequency
 
         self.link2pos_first, self.link2pos_last = None, None
         self.length, self.pos2link = None, None
@@ -404,7 +404,20 @@ class Wikigame(object):
         df['degree_in'] = df['node_id'].apply(lambda n: self.id2deg_in[n])
 
         print('     getting ngram frequencies...')
-        df['ngram'] = df['node'].apply(lambda n: self.ngram.get_frequency(n))
+        get_ngrams = lambda n: ngram.ngram_frequency.get_frequency(n)
+        df['ngram'] = df['node'].apply(get_ngrams)
+
+        print('     getting Wikipedia view counts...')
+
+        def get_view_counts(nodes):
+            result = []
+            for i, n in enumerate(nodes):
+                print('         ', i, '/', len(nodes), end='\r')
+                result.append(viewcounts.viewcount.get_frequency(n))
+            return result
+
+        df['view_count'] = get_view_counts(df['node'])
+
         print('     getting word counts and shortest paths...')
         df['word_count'] = df['node'].apply(lambda n: self.length[n])
         spl_target = lambda d: self.get_spl(d['node_id'], d['target_id'])
