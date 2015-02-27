@@ -8,6 +8,7 @@ import pdb
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy
 import seaborn as sns
 
 # set a few options
@@ -37,7 +38,11 @@ class Plotter(object):
             path = os.path.join('data', label, 'data.obj')
             self.data[label] = pd.read_pickle(path)
             # filter to include only games with shortest possible solutions of 3
-            self.data[label] = self.data[label][(self.data[label]['spl'] == 3)]
+            self.data[label] = self.data[label][
+                (self.data[label]['spl'] == 3) &
+                (self.data[label]['successful']) &
+                (self.data[label]['pl'] < 9)
+            ]
             print(label, 'data loaded\n')
         self.plot_folder = os.path.join('plots')
         if not os.path.exists(self.plot_folder):
@@ -66,7 +71,7 @@ class Plotter(object):
                         print(feature, 'not present')
                         continue
                     x = labels.index(label)
-                    df = dataset[(dataset['pl'] == k) & dataset['successful']]
+                    df = dataset[dataset['pl'] == k]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df['pl'] = df['pl'].apply(lambda l: str(l) +
                                               ' (' + ylabel + ')')
@@ -107,7 +112,7 @@ class Plotter(object):
                 x = labels.index(label)
                 for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
                     # filter the dataset
-                    df = dataset[(dataset['pl'] == k) & dataset['successful']]
+                    df = dataset[dataset['pl'] == k]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
                     p.add_tsplot(df, col=x, time='distance-to-go',
@@ -155,8 +160,7 @@ class Plotter(object):
             p = Plot(nrows=1, ncols=len(features))
             for idx, feature in enumerate(features):
                 for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
-                    df = dataset[(dataset['pl'] == k) & (dataset['spl'] == 3) &
-                                 dataset['successful']]
+                    df = dataset[dataset['pl'] == k]
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
                     p.add_tsplot(df, col=idx, time='distance-to-go',
@@ -169,8 +173,7 @@ class Plotter(object):
 
     def print_click_stats(self):
         print('Statistics for WIKTI')
-        dataset = self.data['WIKTI']
-        df = dataset[dataset['successful'] & (dataset['pl'] < 9)]
+        df = self.data['WIKTI']
         df = df[['linkpos_first', 'linkpos_last', 'linkpos_actual']]
         df['linkpos_diff'] = df['linkpos_first'] - df['linkpos_last']
         df = df[~np.isnan(df['linkpos_diff'])]
@@ -185,8 +188,10 @@ class Plotter(object):
         between = diff[(diff['linkpos_last'] != diff['linkpos_actual']) &
                        (diff['linkpos_first'] != diff['linkpos_actual'])]
         entire = diff.shape[0]
-        print('of those with multiple positions, %.2f%% first, %.2f%% last, %.2f%% inbetween out of %d total' %
-              (100 * first/entire, 100 * last/entire, 100 - 100 * (first + last) / entire, entire))
+        print('of those with multiple positions,',
+              '%.2f%% first, %.2f%% last, %.2f%% inbetween out of %d total' %
+              (100 * first/entire, 100 * last/entire,
+               100 - 100 * (first + last) / entire, entire))
         stats = between[['linkpos_first', 'linkpos_actual', 'linkpos_last']]
         first = stats['linkpos_actual'] - stats['linkpos_first'].tolist()
         last = stats['linkpos_last'] - stats['linkpos_actual'].tolist()
@@ -197,13 +202,13 @@ class Plotter(object):
             else:
                 ll += 1
         total = ff + ll
-        print('of those inbetween, %.2f%% closer to first, %.2f%% closer to last out of %d total' %
+        print('of those inbetween,',
+              '%.2f%% closer to first, %.2f%% closer to last out of %d total' %
               (100 * ff/total, 100 * ll/total, total))
 
     def print_game_stats(self):
         for label, dataset in self.data.items():
-            df = dataset[(dataset['spl'] == 3) & (dataset['successful']) &
-                         (dataset['distance-to-go'] == 0)]
+            df = dataset[dataset['distance-to-go'] == 0]
             df['mission'] = df['start'] + '-' + df['target']
             print(df['mission'].value_counts(), df.shape)
 
@@ -224,20 +229,46 @@ class Plotter(object):
         self.plot_comparison(data, labels, fname_suffix='_split')
 
     def correlation(self):
-        for features in [
-            ['degree_in', 'degree_out'],
-            ['degree_in', 'category_depth'],
-            ['degree_in', 'ngram'],
-            ['category_depth', 'ngram'],
-        ]:
-            for label, dataset in self.data.items():
-                df = dataset[(dataset['pl'] < 9) & dataset['successful']]
-                df = df[features]
-                sns.jointplot(features[0], features[1], df)
-                fname = 'corr_' + features[0] + '_' + features[1] + '_'\
-                        + label + '.png'
+
+        def feature_generator():
+            columns = [
+                # 'category_depth',
+                'degree_in',
+                'ngram',
+                'view_count',
+            ]
+            n = len(columns)
+            for a in range(n):
+                for b in range(n):
+                    if a < b:
+                        yield (columns[a], columns[b])
+
+        for label, dataset in self.data.items():
+            print(label)
+            for f1, f2 in feature_generator():
+                print('   ', f1, '|', f2)
+                df = dataset[[f1, f2]]
+                # pdb.set_trace()
+                df = df[(df[f1] != 0) & (df[f2] != 0)]
+                # if f1 == 'ngram':
+                #     df[f1] = (-1) * np.log(df[f1] * -1)
+                # df[f1] = np.log(df[f1])
+                # df[f2] = np.log(df[f2])
+                # df[f2] = (-1) * np.log(df[f2] * -1)
+                r = scipy.stats.pearsonr(df[f1], df[f2])[0]
+                rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
+                tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
+
+                print('    r = %.2f, rho = %.2f, tau = %.2f\n' % (r, rho, tau))
+
+                sns.jointplot(f1, f2, df, kind='reg', color='#4CB391')
+                fname = 'corr_' + f1 + '_' + f2 + '_' + label + '.png'
                 plt.title(label)
-                plt.savefig(os.path.join(self.plot_folder, fname))
+                # plt.show()
+                plt.subplots_adjust(left=0.15, bottom=0.15, right=0.95,
+                                    top=0.95, wspace=0.3, hspace=0.3)
+                plt.savefig(os.path.join(self.plot_folder,
+                                         'correlation', fname))
 
 
 class Plot(object):
@@ -321,9 +352,9 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
         # pt.plot_linkpos()
-        pt.plot_comparison()
+        # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
-        pt.plot_games_users()
-        # pt.correlation()
+        # pt.plot_games_users()
+        pt.correlation()
 
