@@ -15,15 +15,11 @@ import seaborn as sns
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
 colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
-# colors = ["#4C72B0", "#55A868", "#C44E52", "#8172B2", "#CCB974", "#64B5CD"]
 sns.set_palette(sns.color_palette(colors))
 
 sns.set_style("white")
 # sns.set_style("ticks")
 sns.set_context("notebook", font_scale=1.125, rc={"lines.linewidth": 1.5})
-
-# import warnings
-# warnings.simplefilter("error")
 
 
 class Plotter(object):
@@ -33,17 +29,19 @@ class Plotter(object):
         self.data = {}
         self.labels = labels
         for label in self.labels:
-            # load datasets
+            # load dataset
             print('loading', label, 'data...', end='\r')
             path = os.path.join('data', label, 'data.obj')
             self.data[label] = pd.read_pickle(path)
-            # filter to include only games with shortest possible solutions of 3
+
+            # filter dataset
             self.data[label] = self.data[label][
                 (self.data[label]['spl'] == 3) &
                 (self.data[label]['successful']) &
                 (self.data[label]['pl'] < 9)
             ]
             print(label, 'data loaded\n')
+
         self.plot_folder = os.path.join('plots')
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
@@ -210,7 +208,7 @@ class Plotter(object):
         for label, dataset in self.data.items():
             df = dataset[dataset['distance-to-go'] == 0]
             df['mission'] = df['start'] + '-' + df['target']
-            print(df['mission'].value_counts(), df.shape)
+            print(label, df['mission'].value_counts(), df.shape)
 
     def plot_games_users(self):
         print('plot_games_users()')
@@ -228,33 +226,26 @@ class Plotter(object):
         self.plot_linkpos(data, labels, fname_suffix='_split')
         self.plot_comparison(data, labels, fname_suffix='_split')
 
-    def correlation(self):
+    def correlation_clicked(self):
 
-        def feature_generator():
+        def feature_combinations():
             columns = [
                 # 'category_depth',
                 'degree_in',
                 'ngram',
                 'view_count',
             ]
-            n = len(columns)
-            for a in range(n):
-                for b in range(n):
-                    if a < b:
-                        yield (columns[a], columns[b])
+            for a, ai in columns:
+                for b, bi in columns:
+                    if ai < bi:
+                        yield (a, b)
 
         for label, dataset in self.data.items():
             print(label)
-            for f1, f2 in feature_generator():
+            for f1, f2 in feature_combinations():
                 print('   ', f1, '|', f2)
                 df = dataset[[f1, f2]]
-                # pdb.set_trace()
                 df = df[(df[f1] != 0) & (df[f2] != 0)]
-                # if f1 == 'ngram':
-                #     df[f1] = (-1) * np.log(df[f1] * -1)
-                # df[f1] = np.log(df[f1])
-                # df[f2] = np.log(df[f2])
-                # df[f2] = (-1) * np.log(df[f2] * -1)
                 r = scipy.stats.pearsonr(df[f1], df[f2])[0]
                 rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
                 tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
@@ -269,6 +260,9 @@ class Plotter(object):
                                     top=0.95, wspace=0.3, hspace=0.3)
                 plt.savefig(os.path.join(self.plot_folder,
                                          'correlation', fname))
+
+    def correlation_all(self):
+        pass
 
 
 class Plot(object):
@@ -356,5 +350,5 @@ if __name__ == '__main__':
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.plot_games_users()
-        pt.correlation()
+        pt.correlation_clicked()
 

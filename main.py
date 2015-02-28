@@ -512,7 +512,7 @@ class Wikigame(object):
 
         df = df.join(df.groupby('mission')['pl'].mean(), on='mission',
                      rsuffix='_mission_mean')
-        mission_mean_mean= df['pl_mission_mean'].mean()
+        mission_mean_mean = df['pl_mission_mean'].mean()
         df['above_pl_mission_mean'] = df['pl_mission_mean'] > mission_mean_mean
 
         df = df.join(df.groupby('user')['pl'].mean(), on='user',
