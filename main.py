@@ -522,6 +522,14 @@ class Wikigame(object):
         self.data = df
         self.save_data()
 
+    def create_correlation_data(self):
+        node_id = sorted(self.id2name.keys())
+        df = pd.DataFrame(data=node_id, columns=['node_id'])
+        df['node'] = [self.id2name[n] for n in node_id]
+        df['degree_in'] = [self.id2deg_in[n] for n in node_id]
+        df['degree_out'] = [self.id2deg_out[n] for n in node_id]
+        df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
+
 
 class WIKTI(Wikigame):
     label = 'wikti'
@@ -902,10 +910,11 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        # WIKTI(),
+        WIKTI(),
         Wikispeedia(),
     ]:
-        wg.create_dataframe()
-        wg.complete_dataframe()
-        wg.add_link_context()
-        wg.add_means()
+        # wg.create_dataframe()
+        # wg.complete_dataframe()
+        # wg.add_link_context()
+        # wg.add_means()
+        wg.create_correlation_data()
