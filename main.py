@@ -905,16 +905,17 @@ class Wikispeedia(Wikigame):
         data = pd.concat(results)
         self.save_data(data)
 
+
 if __name__ == '__main__':
 
     # Cached.clear_cache()
 
     for wg in [
         WIKTI(),
-        Wikispeedia(),
+        # Wikispeedia(),
     ]:
-        # wg.create_dataframe()
+        wg.create_dataframe()
         # wg.complete_dataframe()
         # wg.add_link_context()
         # wg.add_means()
-        wg.create_correlation_data()
+        # wg.create_correlation_data()

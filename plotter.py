@@ -79,8 +79,9 @@ class Plotter(object):
                                  value=feature, marker=m, color=c, linestyle=ls,
                                  legend=True)
         path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
-        p.finish(path, suptitle='Clicked Link Position', titles=titles, xlabel=xlabel,
-                 ylabel='word', invert_xaxis=True, invert_yaxis=True)
+        p.finish(path, suptitle='Clicked Link Position', titles=titles,
+                 xlabel=xlabel, ylabel='word',
+                 invert_xaxis=True, invert_yaxis=True)
         plt.rcParams['legend.fontsize'] = fontsize_old
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
@@ -92,17 +93,17 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         titles = np.array([labels])
         for feature, title, ylabel in [
-            ('spl_target', 'Shortest Path Length to Target', ''),
-            ('tfidf_target', 'TF-IDF similarity to Target', ''),
-            ('degree_out', 'Out-degree', ''),
-            ('degree_in', 'In-degree', ''),
+            # ('spl_target', 'Shortest Path Length to Target', ''),
+            # ('tfidf_target', 'TF-IDF similarity to Target', ''),
+            # ('degree_out', 'Outdegree', ''),
+            # ('degree_in', 'Indegree', ''),
             ('ngram', 'N-Gram Frequency (Query)', ''),
-            ('view_count', 'Wikipedia article views', ''),
-            ('category_depth', 'Category Depth', ''),
-            ('category_target', 'Category Distance to target', ''),
-            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
-            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
+            # ('view_count', 'Wikipedia article views', ''),
+            # ('category_depth', 'Category Depth', ''),
+            # ('category_target', 'Category Distance to target', ''),
+            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(data))
@@ -111,6 +112,8 @@ class Plotter(object):
                 for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
                     # filter the dataset
                     df = dataset[dataset['pl'] == k]
+                    if not df.shape[0]:
+                        continue
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
                     p.add_tsplot(df, col=x, time='distance-to-go',
@@ -214,16 +217,22 @@ class Plotter(object):
         print('plot_games_users()')
         df = self.data['Wikispeedia']
         data = {
-            'novice users': df[df['above_pl_user_mean']],
-            'proficient users': df[~df['above_pl_user_mean']],
+            'all': df,
             'easy games': df[df['above_pl_mission_mean']],
             'hard games': df[~df['above_pl_mission_mean']],
+            # 'novice users': df[df['above_pl_user_mean']],
+            # 'proficient users': df[~df['above_pl_user_mean']],
             }
-        labels = ['novice users', 'proficient users',
-                  'easy games', 'hard games']
+        labels = [
+            'all',
+            'easy games',
+            'hard games',
+            # 'novice users',
+            # 'proficient users',
+        ]
         for label, dataset in data.items():
             print(label, dataset.shape[0])
-        self.plot_linkpos(data, labels, fname_suffix='_split')
+        # self.plot_linkpos(data, labels, fname_suffix='_split')
         self.plot_comparison(data, labels, fname_suffix='_split')
 
     def correlation_clicked(self):
@@ -339,9 +348,9 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['Wikispeedia']),
+        Plotter(['Wikispeedia']),
         # Plotter(['WIKTI']),
-        Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
@@ -349,6 +358,6 @@ if __name__ == '__main__':
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
-        # pt.plot_games_users()
-        pt.correlation_clicked()
+        pt.plot_games_users()
+        # pt.correlation_clicked()
 
