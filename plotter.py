@@ -96,10 +96,10 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            # ('degree_in', 'Indegree', ''),
-            ('ngram', 'N-Gram Frequency (Query)', ''),
+            ('degree_in', 'Indegree', 'indegree'),
+            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
             # ('view_count', 'Wikipedia article views', ''),
-            # ('category_depth', 'Category Depth', ''),
+            ('category_depth', 'Category Depth', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
             # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
@@ -119,9 +119,10 @@ class Plotter(object):
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
+            yinv = True if feature == 'category_depth' else False
             path = os.path.join(self.plot_folder, feature+fname_suffix+'.png')
             p.finish(path, suptitle=title, titles=titles, xlabel=xlabel,
-                     ylabel=ylabel, invert_xaxis=True)
+                     ylabel=ylabel, invert_xaxis=True, invert_yaxis=yinv)
 
     def plot_wikti(self):
         """draw plots for features within the WIKTI dataset"""
@@ -213,45 +214,47 @@ class Plotter(object):
             df['mission'] = df['start'] + '-' + df['target']
             print(label, df['mission'].value_counts(), df.shape)
 
-    def plot_games_users(self):
+    def plot_split(self):
         print('plot_games_users()')
         df = self.data['Wikispeedia']
-        data = {
-            'all': df,
-            'easy games': df[df['above_pl_mission_mean']],
-            'hard games': df[~df['above_pl_mission_mean']],
-            # 'novice users': df[df['above_pl_user_mean']],
-            # 'proficient users': df[~df['above_pl_user_mean']],
-            }
-        labels = [
-            'all',
-            'easy games',
-            'hard games',
-            # 'novice users',
-            # 'proficient users',
+        data = [
+            {
+                'all': df,
+                'easy games': df[~df['above_pl_mission_mean']],
+                'hard games': df[df['above_pl_mission_mean']],
+            },
+            # {
+            #     'all': df,
+            #     'slow users': df[~df['above_pl_user_mean']],
+            #     'fast users': df[df['above_pl_user_mean']],
+            # },
         ]
-        for label, dataset in data.items():
-            print(label, dataset.shape[0])
-        # self.plot_linkpos(data, labels, fname_suffix='_split')
-        self.plot_comparison(data, labels, fname_suffix='_split')
+        labels = [
+            ['all', 'easy games', 'hard games'],
+            # ['all', 'fast users', 'slow users'],
+        ]
+        suffices = [
+            '_missions',
+            # '_users',
+        ]
+        for dataset, label, suffix in zip(data, labels, suffices):
+            self.plot_linkpos(dataset, label, fname_suffix=suffix)
+            # self.plot_comparison(dataset, label, fname_suffix=suffix)
+
+    def feature_combinations(self, features):
+        for ai, a in enumerate(features):
+            for bi, b in enumerate(features):
+                if ai < bi:
+                    yield (a, b)
 
     def correlation_clicked(self):
-
-        def feature_combinations():
-            columns = [
-                # 'category_depth',
-                'degree_in',
-                'ngram',
-                'view_count',
-            ]
-            for a, ai in columns:
-                for b, bi in columns:
-                    if ai < bi:
-                        yield (a, b)
-
         for label, dataset in self.data.items():
             print(label)
-            for f1, f2 in feature_combinations():
+            for f1, f2 in self.feature_combinations([
+                'degree_in',
+                'category_depth',
+                'ngram',
+            ]):
                 print('   ', f1, '|', f2)
                 df = dataset[[f1, f2]]
                 df = df[(df[f1] != 0) & (df[f2] != 0)]
@@ -271,7 +274,24 @@ class Plotter(object):
                                          'correlation', fname))
 
     def correlation_all(self):
-        pass
+        path = os.path.join('data', 'Wikispeedia', 'data_correlation.obj')
+        dataset = pd.read_pickle(path)
+        for f1, f2 in self.feature_combinations([
+            'degree_in',
+            'category_depth',
+            'ngram',
+        ]):
+            print('   ', f1, '|', f2)
+            df = dataset[[f1, f2]]
+            df = df[(df[f1] != 0) & (df[f2] != 0)]
+            r = scipy.stats.pearsonr(df[f1], df[f2])[0]
+            rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
+            tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
+            print('    r = %.2f, rho = %.2f, tau = %.2f\n' % (r, rho, tau))
+            sns.jointplot(f1, f2, df, kind='reg', color='#4CB391')
+            plt.subplots_adjust(left=0.15, bottom=0.15, right=0.95,
+                                top=0.95, wspace=0.3, hspace=0.3)
+            plt.show()
 
 
 class Plot(object):
@@ -354,10 +374,11 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        # pt.plot_linkpos()
+        pt.plot_linkpos()
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
-        pt.plot_games_users()
+        # pt.plot_split()
         # pt.correlation_clicked()
+        # pt.correlation_all()
 

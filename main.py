@@ -528,6 +528,18 @@ class Wikigame(object):
         df['node'] = [self.id2name[n] for n in node_id]
         df['degree_in'] = [self.id2deg_in[n] for n in node_id]
         df['degree_out'] = [self.id2deg_out[n] for n in node_id]
+
+        print('    getting category statistics...')
+        category_depth = lambda n: self.get_category_depth(n)
+        df['category_depth'] = df['node_id'].apply(category_depth)
+
+        print('    getting ngram frequencies...')
+        ngrams = []
+        for i, n in enumerate(df['node']):
+            print('   ', i+1, '/', len(df['node']), end='\r')
+            ngrams.append(ngram.ngram_frequency.get_frequency(n))
+        df['ngram'] = ngrams
+
         df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
 
 
@@ -911,11 +923,11 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
-        wg.create_dataframe()
+        # wg.create_dataframe()
         # wg.complete_dataframe()
         # wg.add_link_context()
         # wg.add_means()
-        # wg.create_correlation_data()
+        wg.create_correlation_data()
