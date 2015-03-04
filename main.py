@@ -76,7 +76,7 @@ class Wikigame(object):
         self.cache_folder = os.path.join('data', label, 'cache')
 
         self.link2pos_first, self.link2pos_last = None, None
-        self.length, self.pos2link = None, None
+        self.length, self.pos2link, self.pos2linklength = None, None, None
         self.ib_length, self.lead_length = None, None
         self.link_context, self.link_sets = None, None
 
@@ -270,11 +270,11 @@ class Wikigame(object):
                                  'href="../../wp/[^/]+/(.+?)\.htm" '
                                  'title="[^"]+">.+?</a>)'))
         folder = os.path.join('data', self.label, 'wpcd', 'wp')
-        link2pos_first, link2pos_last, pos2link = {}, {}, {}
+        link2pos_first, link2pos_last, pos2link, pos2linklength = {}, {}, {}, {}
         length, ib_length, lead_length = {}, {}, {}
         for i, a in enumerate(self.name2id.keys()):
             print(unicode(i+1), '/', unicode(len(self.name2id)), end='\r')
-            lpos_first, lpos_last, posl = {}, {}, {}
+            lpos_first, lpos_last, posl, posll = {}, {}, {}, {}
             fname = os.path.join(folder, a[0].lower(), a + '.htm')
             try:
                 with io.open(fname, encoding='utf-8') as infile:
@@ -344,23 +344,25 @@ class Wikigame(object):
                         aid = self.name2id[word[2:-2].replace('%25', '%')]
                         lpos_last[aid] = wi
                         posl[wi] = aid
+                        posll[wi] = word.count('_') + 1
                     except KeyError:
                         pass
             link2pos_first[a] = lpos_first
             link2pos_last[a] = lpos_last
             pos2link[a] = posl
+            pos2linklength[a] = posll
             length[a] = len(words)
         path = os.path.join('data', self.label, 'link_positions.obj')
         with open(path, 'wb') as outfile:
-            pickle.dump([link2pos_first, link2pos_last,
-                         length, pos2link, ib_length, lead_length], outfile, -1)
+            pickle.dump([link2pos_first, link2pos_last, length, pos2link,
+                         pos2linklength, ib_length, lead_length], outfile, -1)
 
     def load_link_positions(self):
         if self.link2pos_first is None:
             path = os.path.join('data', self.label, 'link_positions.obj')
             with open(path, 'rb') as infile:
                 self.link2pos_first, self.link2pos_last, self.length,\
-                    self.pos2link, self.ib_length,\
+                    self.pos2link, self.pos2linklength, self.ib_length,\
                     self.lead_length = pickle.load(infile)
 
     @Cached
@@ -369,7 +371,7 @@ class Wikigame(object):
                        if v == self.name2id[target]])
 
     @Cached
-    def get_link_context(self, start, pos):
+    def get_link_context_count(self, start, pos):
         if self.link_sets is None:
             self.link_sets = {k: sorted(v.keys())
                               for k, v in self.pos2link.iteritems()}
@@ -379,6 +381,10 @@ class Wikigame(object):
             ctxt = sum(pos - 10 <= l <= pos + 10
                        for l in self.link_sets[start])
             return ctxt
+
+    @Cached
+    def get_link_length(self, start, pos):
+        raise NotImplementedError
 
     def load_data(self):
         if self.data is None:
@@ -488,18 +494,19 @@ class Wikigame(object):
 
         # get link context
         context = []
+        anchor_length = []
         for i in range(df.shape[0] - 1):
             print('         ', i+1, '/', df.shape[0], end='\r')
             if (df.iloc[i]['subject'] != df.iloc[i+1]['subject']) or\
                     df.iloc[i]['backtrack']:
                     # if data belongs to different missions or is a backtrack
                 context.append(np.NaN)
+                anchor_length.append(np.NaN)
             else:
                 a = df.iloc[i]['node']
                 b = df.iloc[i][lp]
-                context.append(self.get_link_context(a, b))
-                if np.isnan(self.get_link_context(a, b)):
-                    pdb.set_trace()
+                context.append(self.get_link_context_count(a, b))
+                anchor_length.append(self.get_link_length(a, b))
 
         df['link_context'] = context + [np.NaN]
         self.save_data()
@@ -923,11 +930,12 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        # WIKTI(),
-        Wikispeedia(),
+        WIKTI(),
+        # Wikispeedia(),
     ]:
+        wg.compute_link_positions()
         # wg.create_dataframe()
         # wg.complete_dataframe()
         # wg.add_link_context()
         # wg.add_means()
-        wg.create_correlation_data()
+        # wg.create_correlation_data()

@@ -374,11 +374,11 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_linkpos()
+        # pt.plot_linkpos()
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.plot_split()
         # pt.correlation_clicked()
-        # pt.correlation_all()
+        pt.correlation_all()
 
