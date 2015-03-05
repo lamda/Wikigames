@@ -364,6 +364,8 @@ class Wikigame(object):
                 self.link2pos_first, self.link2pos_last, self.length,\
                     self.pos2link, self.pos2linklength, self.ib_length,\
                     self.lead_length = pickle.load(infile)
+            self.link_sets = {k: sorted(v.keys())
+                              for k, v in self.pos2link.iteritems()}
 
     @Cached
     def get_link_possibilities(self, start, target):
@@ -372,9 +374,6 @@ class Wikigame(object):
 
     @Cached
     def get_link_context_count(self, start, pos):
-        if self.link_sets is None:
-            self.link_sets = {k: sorted(v.keys())
-                              for k, v in self.pos2link.iteritems()}
         if np.isnan(pos):
                 return np.NaN
         else:
@@ -384,7 +383,7 @@ class Wikigame(object):
 
     @Cached
     def get_link_length(self, start, pos):
-        raise NotImplementedError
+        return self.pos2linklength[start][pos]
 
     def load_data(self):
         if self.data is None:
@@ -507,8 +506,11 @@ class Wikigame(object):
                 b = df.iloc[i][lp]
                 context.append(self.get_link_context_count(a, b))
                 anchor_length.append(self.get_link_length(a, b))
+                # print(a, df.iloc[i+1]['node'], b, self.get_link_length(a, b))
+                # pdb.set_trace()
 
         df['link_context'] = context + [np.NaN]
+        df['link_anchor_length'] = anchor_length + [np.NaN]
         self.save_data()
 
     def add_means(self):
@@ -883,7 +885,7 @@ class Wikispeedia(Wikigame):
             df_full['path'], df_full['backtrack'] = path, backtrack
 
             df_full['pl'] = df_full['path'].apply(lambda p: len(p))
-            df_full = df_full[(df_full['spl'] == 3) & (df_full['pl'] < 9)]
+            df_full = df_full[(df_full['spl'] == 4) & (df_full['pl'] < 10)]
 
             def nonexisting_links_present(dtfr):
                 # make sure a link from the log actually exists in the articles
@@ -930,12 +932,12 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        WIKTI(),
-        # Wikispeedia(),
+        # WIKTI(),
+        Wikispeedia(),
     ]:
-        wg.compute_link_positions()
+        # wg.compute_link_positions()
         # wg.create_dataframe()
         # wg.complete_dataframe()
-        # wg.add_link_context()
-        # wg.add_means()
+        wg.add_link_context()
+        wg.add_means()
         # wg.create_correlation_data()

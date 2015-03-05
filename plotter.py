@@ -23,7 +23,7 @@ sns.set_context("notebook", font_scale=1.125, rc={"lines.linewidth": 1.5})
 
 
 class Plotter(object):
-    def __init__(self, labels):
+    def __init__(self, labels, spl=3):
         self.markers = ['o', 'h', 'd', 'v', 's', 'x']
         self.colors = colors
         self.data = {}
@@ -36,7 +36,7 @@ class Plotter(object):
 
             # filter dataset
             self.data[label] = self.data[label][
-                (self.data[label]['spl'] == 3) &
+                (self.data[label]['spl'] == spl) &
                 (self.data[label]['successful']) &
                 (self.data[label]['pl'] < 9)
             ]
@@ -57,7 +57,7 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         titles = np.array([labels])
         p = Plot(1, len(data), rowsize=6, colsize=6)
-        for k, c in zip([4, 5, 6], self.colors):
+        for k, c in zip([4, 5, 6, 7], self.colors):
             for feature, ylabel, m, ls in [
                 ('linkpos_first', 'first occurrence', 'v', 'solid'),
                 ('linkpos_actual', 'click position', 'o', 'dashed'),
@@ -74,6 +74,8 @@ class Plotter(object):
                     df['pl'] = df['pl'].apply(lambda l: str(l) +
                                               ' (' + ylabel + ')')
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
+                    if df.empty:
+                        continue
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length', ci=0,
                                  value=feature, marker=m, color=c, linestyle=ls,
@@ -96,20 +98,20 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            ('degree_in', 'Indegree', 'indegree'),
-            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
+            # ('degree_in', 'Indegree', 'indegree'),
+            # ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
             # ('view_count', 'Wikipedia article views', ''),
-            ('category_depth', 'Category Depth', 'category depth'),
+            # ('category_depth', 'Category Depth', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
-            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
-            # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
+            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(data))
             for label, dataset in data.items():
                 x = labels.index(label)
-                for k, m, c in zip([4, 5, 6, 7], self.markers, self.colors):
+                for k, m, c in zip([4, 5, 6, 7, 8], self.markers, self.colors):
                     # filter the dataset
                     df = dataset[dataset['pl'] == k]
                     if not df.shape[0]:
@@ -238,8 +240,8 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            self.plot_linkpos(dataset, label, fname_suffix=suffix)
-            # self.plot_comparison(dataset, label, fname_suffix=suffix)
+            # self.plot_linkpos(dataset, label, fname_suffix=suffix)
+            self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -318,7 +320,8 @@ class Plot(object):
             ylim_upper = max(a.get_ylim()[1] for a in self.axes[row])
             for col in range(self.axes.shape[1]):
                 ax = self.axes[row, col]
-                ax.set_ylim(ylim_lower, ylim_upper)
+                # ax.set_ylim(ylim_lower, ylim_upper)
+                ax.set_ylim(0, 0.5)
 
     def add_margin(self, margin=0.05):
         for row in range(self.axes.shape[0]):
@@ -368,7 +371,8 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        Plotter(['Wikispeedia']),
+        # Plotter(['Wikispeedia']),
+        Plotter(['Wikispeedia'], 4),
         # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
@@ -378,7 +382,7 @@ if __name__ == '__main__':
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
-        # pt.plot_split()
+        pt.plot_split()
         # pt.correlation_clicked()
-        pt.correlation_all()
+        # pt.correlation_all()
 
