@@ -57,11 +57,11 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         titles = np.array([labels])
         p = Plot(1, len(data), rowsize=6, colsize=6)
-        for k, c in zip([4, 5, 6, 7], self.colors):
+        for k, c in zip([4, 5, 6], self.colors):
             for feature, ylabel, m, ls in [
                 ('linkpos_first', 'first occurrence', 'v', 'solid'),
-                ('linkpos_actual', 'click position', 'o', 'dashed'),
-                ('linkpos_last', 'last occurrence', '^', 'solid'),
+                # ('linkpos_actual', 'click position', 'o', 'dashed'),
+                # ('linkpos_last', 'last occurrence', '^', 'solid'),
                 ('word_count', 'article length', '', 'dotted')
             ]:
                 for label, dataset in data.items():
@@ -101,7 +101,7 @@ class Plotter(object):
             # ('degree_in', 'Indegree', 'indegree'),
             # ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
             # ('view_count', 'Wikipedia article views', ''),
-            # ('category_depth', 'Category Depth', 'category depth'),
+            # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
             ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
@@ -240,8 +240,8 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            # self.plot_linkpos(dataset, label, fname_suffix=suffix)
-            self.plot_comparison(dataset, label, fname_suffix=suffix)
+            self.plot_linkpos(dataset, label, fname_suffix=suffix)
+            # self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -260,6 +260,8 @@ class Plotter(object):
                 print('   ', f1, '|', f2)
                 df = dataset[[f1, f2]]
                 df = df[(df[f1] != 0) & (df[f2] != 0)]
+                # df[f1] = df[f1].apply(np.log)
+                # df[f2] = df[f2].apply(lambda x: np.log(x * -1))
                 r = scipy.stats.pearsonr(df[f1], df[f2])[0]
                 rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
                 tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
@@ -286,6 +288,8 @@ class Plotter(object):
             print('   ', f1, '|', f2)
             df = dataset[[f1, f2]]
             df = df[(df[f1] != 0) & (df[f2] != 0)]
+            # df[f1] = df[f1].apply(np.log)
+            # df[f2] = df[f2].apply(lambda x: np.log(x * -1))
             r = scipy.stats.pearsonr(df[f1], df[f2])[0]
             rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
             tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
@@ -294,6 +298,45 @@ class Plotter(object):
             plt.subplots_adjust(left=0.15, bottom=0.15, right=0.95,
                                 top=0.95, wspace=0.3, hspace=0.3)
             plt.show()
+
+    def correlation_max(self):
+        for label, dataset in self.data.items():
+            print(label)
+            dataset.index = np.arange(dataset.shape[0])
+            df = [dataset.ix[np.random.choice(dataset[(dataset['pl'] == k) & (dataset['step'] == 1)].index.values,
+                             281, replace=False)]
+                  for k in [4, 5, 6, 7]]
+            df = pd.concat(df)
+            # df = dataset
+            # gb = df.groupby('subject')
+            # pl = gb['pl'].mean()
+            # df = df[df['step'] == 1]
+            pl = df['pl']
+            # hugo = df.groupby('pl').mean()
+            pdb.set_trace()
+            for f1 in [
+                'degree_in',
+                'category_depth',
+                'ngram',
+            ]:
+                print('   ', f1)
+                # feature = gb[f1].max()
+                feature = df[f1]
+                # pdb.set_trace()
+                r = scipy.stats.pearsonr(pl, feature)[0]
+                rho = scipy.stats.spearmanr(pl, feature)[0]
+                tau = scipy.stats.kendalltau(pl, feature)[0]
+
+                print('    r = %.2f, rho = %.2f, tau = %.2f\n' % (r, rho, tau))
+
+                sns.jointplot(pl, feature, kind='kde', color='#4CB391')
+                plt.title(label)
+                # plt.show()
+                plt.subplots_adjust(left=0.15, bottom=0.15, right=0.95,
+                                    top=0.95, wspace=0.3, hspace=0.3)
+                fname = 'corr_4_' + f1 + '_' + label + '.png'
+                plt.savefig(os.path.join(self.plot_folder,
+                                         'correlation', fname))
 
 
 class Plot(object):
@@ -320,8 +363,8 @@ class Plot(object):
             ylim_upper = max(a.get_ylim()[1] for a in self.axes[row])
             for col in range(self.axes.shape[1]):
                 ax = self.axes[row, col]
-                # ax.set_ylim(ylim_lower, ylim_upper)
-                ax.set_ylim(0, 0.5)
+                ax.set_ylim(ylim_lower, ylim_upper)
+                # ax.set_ylim(0, 0.5)
 
     def add_margin(self, margin=0.05):
         for row in range(self.axes.shape[0]):
@@ -365,14 +408,16 @@ class Plot(object):
                                  wspace=0.3, hspace=0.2)
         if self.axes.shape[1] == 1:
             self.fig.subplots_adjust(left=0.15)
+        # plt.show()
         plt.savefig(fname)
+        print(fname)
         plt.close(self.fig)
 
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['Wikispeedia']),
-        Plotter(['Wikispeedia'], 4),
+        Plotter(['Wikispeedia']),
+        # Plotter(['Wikispeedia'], 4),
         # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
@@ -382,7 +427,8 @@ if __name__ == '__main__':
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
-        pt.plot_split()
-        # pt.correlation_clicked()
+        # pt.plot_split()
+        pt.correlation_clicked()
         # pt.correlation_all()
+        # pt.correlation_max()
 
