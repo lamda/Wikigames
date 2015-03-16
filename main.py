@@ -412,7 +412,7 @@ class Wikigame(object):
         get_ngrams = lambda n: ngram.ngram_frequency.get_frequency(n)
         df['ngram'] = df['node'].apply(get_ngrams)
 
-        print('     getting Wikipedia view counts...')
+        # print('     getting Wikipedia view counts...')
 
         def get_view_counts(nodes):
             result = []
@@ -421,7 +421,7 @@ class Wikigame(object):
                 result.append(viewcounts.viewcount.get_frequency(n))
             return result
 
-        df['view_count'] = get_view_counts(df['node'])
+        # df['view_count'] = get_view_counts(df['node'])
 
         print('     getting word counts and shortest paths...')
         df['word_count'] = df['node'].apply(lambda n: self.length[n])
@@ -531,6 +531,50 @@ class Wikigame(object):
         self.data = df
         self.save_data()
 
+    def add_percentages(self):
+        self.load_data()
+        df = self.data
+
+        print('     getting indegree percentage...')
+        self.load_link_positions()
+        perc = []
+        for i in range(df.shape[0] - 1):
+            print('         ', i+1, '/', df.shape[0], end='\r')
+            if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
+                    df.iloc[i]['backtrack']:
+                    # if data belongs to different missions or is a backtrack
+                perc.append(np.NaN)
+            else:
+                a = df.iloc[i]['node']
+                b = df.iloc[i+1]['node_id']
+                data = sorted(self.id2deg_in[v] for v in self.pos2link[a].values())
+                pos = bisect.bisect_left(data, self.id2deg_in[b])
+                perc.append(pos / len(data))
+        perc.append(np.NaN)
+        df['perc_deg_out'] = perc
+
+        print('     getting ngram percentage...')
+        perc = []
+        for i in range(df.shape[0] - 1):
+            print('         ', i+1, '/', df.shape[0], end='\r')
+            if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
+                    df.iloc[i]['backtrack']:
+                    # if data belongs to different missions or is a backtrack
+                perc.append(np.NaN)
+            else:
+                a = df.iloc[i]['node']
+                b = df.iloc[i+1]['node']
+                data = sorted(ngram.ngram_frequency.get_frequency(self.id2name[v])
+                              for v in self.pos2link[a].values())
+                pos = bisect.bisect_left(data, ngram.ngram_frequency.get_frequency(b))
+                perc.append(pos / len(data))
+        perc.append(np.NaN)
+        df['perc_ngram'] = perc
+
+        self.data = df
+        self.save_data()
+
+
     def create_correlation_data(self):
         node_id = sorted(self.id2name.keys())
         df = pd.DataFrame(data=node_id, columns=['node_id'])
@@ -587,7 +631,7 @@ class WIKTI(Wikigame):
         prefix = "u'current_page': u'http://0.0.0.0/wikigame/wiki-schools/wp/"
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
-        folders = ['U' + '%02d' % i for i in range(1, 10)]
+        folders = ['U' + '%02d' % i for i in range(1, 11)]
         for folder in folders:
             print('\n', folder)
 
@@ -938,6 +982,7 @@ if __name__ == '__main__':
         # wg.compute_link_positions()
         # wg.create_dataframe()
         # wg.complete_dataframe()
-        wg.add_link_context()
-        wg.add_means()
+        # wg.add_link_context()
+        # wg.add_means()
         # wg.create_correlation_data()
+        wg.add_percentages()

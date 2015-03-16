@@ -57,7 +57,7 @@ class Plotter(object):
         xlabel = 'Distance to-go to target'
         titles = np.array([labels])
         p = Plot(1, len(data), rowsize=6, colsize=6)
-        for k, c in zip([4, 5, 6], self.colors):
+        for k, c in zip([4, 5, 6, 7], self.colors):
             for feature, ylabel, m, ls in [
                 ('linkpos_first', 'first occurrence', 'v', 'solid'),
                 # ('linkpos_actual', 'click position', 'o', 'dashed'),
@@ -98,10 +98,10 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            # ('degree_in', 'Indegree', 'indegree'),
-            # ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
+            ('degree_in', 'Indegree', 'indegree'),
+            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
             # ('view_count', 'Wikipedia article views', ''),
-            # ('category_depth', 'Category Specificity', 'category depth'),
+            ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
             ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
@@ -111,7 +111,7 @@ class Plotter(object):
             p = Plot(nrows=1, ncols=len(data))
             for label, dataset in data.items():
                 x = labels.index(label)
-                for k, m, c in zip([4, 5, 6, 7, 8], self.markers, self.colors):
+                for k, m, c in zip([4, 5, 6, 7, 8, 9], self.markers, self.colors):
                     # filter the dataset
                     df = dataset[dataset['pl'] == k]
                     if not df.shape[0]:
@@ -241,7 +241,7 @@ class Plotter(object):
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
             self.plot_linkpos(dataset, label, fname_suffix=suffix)
-            # self.plot_comparison(dataset, label, fname_suffix=suffix)
+            self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -416,19 +416,21 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        Plotter(['Wikispeedia']),
-        # Plotter(['Wikispeedia'], 4),
+        # Plotter(['Wikispeedia']),
+        Plotter(['Wikispeedia'], 4),
         # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
+        # pdb.set_trace()
         # pt.plot_linkpos()
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
-        # pt.plot_split()
-        pt.correlation_clicked()
+        # pt.print_click_stats()
+        pt.plot_split()
+        # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()
 
