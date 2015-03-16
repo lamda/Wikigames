@@ -19,6 +19,7 @@ import pymysql
 from decorators import Cached
 import ngram
 import viewcounts
+import model
 
 # set a few options
 pd.options.mode.chained_assignment = None
@@ -606,6 +607,11 @@ class Wikigame(object):
         self.load_data()
         df = self.data
         # compute all models
+        start = df[df['step'] == 0]['node_id']
+        first = df[df['step'] == 1]['node_id']
+        pdb.set_trace()
+        gt = model.GroundTruthModel(start, first, self)
+        r = model.RandomModel(start, self)
         # compare models to random and ground truth
         # save models
         # save symmetric normalized KL divergences
@@ -1007,10 +1013,12 @@ if __name__ == '__main__':
 
         # wg.create_correlation_data()
 
-        wg.create_dataframe()
-        wg.complete_dataframe()
-        wg.add_link_context()
-        wg.add_means()
-        wg.add_percentages()
+        # wg.create_dataframe()
+        # wg.complete_dataframe()
+        # wg.add_link_context()
+        # wg.add_means()
+        # wg.add_percentages()
+
+        wg.compare_models()
 
 
