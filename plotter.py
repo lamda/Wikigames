@@ -98,14 +98,16 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            ('degree_in', 'Indegree', 'indegree'),
-            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
+            # ('degree_in', 'Indegree', 'indegree'),
+            # ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
             # ('view_count', 'Wikipedia article views', ''),
-            ('category_depth', 'Category Specificity', 'category depth'),
+            # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
-            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
-            ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links')
+            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links'),
+            ('perc_deg_out', 'Indegree Percentage', ''),
+            ('perc_ngram', 'Ngram Percentage', ''),
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(data))
@@ -122,9 +124,16 @@ class Plotter(object):
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
             yinv = True if feature == 'category_depth' else False
+            if 'perc' in feature:
+                ylim = (0.2, 0.7)
+            elif 'linkpos' in feature:
+                ylim = (0, 0.5)
+            else:
+                ylim = None
             path = os.path.join(self.plot_folder, feature+fname_suffix+'.png')
             p.finish(path, suptitle=title, titles=titles, xlabel=xlabel,
-                     ylabel=ylabel, invert_xaxis=True, invert_yaxis=yinv)
+                     ylabel=ylabel, invert_xaxis=True, invert_yaxis=yinv,
+                     ylim=ylim)
 
     def plot_wikti(self):
         """draw plots for features within the WIKTI dataset"""
@@ -240,7 +249,7 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            self.plot_linkpos(dataset, label, fname_suffix=suffix)
+            # self.plot_linkpos(dataset, label, fname_suffix=suffix)
             self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
@@ -364,7 +373,12 @@ class Plot(object):
             for col in range(self.axes.shape[1]):
                 ax = self.axes[row, col]
                 ax.set_ylim(ylim_lower, ylim_upper)
-                # ax.set_ylim(0, 0.5)
+
+    def set_ylim(self, ylim):
+        for row in range(self.axes.shape[0]):
+            for col in range(self.axes.shape[1]):
+                ax = self.axes[row, col]
+                ax.set_ylim(ylim[0], ylim[1])
 
     def add_margin(self, margin=0.05):
         for row in range(self.axes.shape[0]):
@@ -387,7 +401,11 @@ class Plot(object):
         ylabel = kwargs.pop('ylabel', suptitle)
         invert_xaxis = kwargs.pop('invert_xaxis', False)
         invert_yaxis = kwargs.pop('invert_yaxis', False)
-        self.match_ylim()
+        ylim = kwargs.pop('ylim', False)
+        if ylim:
+            self.set_ylim(ylim)
+        else:
+            self.match_ylim()
         self.add_margin()
         for row in range(self.axes.shape[0]):
             for col in range(self.axes.shape[1]):
@@ -416,8 +434,8 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['Wikispeedia']),
-        Plotter(['Wikispeedia'], 4),
+        Plotter(['Wikispeedia']),
+        # Plotter(['Wikispeedia'], 4),
         # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),

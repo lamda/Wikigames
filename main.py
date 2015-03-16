@@ -551,7 +551,7 @@ class Wikigame(object):
                 pos = bisect.bisect_left(data, self.id2deg_in[b])
                 perc.append(pos / len(data))
         perc.append(np.NaN)
-        df['perc_deg_out'] = perc
+        df['perc_deg_in'] = perc
 
         print('     getting ngram percentage...')
         perc = []
@@ -573,7 +573,6 @@ class Wikigame(object):
 
         self.data = df
         self.save_data()
-
 
     def create_correlation_data(self):
         node_id = sorted(self.id2name.keys())
