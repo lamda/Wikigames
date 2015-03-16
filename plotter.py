@@ -98,16 +98,26 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            # ('degree_in', 'Indegree', 'indegree'),
-            # ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
-            # ('view_count', 'Wikipedia article views', ''),
+            ('degree_in', 'Indegree', 'indegree'),
+            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
+            ('view_count', 'Wikipedia article views', ''),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
             # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
             # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links'),
-            ('perc_deg_out', 'Indegree Percentage', ''),
+
+            ('perc_deg_in', 'Indegree Percentage', ''),
             ('perc_ngram', 'Ngram Percentage', ''),
+            ('perc_view_count', 'Ngram Percentage', ''),
+
+            ('dev_av_deg_in', 'Indegree Deviation from Average', ''),
+            ('dev_av_ngram', 'Ngram Deviation from Average', ''),
+            ('dev_av_view_count', 'View Count Deviation from Average', ''),
+
+            ('dev_md_deg_in', 'Indegree Deviation from Median', ''),
+            ('dev_md_ngram', 'Ngram Deviation from Median', ''),
+            ('dev_md_view_count', 'View Count Deviation from Median', ''),
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(data))
@@ -228,6 +238,7 @@ class Plotter(object):
     def plot_split(self):
         print('plot_games_users()')
         df = self.data['Wikispeedia']
+        # df = df[df['node'] != 'United_States']
         data = [
             {
                 'all': df,
@@ -312,9 +323,9 @@ class Plotter(object):
         for label, dataset in self.data.items():
             print(label)
             dataset.index = np.arange(dataset.shape[0])
-            df = [dataset.ix[np.random.choice(dataset[(dataset['pl'] == k) & (dataset['step'] == 1)].index.values,
-                             281, replace=False)]
-                  for k in [4, 5, 6, 7]]
+            d = dataset[(dataset['pl'] == k) & (dataset['step'] == 1)]
+            sample = np.random.choice(d.index.values, 281, replace=False)
+            df = [dataset.ix[sample] for k in [4, 5, 6, 7]]
             df = pd.concat(df)
             # df = dataset
             # gb = df.groupby('subject')
@@ -346,6 +357,15 @@ class Plotter(object):
                 fname = 'corr_4_' + f1 + '_' + label + '.png'
                 plt.savefig(os.path.join(self.plot_folder,
                                          'correlation', fname))
+
+    def mutual_information(self):
+        def nmi(self, a, b):
+            pass
+
+        df = self.data['Wikispeedia']
+        a, b = df['ngram'], df['degree_in']
+        pdb.set_trace()
+        sklearn.metrics.cluster.normalized_mutual_info_score
 
 
 class Plot(object):
@@ -426,9 +446,7 @@ class Plot(object):
                                  wspace=0.3, hspace=0.2)
         if self.axes.shape[1] == 1:
             self.fig.subplots_adjust(left=0.15)
-        # plt.show()
         plt.savefig(fname)
-        print(fname)
         plt.close(self.fig)
 
 
@@ -451,4 +469,5 @@ if __name__ == '__main__':
         # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()
+        # pt.mutual_information()
 

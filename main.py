@@ -412,7 +412,7 @@ class Wikigame(object):
         get_ngrams = lambda n: ngram.ngram_frequency.get_frequency(n)
         df['ngram'] = df['node'].apply(get_ngrams)
 
-        # print('     getting Wikipedia view counts...')
+        print('     getting Wikipedia view counts...')
 
         def get_view_counts(nodes):
             result = []
@@ -421,7 +421,7 @@ class Wikigame(object):
                 result.append(viewcounts.viewcount.get_frequency(n))
             return result
 
-        # df['view_count'] = get_view_counts(df['node'])
+        df['view_count'] = get_view_counts(df['node'])
 
         print('     getting word counts and shortest paths...')
         df['word_count'] = df['node'].apply(lambda n: self.length[n])
@@ -534,42 +534,43 @@ class Wikigame(object):
     def add_percentages(self):
         self.load_data()
         df = self.data
-
-        print('     getting indegree percentage...')
         self.load_link_positions()
-        perc = []
-        for i in range(df.shape[0] - 1):
-            print('         ', i+1, '/', df.shape[0], end='\r')
-            if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
-                    df.iloc[i]['backtrack']:
-                    # if data belongs to different missions or is a backtrack
-                perc.append(np.NaN)
-            else:
-                a = df.iloc[i]['node']
-                b = df.iloc[i+1]['node_id']
-                data = sorted(self.id2deg_in[v] for v in self.pos2link[a].values())
-                pos = bisect.bisect_left(data, self.id2deg_in[b])
-                perc.append(pos / len(data))
-        perc.append(np.NaN)
-        df['perc_deg_in'] = perc
 
-        print('     getting ngram percentage...')
-        perc = []
-        for i in range(df.shape[0] - 1):
-            print('         ', i+1, '/', df.shape[0], end='\r')
-            if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
-                    df.iloc[i]['backtrack']:
-                    # if data belongs to different missions or is a backtrack
-                perc.append(np.NaN)
-            else:
-                a = df.iloc[i]['node']
-                b = df.iloc[i+1]['node']
-                data = sorted(ngram.ngram_frequency.get_frequency(self.id2name[v])
-                              for v in self.pos2link[a].values())
-                pos = bisect.bisect_left(data, ngram.ngram_frequency.get_frequency(b))
-                perc.append(pos / len(data))
-        perc.append(np.NaN)
-        df['perc_ngram'] = perc
+        for label, func in [
+            ('deg_in',
+             lambda x: self.id2deg_in[x]),
+
+            ('ngram',
+             lambda x: ngram.ngram_frequency.get_frequency(self.id2name[x])),
+
+            ('view_count',
+             lambda x: viewcounts.viewcount.get_frequency(self.id2name[x]))
+        ]:
+            print('     getting', label, 'percentage...')
+            perc, av, md = [], [], []
+            for i in range(df.shape[0] - 1):
+                print('         ', i+1, '/', df.shape[0], end='\r')
+                if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
+                        df.iloc[i]['backtrack']:
+                        # data belongs to different missions or is a backtrack
+                    perc.append(np.NaN)
+                    av.append(np.NaN)
+                    md.append(np.NaN)
+                else:
+                    a = df.iloc[i]['node']
+                    b = df.iloc[i+1]['node_id']
+                    data = sorted(func(v) for v in self.pos2link[a].values())
+                    clicked = func(b)
+                    pos = bisect.bisect_left(data, clicked)
+                    perc.append(pos / len(data))
+                    av.append(np.abs(np.mean(data) - clicked))
+                    md.append(np.abs(np.median(data) - clicked))
+            perc.append(np.NaN)
+            av.append(np.NaN)
+            md.append(np.NaN)
+            df['perc_' + label] = perc
+            df['dev_av_' + label] = av
+            df['dev_md_' + label] = md
 
         self.data = df
         self.save_data()
@@ -591,6 +592,13 @@ class Wikigame(object):
             print('   ', i+1, '/', len(df['node']), end='\r')
             ngrams.append(ngram.ngram_frequency.get_frequency(n))
         df['ngram'] = ngrams
+
+        print('    getting view counts...')
+        view_counts = []
+        for i, n in enumerate(df['node']):
+            print('   ', i+1, '/', len(df['node']), end='\r')
+            view_counts.append(viewcounts.viewcount.get_frequency(n))
+        df['view_count'] = view_counts
 
         df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
 
@@ -643,6 +651,7 @@ class WIKTI(Wikigame):
                 print('   ', filename)
                 fname = os.path.join(folder_logs, folder, filename)
                 df_full = pd.read_csv(fname, sep='\t', usecols=[1, 2, 3],
+                                      encoding='utf-8',
                                       names=['time', 'action', 'node'])
 
                 # perform sanity checks
@@ -866,7 +875,7 @@ class Wikispeedia(Wikigame):
                                             self.label)
         cat_calculator.run()
 
-    def create_dataframe(self):
+    def create_dataframe(self, use_only_spl=3):
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
         self.load_link_positions()
@@ -875,6 +884,7 @@ class Wikispeedia(Wikigame):
             fname = os.path.join(folder_logs, filename)
             successful = False if 'unfinished' in filename else True
             df_full = pd.read_csv(fname, sep='\t', comment='#', index_col=False,
+                                  encoding='utf-8',
                                   names=['user', 'timestamp', 'duration',
                                          'path'])
             # df_full = df_full.iloc[:1000]
@@ -893,6 +903,7 @@ class Wikispeedia(Wikigame):
                 target = pd.DataFrame([t[-1] for t in paths])
             else:
                 target = pd.read_csv(fname, sep='\t', comment='#',
+                                     encoding='utf-8',
                                      usecols=[4], names=['target'])
             df_full['target'] = target
             df_full['target_id'] = df_full['target'].apply(lambda n:
@@ -928,7 +939,12 @@ class Wikispeedia(Wikigame):
             df_full['path'], df_full['backtrack'] = path, backtrack
 
             df_full['pl'] = df_full['path'].apply(lambda p: len(p))
-            df_full = df_full[(df_full['spl'] == 4) & (df_full['pl'] < 10)]
+            if use_only_spl == 3:
+                df_full = df_full[(df_full['spl'] == 3) & (df_full['pl'] < 8)]
+            elif use_only_spl == 4:
+                df_full = df_full[(df_full['spl'] == 4) & (df_full['pl'] < 10)]
+            else:
+                raise NotImplementedError
 
             def nonexisting_links_present(dtfr):
                 # make sure a link from the log actually exists in the articles
@@ -979,9 +995,13 @@ if __name__ == '__main__':
         Wikispeedia(),
     ]:
         # wg.compute_link_positions()
-        # wg.create_dataframe()
-        # wg.complete_dataframe()
-        # wg.add_link_context()
-        # wg.add_means()
+
         # wg.create_correlation_data()
+
+        wg.create_dataframe()
+        wg.complete_dataframe()
+        wg.add_link_context()
+        wg.add_means()
         wg.add_percentages()
+
+
