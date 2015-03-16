@@ -602,6 +602,15 @@ class Wikigame(object):
 
         df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
 
+    def compare_models(self):
+        self.load_data()
+        df = self.data
+        # compute all models
+        # compare models to random and ground truth
+        # save models
+        # save symmetric normalized KL divergences
+        # implement a plot method for the results
+
 
 class WIKTI(Wikigame):
     label = 'wikti'
