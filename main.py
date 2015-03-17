@@ -15,6 +15,7 @@ import re
 import numpy as np
 import pandas as pd
 import pymysql
+import scipy.stats
 
 from decorators import Cached
 import ngram
@@ -606,14 +607,23 @@ class Wikigame(object):
     def compare_models(self):
         self.load_data()
         df = self.data
+        self.load_link_positions()
+
         # compute all models
         start = df[df['step'] == 0]['node_id']
         first = df[df['step'] == 1]['node_id']
-        pdb.set_trace()
-        gt = model.GroundTruthModel(start, first, self)
-        r = model.RandomModel(start, self)
+        gm = model.GroundTruthModel(start, first, self)
+        rm = model.RandomModel(start, self)
+        dm = model.DegreeModel(start, self)
+        vm = model.ViewCountModel(start, self)
+        fm = model.FamiliarityModel(start, self)
+
         # compare models to random and ground truth
-        # save models
+        print('Random %.2f' % scipy.stats.entropy(gm.data, rm.data))
+        print('Degree %.2f' % scipy.stats.entropy(gm.data, dm.data))
+        print('View Counts %.2f' % scipy.stats.entropy(gm.data, vm.data))
+        print('Familiarity %.2f' % scipy.stats.entropy(gm.data, fm.data))
+
         # save symmetric normalized KL divergences
         # implement a plot method for the results
 

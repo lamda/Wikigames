@@ -9,6 +9,10 @@ from decorators import Cached
 
 
 class NgramFrequency(object):
+    """
+    queries http://weblm.research.microsoft.com/info/rest.html
+    more information: http://blogs.msdn.com/b/webngram/
+    """
     def __init__(self):
         self.token = credentials.microsoft_token
         self.ngram = {}
