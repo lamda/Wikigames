@@ -99,8 +99,8 @@ class Plotter(object):
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
             # ('degree_in', 'Indegree', 'indegree'),
-            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
-            # ('view_count', 'Wikipedia article views', ''),
+            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences'),
+            ('view_count', 'View Count', ''),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
@@ -260,8 +260,8 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            # self.plot_linkpos(dataset, label, fname_suffix=suffix)
-            self.plot_comparison(dataset, label, fname_suffix=suffix)
+            self.plot_linkpos(dataset, label, fname_suffix=suffix)
+            # self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -303,6 +303,7 @@ class Plotter(object):
         for f1, f2 in self.feature_combinations([
             'degree_in',
             'category_depth',
+            'view_count',
             'ngram',
         ]):
             print('   ', f1, '|', f2)
@@ -314,10 +315,10 @@ class Plotter(object):
             rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
             tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
             print('    r = %.2f, rho = %.2f, tau = %.2f\n' % (r, rho, tau))
-            sns.jointplot(f1, f2, df, kind='reg', color='#4CB391')
-            plt.subplots_adjust(left=0.15, bottom=0.15, right=0.95,
-                                top=0.95, wspace=0.3, hspace=0.3)
-            plt.show()
+            # sns.jointplot(f1, f2, df, kind='reg', color='#4CB391')
+            # plt.subplots_adjust(left=0.15, bottom=0.15, right=0.95,
+            #                     top=0.95, wspace=0.3, hspace=0.3)
+            # plt.show()
 
     def correlation_max(self):
         for label, dataset in self.data.items():
@@ -452,9 +453,9 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        Plotter(['Wikispeedia']),
+        # Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
-        # Plotter(['WIKTI']),
+        Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
@@ -462,10 +463,10 @@ if __name__ == '__main__':
         # pdb.set_trace()
         # pt.plot_linkpos()
         # pt.plot_comparison()
-        # pt.plot_wikti()
+        pt.plot_wikti()
         # pt.print_game_stats()
         # pt.print_click_stats()
-        pt.plot_split()
+        # pt.plot_split()
         # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()

@@ -621,7 +621,7 @@ class Wikigame(object):
         lm = model.LinkPosModel(start, self)
         ldm = model.LinkPosDegreeModel(start, self)
         lfm = model.LinkPosFamiliarityModel(start, self)
-        # lvm = model.LinkPosViewCountModel(start, self)
+        lvm = model.LinkPosViewCountModel(start, self)
         mdls = [
             gm,
             rm,
@@ -636,10 +636,15 @@ class Wikigame(object):
         ]
 
         # compare models
-        for m in mdls:
-            print('\n', m.label)
-            for n in mdls:
-                m.compare_to(n)
+        print('\n', gm.label)
+        for n in mdls:
+            gm.compare_to(n)
+
+        import matplotlib.pyplot as plt
+        for mdl in mdls:
+            plt.plot(np.cumsum(mdl.data), label=mdl.label)
+        plt.legend()
+        plt.show()
 
 
 class WIKTI(Wikigame):

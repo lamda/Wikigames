@@ -6,6 +6,7 @@ import pdb
 
 import numpy as np
 import scipy.stats
+import sklearn.metrics
 
 import ngram
 import viewcounts
@@ -45,8 +46,10 @@ class NavigationModel(object):
 
         kl = np.abs(scipy.stats.entropy(self.data, mdl.data, base=2))
         ks = np.abs(scipy.stats.ks_2samp(self.data, mdl.data))
+        rmse = np.log2(sklearn.metrics.mean_squared_error(self.data, mdl.data))
         lab = self.label + '\t' + mdl.label
-        print('\t%.2f\t%.2f\t%s\t%s' % (kl, ks[0], sig_stars(ks[1]), lab))
+        print('\t%.2f\t%.2f\t%s\t%.5f\t%s'
+              % (kl, ks[0], sig_stars(ks[1]), rmse, lab))
 
 
 class GroundTruthModel(NavigationModel):
