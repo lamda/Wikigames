@@ -20,7 +20,6 @@ class WikipediaViewCounts(object):
         return self.retrieve_frequency(title)
 
     def retrieve_frequency(self, title):
-        print('actually retrieving...')
         title = title.replace(' ', '_').replace('%2F', '/')
         months = [unicode(i).zfill(2) for i in range(1, 13)][:1]
         views = 0

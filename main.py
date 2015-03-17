@@ -15,7 +15,6 @@ import re
 import numpy as np
 import pandas as pd
 import pymysql
-import scipy.stats
 
 from decorators import Cached
 import ngram
@@ -618,15 +617,29 @@ class Wikigame(object):
         dm = model.DegreeModel(start, self)
         vm = model.ViewCountModel(start, self)
         fm = model.FamiliarityModel(start, self)
+        cm = model.CategoryModel(start, self)
+        lm = model.LinkPosModel(start, self)
+        ldm = model.LinkPosDegreeModel(start, self)
+        lfm = model.LinkPosFamiliarityModel(start, self)
+        # lvm = model.LinkPosViewCountModel(start, self)
+        mdls = [
+            gm,
+            rm,
+            dm,
+            vm,
+            fm,
+            cm,
+            lm,
+            ldm,
+            lfm,
+            lvm,
+        ]
 
-        # compare models to random and ground truth
-        print('Random %.2f' % scipy.stats.entropy(gm.data, rm.data))
-        print('Degree %.2f' % scipy.stats.entropy(gm.data, dm.data))
-        print('View Counts %.2f' % scipy.stats.entropy(gm.data, vm.data))
-        print('Familiarity %.2f' % scipy.stats.entropy(gm.data, fm.data))
-
-        # save symmetric normalized KL divergences
-        # implement a plot method for the results
+        # compare models
+        for m in mdls:
+            print('\n', m.label)
+            for n in mdls:
+                m.compare_to(n)
 
 
 class WIKTI(Wikigame):
