@@ -413,6 +413,7 @@ class Wikigame(object):
         print('     getting ngram frequencies...')
         get_ngrams = lambda n: ngram.ngram_frequency.get_frequency(n)
         df['ngram'] = df['node'].apply(get_ngrams)
+        df['ngram'] = df['ngram'].apply(np.exp)
 
         print('     getting Wikipedia view counts...')
 
@@ -1020,7 +1021,6 @@ if __name__ == '__main__':
         Wikispeedia(),
     ]:
         # wg.compute_link_positions()
-
         # wg.create_correlation_data()
 
         # wg.create_dataframe()

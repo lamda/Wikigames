@@ -98,26 +98,26 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            ('degree_in', 'Indegree', 'indegree'),
+            # ('degree_in', 'Indegree', 'indegree'),
             ('ngram', 'N-Gram Occurrences (Query)', 'occurrences (log)'),
-            ('view_count', 'Wikipedia article views', ''),
+            # ('view_count', 'Wikipedia article views', ''),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
             # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
             # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links'),
 
-            ('perc_deg_in', 'Indegree Percentage', ''),
-            ('perc_ngram', 'Ngram Percentage', ''),
-            ('perc_view_count', 'Ngram Percentage', ''),
-
-            ('dev_av_deg_in', 'Indegree Deviation from Average', ''),
-            ('dev_av_ngram', 'Ngram Deviation from Average', ''),
-            ('dev_av_view_count', 'View Count Deviation from Average', ''),
-
-            ('dev_md_deg_in', 'Indegree Deviation from Median', ''),
-            ('dev_md_ngram', 'Ngram Deviation from Median', ''),
-            ('dev_md_view_count', 'View Count Deviation from Median', ''),
+            # ('perc_deg_in', 'Indegree Percentage', ''),
+            # ('perc_ngram', 'Ngram Percentage', ''),
+            # ('perc_view_count', 'Ngram Percentage', ''),
+            #
+            # ('dev_av_deg_in', 'Indegree Deviation from Average', ''),
+            # ('dev_av_ngram', 'Ngram Deviation from Average', ''),
+            # ('dev_av_view_count', 'View Count Deviation from Average', ''),
+            #
+            # ('dev_md_deg_in', 'Indegree Deviation from Median', ''),
+            # ('dev_md_ngram', 'Ngram Deviation from Median', ''),
+            # ('dev_md_view_count', 'View Count Deviation from Median', ''),
         ]:
             print(feature)
             p = Plot(nrows=1, ncols=len(data))
@@ -236,7 +236,7 @@ class Plotter(object):
             print(label, df['mission'].value_counts(), df.shape)
 
     def plot_split(self):
-        print('plot_games_users()')
+        print('plot_split()')
         df = self.data['Wikispeedia']
         # df = df[df['node'] != 'United_States']
         data = [
