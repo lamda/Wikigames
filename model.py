@@ -8,20 +8,43 @@ import numpy as np
 import scipy.stats
 import sklearn.metrics
 
+import decorators
 import ngram
 import viewcounts
 
 
 class NavigationModel(object):
-    def __init__(self, start, wikigame, label):
+    def __init__(self, start, pos, wikigame, label):
         self.start = start
+        self.pos = pos
         self.wikigame = wikigame
         self.node2weight = {n: 0.000001 for n in self.wikigame.id2name}
         self.data = None
         self.label = label
+        self.window = None
+        # self.compute()
 
     def compute(self):
         raise NotImplementedError
+
+    # @decorators.Cached
+    def get_neighbors(self, node, pos,
+                      window_type='words', window=False, names=False):
+        node = self.wikigame.id2name[node]
+        if window:
+            if window_type == 'words':
+                neighbors = [n for p, n in self.wikigame.pos2link[node].items()
+                             if (pos-window) <= p <= (pos+window)]
+            elif window_type == 'links':
+                positions = sorted(self.wikigame.pos2link[node])
+                index = positions.index(pos)
+                positions = positions[max(0, index-window):min(index+window+1, len(positions))]
+                neighbors = [self.wikigame.pos2link[node][k] for k in positions]
+        else:
+            neighbors = [n for n in self.wikigame.pos2link[node].values()]
+        if names:
+            neighbors = [(n, self.wikigame.id2name[n]) for n in neighbors]
+        return neighbors
 
     def set_data(self):
         total = sum(self.node2weight.values())
@@ -44,19 +67,23 @@ class NavigationModel(object):
                 return ".  "
             return "   "
 
-        kl = np.abs(scipy.stats.entropy(self.data, mdl.data, base=2))
-        ks = np.abs(scipy.stats.ks_2samp(self.data, mdl.data))
-        rmse = np.log2(sklearn.metrics.mean_squared_error(self.data, mdl.data))
+        kl = self.get_kld(mdl)
+        # ks = np.abs(scipy.stats.ks_2samp(self.data, mdl.data))
+        # rmse = np.log2(sklearn.metrics.mean_squared_error(self.data, mdl.data))
         lab = self.label + '\t' + mdl.label
-        print('\t%.2f\t%.2f\t%s\t%.5f\t%s'
-              % (kl, ks[0], sig_stars(ks[1]), rmse, lab))
+        # print('\t%.2f\t%.2f\t%s\t%.5f\t%s'
+        #       % (kl, ks[0], sig_stars(ks[1]), rmse, lab))
+        print('\t%.2f\t%s' % (kl, lab))
+
+    def get_kld(self, mdl):
+        return np.abs(scipy.stats.entropy(self.data, mdl.data, base=2))
 
 
 class GroundTruthModel(NavigationModel):
-    def __init__(self, start, first, wikigame):
-        super(GroundTruthModel, self).__init__(start, wikigame, 'Ground Truth')
+    def __init__(self, start, pos, first, wikigame):
         self.first = first
-        self.compute()
+        super(GroundTruthModel, self).__init__(start, pos, wikigame,
+                                               'Ground Truth')
 
     def compute(self):
         vc = self.first.value_counts()
@@ -66,27 +93,24 @@ class GroundTruthModel(NavigationModel):
 
 
 class RandomModel(NavigationModel):
-    def __init__(self, start, wikigame):
-        super(RandomModel, self).__init__(start, wikigame, 'Random')
-        self.compute()
+    def __init__(self, start, pos, wikigame):
+        super(RandomModel, self).__init__(start, pos, wikigame, 'Random')
 
     def compute(self):
-        for i, node in enumerate(self.start):
-            node = self.wikigame.id2name[node]
-            for neighbor in self.wikigame.pos2link[node].values():
-                self.node2weight[neighbor] += 1
+        for node, pos in zip(self.start, self.pos):
+            neighbors = self.get_neighbors(node, pos, window=self.window)
+            for n in neighbors:
+                self.node2weight[n] += 1
         self.set_data()
 
 
 class DegreeModel(NavigationModel):
-    def __init__(self, start, wikigame):
-        super(DegreeModel, self).__init__(start, wikigame, 'Degree')
-        self.compute()
+    def __init__(self, start, pos, wikigame):
+        super(DegreeModel, self).__init__(start, pos, wikigame, 'Degree')
 
     def compute(self):
-        for i, node in enumerate(self.start):
-            node = self.wikigame.id2name[node]
-            neighbors = self.wikigame.pos2link[node].values()
+        for node, pos in zip(self.start, self.pos):
+            neighbors = self.get_neighbors(node, pos, window=self.window)
             total = sum(self.wikigame.id2deg_in[nb] for nb in neighbors)
             for nb in neighbors:
                 self.node2weight[nb] += self.wikigame.id2deg_in[nb] / total
@@ -94,16 +118,14 @@ class DegreeModel(NavigationModel):
 
 
 class ViewCountModel(NavigationModel):
-    def __init__(self, start, wikigame):
-        super(ViewCountModel, self).__init__(start, wikigame, 'View Count')
-        self.compute()
+    def __init__(self, start, pos, wikigame):
+        super(ViewCountModel, self).__init__(start, pos, wikigame, 'View Count')
 
     def compute(self):
         vc = viewcounts.viewcount
-        for i, node in enumerate(self.start):
-            node = self.wikigame.id2name[node]
-            neighbors = [(n, self.wikigame.id2name[n])
-                         for n in self.wikigame.pos2link[node].values()]
+        for node, pos in zip(self.start, self.pos):
+            neighbors = self.get_neighbors(node, pos, window=self.window,
+                                           names=True)
             total = sum(vc.get_frequency(nb[1]) for nb in neighbors)
             for nid, nb in neighbors:
                 self.node2weight[nid] += vc.get_frequency(nb) / total
@@ -111,16 +133,14 @@ class ViewCountModel(NavigationModel):
 
 
 class FamiliarityModel(NavigationModel):
-    def __init__(self, start, wikigame):
-        super(FamiliarityModel, self).__init__(start, wikigame, 'Familiarity')
-        self.compute()
+    def __init__(self, start, pos, wikigame):
+        super(FamiliarityModel, self).__init__(start, pos, wikigame,
+                                               'Familiarity')
 
     def compute(self):
         ng = ngram.ngram_frequency
-        for i, node in enumerate(self.start):
-            node = self.wikigame.id2name[node]
-            neighbors = [(n, self.wikigame.id2name[n])
-                         for n in self.wikigame.pos2link[node].values()]
+        for node, pos in zip(self.start, self.pos):
+            neighbors = self.get_neighbors(node, pos, window=self.window, names=True)
             total = sum(np.exp(ng.get_frequency(nb[1])) for nb in neighbors)
             for nid, neighbor in neighbors:
                 self.node2weight[nid] += np.exp(ng.get_frequency(neighbor)) / total
@@ -128,26 +148,36 @@ class FamiliarityModel(NavigationModel):
 
 
 class CategoryModel(NavigationModel):
-    def __init__(self, start, wikigame):
-        super(CategoryModel, self).__init__(start, wikigame, 'Category')
-        self.compute()
+    def __init__(self, start, pos, wikigame):
+        super(CategoryModel, self).__init__(start, pos, wikigame, 'Category')
 
     def compute(self):
-        for i, node in enumerate(self.start):
-            node = self.wikigame.id2name[node]
-            neighbors = self.wikigame.pos2link[node].values()
+        for node, pos in zip(self.start, self.pos):
+            neighbors = self.get_neighbors(node, pos, window=self.window)
             total = sum(self.wikigame.get_category_depth(n) for n in neighbors)
             for nb in neighbors:
                 self.node2weight[nb] += self.wikigame.get_category_depth(nb) / total
         self.set_data()
 
 
+class TfidfModel(NavigationModel):
+    def __init__(self, start, pos, wikigame):
+        super(TfidfModel, self).__init__(start, pos, wikigame, 'TF-IDF')
+
+    def compute(self):
+        for node, pos in zip(self.start, self.pos):
+            neighbors = self.get_neighbors(node, pos, window=self.window)
+            total = sum(self.wikigame.get_tfidf_similarity(node, n) for n in neighbors)
+            for nb in neighbors:
+                self.node2weight[nb] += self.wikigame.get_tfidf_similarity(node, nb) / total
+        self.set_data()
+
+
 class LinkPosModel(NavigationModel):
-    def __init__(self, start, wikigame, lead_weight=0.4):
-        super(LinkPosModel, self).__init__(start, wikigame,
-                                           'Linkpos %.2f' % lead_weight)
+    def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
-        self.compute()
+        super(LinkPosModel, self).__init__(start, pos, wikigame,
+                                           'Linkpos %.2f' % lead_weight)
 
     def compute(self):
         for i, node in enumerate(self.start):
@@ -166,13 +196,11 @@ class LinkPosModel(NavigationModel):
 
 
 class LinkPosDegreeModel(NavigationModel):
-    def __init__(self, start, wikigame, lead_weight=0.4):
-        super(LinkPosDegreeModel, self).__init__(start, wikigame,
+    def __init__(self, start, pos, wikigame, lead_weight=0.4):
+        self.lead_weight = lead_weight
+        super(LinkPosDegreeModel, self).__init__(start, pos, wikigame,
                                                  'LinkPosDegree %.2f' %
                                                  lead_weight)
-        self.lead_weight = lead_weight
-        self.compute()
-
     def compute(self):
         for i, node in enumerate(self.start):
             node = self.wikigame.id2name[node]
@@ -195,12 +223,11 @@ class LinkPosDegreeModel(NavigationModel):
 
 
 class LinkPosFamiliarityModel(NavigationModel):
-    def __init__(self, start, wikigame, lead_weight=0.4):
-        super(LinkPosFamiliarityModel, self).__init__(start, wikigame,
+    def __init__(self, start, pos, wikigame, lead_weight=0.4):
+        self.lead_weight = lead_weight
+        super(LinkPosFamiliarityModel, self).__init__(start, pos, wikigame,
                                                       'LinkPosFamiliarity %.2f'
                                                       % lead_weight)
-        self.lead_weight = lead_weight
-        self.compute()
 
     def compute(self):
         ng = ngram.ngram_frequency
@@ -228,12 +255,11 @@ class LinkPosFamiliarityModel(NavigationModel):
 
 
 class LinkPosViewCountModel(NavigationModel):
-    def __init__(self, start, wikigame, lead_weight=0.4):
-        super(LinkPosViewCountModel, self).__init__(start, wikigame,
+    def __init__(self, start, pos, wikigame, lead_weight=0.4):
+        self.lead_weight = lead_weight
+        super(LinkPosViewCountModel, self).__init__(start, pos, wikigame,
                                                       'LinkPosViewCount %.2f'
                                                       % lead_weight)
-        self.lead_weight = lead_weight
-        self.compute()
 
     def compute(self):
         vc = viewcounts.viewcount

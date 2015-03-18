@@ -8,6 +8,7 @@ import cPickle as pickle
 import datetime
 import HTMLParser
 import io
+import operator
 import os
 import pdb
 import re
@@ -16,7 +17,7 @@ import numpy as np
 import pandas as pd
 import pymysql
 
-from decorators import Cached
+import decorators
 import ngram
 import viewcounts
 import model
@@ -206,7 +207,7 @@ class Wikigame(object):
             with io.open(ofname, 'w', encoding='utf-8') as outfile:
                 outfile.write(text)
 
-    @Cached
+    @decorators.Cached
     def get_tfidf_similarity(self, start, target):
         if start > target:
             start, target = target, start
@@ -216,14 +217,14 @@ class Wikigame(object):
         similarity = self.db_connector.execute(query)
         return similarity[0]['similarity']
 
-    @Cached
+    @decorators.Cached
     def get_category_depth(self, node):
         query = '''SELECT category_depth FROM node_data
                    WHERE node_id=%d''' % node
         depth = self.db_connector.execute(query)
         return depth[0]['category_depth']
 
-    @Cached
+    @decorators.Cached
     def get_category_distance(self, start, target):
         if start > target:
             start, target = target, start
@@ -233,7 +234,7 @@ class Wikigame(object):
         distance = self.db_connector.execute(query)
         return distance[0]['distance']
 
-    @Cached
+    @decorators.Cached
     def get_spl(self, start, target):
         """ get the shortest path length for two nodes from the database
         if this is too slow, add an index to the table as follows:
@@ -368,12 +369,12 @@ class Wikigame(object):
             self.link_sets = {k: sorted(v.keys())
                               for k, v in self.pos2link.iteritems()}
 
-    @Cached
+    @decorators.Cached
     def get_link_possibilities(self, start, target):
         return sorted([k for k, v in self.pos2link[start].items()
                        if v == self.name2id[target]])
 
-    @Cached
+    @decorators.Cached
     def get_link_context_count(self, start, pos):
         if np.isnan(pos):
                 return np.NaN
@@ -382,7 +383,7 @@ class Wikigame(object):
                        for l in self.link_sets[start])
             return ctxt
 
-    @Cached
+    @decorators.Cached
     def get_link_length(self, start, pos):
         return self.pos2linklength[start][pos]
 
@@ -606,45 +607,69 @@ class Wikigame(object):
 
     def compare_models(self):
         self.load_data()
-        df = self.data
         self.load_link_positions()
+        # for label, df in [
+        #     ('all', self.data),
+        #     ('easy games', self.data[~self.data['above_pl_mission_mean']]),
+        #     ('hard games', self.data[self.data['above_pl_mission_mean']]),
+        # ]:
+        #     print('\n--------', label, '--------')
 
-        # compute all models
-        start = df[df['step'] == 0]['node_id']
-        first = df[df['step'] == 1]['node_id']
-        gm = model.GroundTruthModel(start, first, self)
-        rm = model.RandomModel(start, self)
-        dm = model.DegreeModel(start, self)
-        vm = model.ViewCountModel(start, self)
-        fm = model.FamiliarityModel(start, self)
-        cm = model.CategoryModel(start, self)
-        lm = model.LinkPosModel(start, self)
-        ldm = model.LinkPosDegreeModel(start, self)
-        lfm = model.LinkPosFamiliarityModel(start, self)
-        lvm = model.LinkPosViewCountModel(start, self)
-        mdls = [
-            gm,
-            rm,
-            dm,
-            vm,
-            fm,
-            cm,
-            lm,
-            ldm,
-            lfm,
-            lvm,
-        ]
+        df = self.data.iloc
+        for pl in [4, 5, 6, 7]:
+            df = df[df['pl'] == pl]
+            print('PATH LENGTH', pl)
+            for step in range(pl):
+                print('\n--------', step, '--------')
+                first = df[df['step'] == step]['node_id']
+                pos = df[df['step'] == step]['linkpos_first']
+                second = df[df['step'] == step+1]['node_id']
+                gm = model.GroundTruthModel(first, pos, second, self)
+                gm.compute()
+                mdls = []
+                for mdl in [
+                    model.RandomModel,
+                    model.DegreeModel,
+                    model.ViewCountModel,
+                    model.FamiliarityModel,
+                    model.CategoryModel,
+                    model.TfidfModel,
+                    model.LinkPosModel,
+                    model.LinkPosDegreeModel,
+                    model.LinkPosFamiliarityModel,
+                    model.LinkPosViewCountModel,
+                ]:
+                    mdls.append(mdl(first, pos, self))
 
-        # compare models
-        print('\n', gm.label)
-        for n in mdls:
-            gm.compare_to(n)
+                # compare models
+                # print('\n', gm.label, 'Link Window: +/-', gm.window, 'words')
+                results = {}
+                for n in mdls:
+                    n.compute()
+                    # gm.compare_to(n)
+                    results[n.label] = gm.get_kld(n)
+                for r in sorted(results.items(), key=operator.itemgetter(1)):
+                    print('%.2f\t%s' % (r[1], r[0]))
 
-        import matplotlib.pyplot as plt
-        for mdl in mdls:
-            plt.plot(np.cumsum(mdl.data), label=mdl.label)
-        plt.legend()
-        plt.show()
+
+        # import matplotlib.pyplot as plt
+        # window_range = range(1, 21)
+        # window_range = range(4, 11)
+        # window_range = [None]
+        # for mdl in mdls:
+        #     print(mdl.label)
+        #     result = []
+        #     for window in window_range:
+        #         mdl.window = window
+        #         mdl.node2weight = {n: 0.000001 for n in self.id2name}
+        #         mdl.compute()
+        #         result.append(gm.get_kld(mdl))
+        #         print('    ', window if window is not None else 'None',
+        #               '\t%.2f' % gm.get_kld(mdl))
+        #         pdb.set_trace()
+        #     plt.plot(window_range, result, label=mdl.label, marker='o')
+        # plt.legend()
+        # plt.savefig(os.path.join('plots', 'kl.png'))
 
 
 class WIKTI(Wikigame):
