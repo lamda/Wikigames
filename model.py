@@ -27,7 +27,6 @@ class NavigationModel(object):
     def compute(self):
         raise NotImplementedError
 
-    # @decorators.Cached
     def get_neighbors(self, node, pos,
                       window_type='words', window=False, names=False):
         node = self.wikigame.id2name[node]

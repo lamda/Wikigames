@@ -16,6 +16,8 @@ import re
 import numpy as np
 import pandas as pd
 import pymysql
+from sklearn.metrics import mutual_info_score
+from scipy.stats import entropy
 
 import decorators
 import ngram
@@ -68,9 +70,10 @@ class DbConnector(object):
 
 
 class Wikigame(object):
-    def __init__(self, label):
-        print(label)
+    def __init__(self, label, successful=True):
+        print(label, '(', successful, ')')
         self.label = label
+        self.successful = successful
         self.data = None
         self.graph = None
         self.html_base_folder = os.path.join('data', label, 'wpcd', 'wp')
@@ -389,13 +392,17 @@ class Wikigame(object):
 
     def load_data(self):
         if self.data is None:
-            path = os.path.join('data', self.label, 'data.obj')
+            successful = '' if self.successful else '_unsucessful'
+            path = os.path.join('data', self.label,
+                                'data' + successful + '.obj')
             self.data = pd.read_pickle(path)
 
     def save_data(self, data=None):
         if data is None:
             data = self.data
-        data.to_pickle(os.path.join('data', self.label, 'data.obj'))
+        successful = '' if self.successful else '_unsucessful'
+        data.to_pickle(os.path.join('data', self.label,
+                                    'data' + successful + '.obj'))
 
     def print_error(self, message):
         print('        Error:', message)
@@ -605,9 +612,46 @@ class Wikigame(object):
 
         df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
 
-    def compare_models(self):
+    def compare_models_lead(self):
         self.load_data()
         self.load_link_positions()
+        df = self.data
+        df.index = range(df.shape[0])
+        step = 0
+        first = df[(df['step'] == step) & (df['linkpos_lead'])]['node_id']
+        pos = df[(df['step'] == step) & (df['linkpos_lead'])]['linkpos_first']
+        second = df.iloc[first.index + 1]['node_id']
+        gm = model.GroundTruthModel(first, pos, second, self)
+        gm.compute()
+        mdls = []
+        for mdl in [
+            model.RandomModel,
+            model.DegreeModel,
+            model.ViewCountModel,
+            model.FamiliarityModel,
+            model.CategoryModel,
+            model.TfidfModel,
+            # model.LinkPosModel,
+            # model.LinkPosDegreeModel,
+            # model.LinkPosFamiliarityModel,
+            # model.LinkPosViewCountModel,
+        ]:
+            mdls.append(mdl(first, pos, self))
+
+        # compare models
+        # print('\n', gm.label, 'Link Window: +/-', gm.window, 'words')
+        results = {}
+        for n in mdls:
+            n.compute()
+            # gm.compare_to(n)
+            results[n.label] = gm.get_kld(n)
+        for r in sorted(results.items(), key=operator.itemgetter(1)):
+            print('%.2f\t%s' % (r[1], r[0]))
+
+    def compare_models_stepwise(self):
+        self.load_data()
+        self.load_link_positions()
+        self.id2deg_in[4298] = 100
         # for label, df in [
         #     ('all', self.data),
         #     ('easy games', self.data[~self.data['above_pl_mission_mean']]),
@@ -615,10 +659,14 @@ class Wikigame(object):
         # ]:
         #     print('\n--------', label, '--------')
 
-        df = self.data.iloc
-        for pl in [4, 5, 6, 7]:
-            df = df[df['pl'] == pl]
-            print('PATH LENGTH', pl)
+        for pl in [
+            4,
+            5,
+            6,
+            7
+        ]:
+            df = self.data[self.data['pl'] == pl]
+            print('----------------PATH LENGTH', pl, '----------------')
             for step in range(pl):
                 print('\n--------', step, '--------')
                 first = df[df['step'] == step]['node_id']
@@ -671,12 +719,90 @@ class Wikigame(object):
         # plt.legend()
         # plt.savefig(os.path.join('plots', 'kl.png'))
 
+    def compare_models_first(self):
+        self.load_data()
+        self.load_link_positions()
+        step = 0
+        for df in [
+            self.data[self.data['usa']],
+            self.data[~self.data['usa']],
+        ]:
+            first = df[df['step'] == step]['node_id']
+            pos = df[df['step'] == step]['linkpos_first']
+            second = df[df['step'] == step+1]['node_id']
+            gm = model.GroundTruthModel(first, pos, second, self)
+            gm.compute()
+            mdls = []
+            for mdl in [
+                model.RandomModel,
+                model.DegreeModel,
+                model.ViewCountModel,
+                model.FamiliarityModel,
+                model.CategoryModel,
+                model.TfidfModel,
+                model.LinkPosModel,
+                model.LinkPosDegreeModel,
+                model.LinkPosFamiliarityModel,
+                model.LinkPosViewCountModel,
+            ]:
+                mdls.append(mdl(first, pos, self))
+
+            # compare models
+            # print('\n', gm.label, 'Link Window: +/-', gm.window, 'words')
+            results = {}
+            for n in mdls:
+                n.compute()
+                # gm.compare_to(n)
+                results[n.label] = gm.get_kld(n)
+            for r in sorted(results.items(), key=operator.itemgetter(1)):
+                print('%.2f\t%s' % (r[1], r[0]))
+
+    def compare_mi(self):
+        self.load_data()
+        self.load_link_positions()
+        step = 0
+        df = self.data
+        degs = df[df['step'] == step+1]['degree_in']
+        ngrams = df[df['step'] == step+1]['ngram']
+        nodes = df[df['step'] == step+1]['node_id']
+
+        ct = np.histogram2d(degs, ngrams)[0]
+        mi = mutual_info_score(None, None, ct) / max(entropy(degs), entropy(ngrams))
+        print('degs ngrams %.4f' % mi)
+
+        ct = np.histogram2d(degs, nodes)[0]
+        mi = mutual_info_score(None, None, ct) / max(entropy(degs), entropy(nodes))
+        print('degs nodes %.4f' % mi)
+
+        ct = np.histogram2d(ngrams, nodes)[0]
+        mi = mutual_info_score(None, None, ct) / max(entropy(ngrams), entropy(nodes))
+        print('ngrams nodes %.4f' % mi)
+
+        # degs = np.histogram(degs, bins=100, density=True)[0]
+        # ngrams = np.histogram(ngrams, bins=100, density=True)[0]
+        # nodes = np.histogram(nodes, bins=100, density=True)[0]
+
+        def je(a, b):
+            ct = np.histogram2d(a, b)[0]
+            return entropy(ct.flatten())
+
+        def je3(a, b, c):
+            ct = np.histogramdd([a, b, c])[0]
+            return entropy(ct.flatten())
+
+        x = degs
+        y = ngrams
+        z = nodes
+        cmi = je(x, z) + je(y, z) - je3(x, y, z) - entropy(np.histogram(z)[0])
+        print('degs ngrams nodes %.4f' % cmi)
+        pdb.set_trace()
+
 
 class WIKTI(Wikigame):
     label = 'wikti'
 
-    def __init__(self):
-        super(WIKTI, self).__init__(WIKTI.label)
+    def __init__(self, successful=True):
+        super(WIKTI, self).__init__(WIKTI.label, successful)
 
     def fill_database(self):
         from modules.TfidfCalculator import TfidfCalculator
@@ -694,6 +820,8 @@ class WIKTI(Wikigame):
     def create_dataframe(self):
         """compute the click data as a pandas frame"""
         print('creating dataframe...')
+        if not self.successful:
+            raise NotImplementedError
 
         def parse_node(node_string):
             m = re.findall(r'/([^/]*?)\.htm', node_string)
@@ -898,8 +1026,8 @@ class WIKTI(Wikigame):
 class Wikispeedia(Wikigame):
     label = 'wikispeedia'
 
-    def __init__(self):
-        super(Wikispeedia, self).__init__(Wikispeedia.label)
+    def __init__(self, successful=True):
+        super(Wikispeedia, self).__init__(Wikispeedia.label, successful)
 
     @staticmethod
     def build_database(label):
@@ -948,108 +1076,112 @@ class Wikispeedia(Wikigame):
         results = []
         folder_logs = os.path.join('data', self.label, 'logfiles')
         self.load_link_positions()
-        for filename in sorted(os.listdir(folder_logs))[:1]:  # only successful
-            print('    ', filename)
-            fname = os.path.join(folder_logs, filename)
-            successful = False if 'unfinished' in filename else True
-            df_full = pd.read_csv(fname, sep='\t', comment='#', index_col=False,
-                                  encoding='utf-8',
-                                  names=['user', 'timestamp', 'duration',
-                                         'path'])
-            # df_full = df_full.iloc[:1000]
+        filename = 'paths_finished' if self.successful else 'paths_unfinished'
+        filename += '.tsv'
 
-            def convert_time(t):
-                tm = datetime.datetime.fromtimestamp(t)
-                return tm.strftime('%Y-%m-%d %H:%M:%S')
+        print('    ', filename)
+        fname = os.path.join(folder_logs, filename)
+        successful = False if 'unfinished' in filename else True
+        df_full = pd.read_csv(fname, sep='\t', comment='#', index_col=False,
+                              encoding='utf-8', usecols=[0, 1, 2, 3],
+                              names=['user', 'timestamp', 'duration',
+                                     'path'])
+        # df_full = df_full.iloc[:1000]
 
-            df_full['timestamp'] = df_full['timestamp'].apply(convert_time)
-            paths = df_full['path'].str.split(';').tolist()
-            start = pd.DataFrame([t[0] for t in paths])
-            df_full['start'] = start
-            df_full['start_id'] = df_full['start'].apply(lambda n:
-                                                         self.name2id[n])
-            if successful:
-                target = pd.DataFrame([t[-1] for t in paths])
-            else:
-                target = pd.read_csv(fname, sep='\t', comment='#',
-                                     encoding='utf-8',
-                                     usecols=[4], names=['target'])
-            df_full['target'] = target
-            df_full['target_id'] = df_full['target'].apply(lambda n:
-                                                           self.name2id[n])
-            spl = lambda d: self.get_spl(self.name2id[d['start']],
-                                         d['target_id'])
-            df_full['spl'] = df_full.apply(spl, axis=1)
+        def convert_time(t):
+            tm = datetime.datetime.fromtimestamp(t)
+            return tm.strftime('%Y-%m-%d %H:%M:%S')
 
-            def resolve_backtracks(path):
-                path = path.split(';')
-                backtrack = [False] * len(path)
-                if '<' not in path:
-                    return path, backtrack
+        df_full['timestamp'] = df_full['timestamp'].apply(convert_time)
+        paths = df_full['path'].str.split(';').tolist()
+        start = pd.DataFrame([t[0] for t in paths])
+        df_full['start'] = start
+        df_full['start_id'] = df_full['start'].apply(lambda n:
+                                                     self.name2id[n])
+        if successful:
+            target = pd.DataFrame([t[-1] for t in paths])
+        else:
+            target = pd.read_csv(fname, sep='\t', comment='#',
+                                 encoding='utf-8',
+                                 usecols=[4], names=['target'])
+        df_full['target'] = target
+        df_full = df_full[df_full['start'].isin(self.name2id)]
+        df_full = df_full[df_full['target'].isin(self.name2id)]
+        df_full['target_id'] = df_full['target'].apply(lambda n:
+                                                       self.name2id[n])
+        spl = lambda d: self.get_spl(self.name2id[d['start']],
+                                     d['target_id'])
+        df_full['spl'] = df_full.apply(spl, axis=1)
 
-                path.reverse()
-                path_resolved = [path[-1]]
-                stack = [path.pop()]
-                i = 0
-                while path:
-                    i += 1
-                    p = path.pop()
-                    if p == '<':
-                        stack.pop()
-                        backtrack[i-1] = True
-                    else:
-                        stack.append(p)
-                    path_resolved.append(stack[-1])
-                return path_resolved, backtrack
+        def resolve_backtracks(path):
+            path = path.split(';')
+            backtrack = [False] * len(path)
+            if '<' not in path:
+                return path, backtrack
 
-            result = map(resolve_backtracks, df_full['path'])
-            path = [r[0] for r in result]
-            backtrack = [r[1] for r in result]
-            df_full['path'], df_full['backtrack'] = path, backtrack
+            path.reverse()
+            path_resolved = [path[-1]]
+            stack = [path.pop()]
+            i = 0
+            while path:
+                i += 1
+                p = path.pop()
+                if p == '<':
+                    stack.pop()
+                    backtrack[i-1] = True
+                else:
+                    stack.append(p)
+                path_resolved.append(stack[-1])
+            return path_resolved, backtrack
 
-            df_full['pl'] = df_full['path'].apply(lambda p: len(p))
-            if use_only_spl == 3:
-                df_full = df_full[(df_full['spl'] == 3) & (df_full['pl'] < 8)]
-            elif use_only_spl == 4:
-                df_full = df_full[(df_full['spl'] == 4) & (df_full['pl'] < 10)]
-            else:
-                raise NotImplementedError
+        result = map(resolve_backtracks, df_full['path'])
+        path = [r[0] for r in result]
+        backtrack = [r[1] for r in result]
+        df_full['path'], df_full['backtrack'] = path, backtrack
 
-            def nonexisting_links_present(dtfr):
-                # make sure a link from the log actually exists in the articles
-                for i in range(dtfr.shape[0] - 1):
-                    if dtfr.iloc[i]['backtrack']:
-                        continue
-                    a = dtfr.iloc[i]['node']
-                    b = dtfr.iloc[i+1]['node']
-                    links = self.get_link_possibilities(a, b)
-                    if len(links) == 0:
-                        print('        link does not exist:', a, b)
-                        return True
-                return False
+        df_full['pl'] = df_full['path'].apply(lambda p: len(p))
+        if use_only_spl == 3:
+            df_full = df_full[(df_full['spl'] == 3) & (df_full['pl'] < 8)]
+        elif use_only_spl == 4:
+            df_full = df_full[(df_full['spl'] == 4) & (df_full['pl'] < 10)]
+        else:
+            raise NotImplementedError
 
-            for eid, entry in enumerate(df_full.iterrows()):
-                print('    ', eid + 1, '/', df_full.shape[0], end='\r')
-                entry = entry[1]
-                df = pd.DataFrame(data=zip(entry['path'], entry['backtrack']),
-                                  columns=['node', 'backtrack'])
-                if nonexisting_links_present(df):
+        def nonexisting_links_present(dtfr):
+            # make sure a link from the log actually exists in the articles
+            for i in range(dtfr.shape[0] - 1):
+                if dtfr.iloc[i]['backtrack']:
                     continue
+                a = dtfr.iloc[i]['node']
+                b = dtfr.iloc[i+1]['node']
+                links = self.get_link_possibilities(a, b)
+                if len(links) == 0:
+                    print('        link does not exist:', a, b)
+                    return True
+            return False
 
-                df['successful'] = successful
-                df['spl'] = entry['spl']
-                df['pl'] = entry['pl']
-                df['step'] = range(df.shape[0])
-                df['distance-to-go'] = list(reversed(range(df.shape[0])))
-                df['subject'] = eid
-                df['user'] = entry['user']
-                df['timestamp'] = entry['timestamp']
-                df['duration'] = entry['duration']
-                df['start'] = entry['start']
-                df['start_id'] = entry['start_id']
-                df['target'] = entry['target']
-                df['target_id'] = entry['target_id']
-                results.append(df)
+        for eid, entry in enumerate(df_full.iterrows()):
+            print('    ', eid + 1, '/', df_full.shape[0], end='\r')
+            entry = entry[1]
+            df = pd.DataFrame(data=zip(entry['path'], entry['backtrack']),
+                              columns=['node', 'backtrack'])
+            if nonexisting_links_present(df):
+                continue
+            df['successful'] = successful
+            df['spl'] = entry['spl']
+            df['pl'] = entry['pl']
+            df['step'] = range(df.shape[0])
+            df['distance-to-go'] = list(reversed(range(df.shape[0])))
+            df['subject'] = eid
+            df['user'] = entry['user']
+            df['usa'] = 'United_States' in entry['path']
+            df['timestamp'] = entry['timestamp']
+            df['duration'] = entry['duration']
+            df['start'] = entry['start']
+            df['start_id'] = entry['start_id']
+            df['target'] = entry['target']
+            df['target_id'] = entry['target_id']
+            results.append(df)
 
         data = pd.concat(results)
         self.save_data(data)
@@ -1060,8 +1192,9 @@ if __name__ == '__main__':
     # Cached.clear_cache()
 
     for wg in [
-        # WIKTI(),
-        Wikispeedia(),
+        # WIKTI(successful=True),
+        Wikispeedia(successful=True),
+        # Wikispeedia(successful=False),
     ]:
         # wg.compute_link_positions()
         # wg.create_correlation_data()
@@ -1072,6 +1205,9 @@ if __name__ == '__main__':
         # wg.add_means()
         # wg.add_percentages()
 
-        wg.compare_models()
+        # wg.compare_models_lead()
+        wg.compare_models_stepwise()
+        # wg.compare_models_first()
+        # wg.compare_mi()
 
 
