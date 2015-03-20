@@ -612,6 +612,33 @@ class Wikigame(object):
 
         # df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
 
+    def lead_links(self):
+        self.load_link_positions()
+        lead_ib_links, rest_links = [], []
+        for i, node in enumerate(self.name2id.keys()):
+            print(i+1, '/', len(self.name2id), end='\r')
+            try:
+                limit = self.lead_length[node]
+            except KeyError:
+                continue
+            for pos, link in self.pos2link[node].items():
+                if pos < limit:
+                    lead_ib_links.append(link)
+                else:
+                    rest_links.append(link)
+
+        for label, func in [
+            ('degree_in', lambda x: self.id2deg_in[x]),
+            ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
+            ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
+        ]:
+            lead_ib = np.mean([func(l) for l in lead_ib_links])
+            rest = np.mean([func(l) for l in rest_links])
+            if label == 'ngram':
+                lead_ib, rest = np.log(lead_ib), np.log(rest)
+            print(label)
+            print('    Lead & IB:\t%.4f\n    Rest:\t\t%.4f\n' % (lead_ib, rest))
+
     def compare_models_lead(self):
         self.load_data()
         self.load_link_positions()
@@ -1182,7 +1209,7 @@ if __name__ == '__main__':
         # Wikispeedia(successful=False),
     ]:
         # wg.compute_link_positions()
-        # wg.create_correlation_data()
+        wg.create_correlation_data()
         # wg.create_dataframe()
         # wg.complete_dataframe()
         # wg.add_link_context()
@@ -1190,8 +1217,11 @@ if __name__ == '__main__':
         # wg.add_percentages()
 
         # wg.compare_models_lead()
-        wg.compare_models_stepwise()
+        # wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
+
+        # wg.lead_links()
+        # pdb.set_trace()
 
 

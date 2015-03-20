@@ -2,9 +2,11 @@
 
 from __future__ import division, print_function
 
+import operator
 import os
 import pdb
 
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,7 +16,8 @@ import seaborn as sns
 # set a few options
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
-colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71"]
+colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71",
+          "#4C72B0", "#55A868", "#C44E52", "#8172B2", "#CCB974", "#64B5CD"]
 sns.set_palette(sns.color_palette(colors))
 
 sns.set_style("white")
@@ -24,7 +27,7 @@ sns.set_context("notebook", font_scale=1.125, rc={"lines.linewidth": 1.5})
 
 class Plotter(object):
     def __init__(self, labels, spl=3):
-        self.markers = ['o', 'h', 'd', 'v', 's', 'x']
+        self.markers = ['o', 's', '^', 'd', 'v', 'h']
         self.colors = colors
         self.data = {}
         self.labels = labels
@@ -60,8 +63,8 @@ class Plotter(object):
         for k, c in zip([4, 5, 6, 7], self.colors):
             for feature, ylabel, m, ls in [
                 ('linkpos_first', 'first occurrence', 'v', 'solid'),
-                # ('linkpos_actual', 'click position', 'o', 'dashed'),
-                # ('linkpos_last', 'last occurrence', '^', 'solid'),
+                ('linkpos_actual', 'click position', 'o', 'dashed'),
+                ('linkpos_last', 'last occurrence', '^', 'solid'),
                 ('word_count', 'article length', '', 'dotted')
             ]:
                 for label, dataset in data.items():
@@ -79,12 +82,60 @@ class Plotter(object):
                     p.add_tsplot(df, col=x, time='distance-to-go',
                                  unit='subject', condition='Game length', ci=0,
                                  value=feature, marker=m, color=c, linestyle=ls,
-                                 legend=True)
+                                 legend='single')
         path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
         p.finish(path, suptitle='Clicked Link Position', titles=titles,
                  xlabel=xlabel, ylabel='word',
                  invert_xaxis=True, invert_yaxis=True)
         plt.rcParams['legend.fontsize'] = fontsize_old
+
+    def plot_linkpos_fill_between(self, data=None, labels=None, fname_suffix='',
+                                  full=True):
+        fontsize_old = plt.rcParams['legend.fontsize']
+        plt.rcParams['legend.fontsize'] = 7.5
+        if data is None:
+            data = self.data
+        if labels is None:
+            labels = self.labels
+        print('linkpos()')
+        xlabel = 'Distance to-go to target'
+        titles = np.array([labels])
+        p = Plot(1, len(data), rowsize=6, colsize=6)
+        # for k, c in zip([4, 5, 6, 7], self.colors):
+        for k, c, m in zip([4, 5, 6], self.colors, self.markers):
+            for label, dataset in data.items():
+                col = labels.index(label)
+                df = dataset[dataset['pl'] == k]
+                df = df.dropna()
+                x = sorted(df['distance-to-go'].unique().tolist())
+                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].mean()
+                         for dtg in range(1, k)]
+                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].mean()
+                        for dtg in range(1, k)]
+                length = [df[df['distance-to-go'] == dtg]['word_count'].mean()
+                          for dtg in range(1, k)]
+                if full:
+                    p.add_fill_between(x, first, last, color=c, col=col, gl=k,
+                                       label='link occurrence')
+                    p.add_plot(x, first, color=c, col=col, lw=0.5)
+                    p.add_plot(x, last, color=c, col=col, lw=0.5)
+                    if 'linkpos_actual' in df.columns:
+                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].mean()
+                                  for dtg in range(1, k)]
+                        p.add_plot(x, actual, color=c, col=col,
+                                   label='actual link position', ls='dashed')
+                else:
+                    p.add_plot(x, first, color=c, marker=m, col=col,
+                               label='link position')
+                p.add_plot(x, length, color=c, col=col, label='article length',
+                           ls='dotted')
+
+        path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
+        p.finish(path, suptitle='Clicked Link Position', titles=titles,
+                 xlabel=xlabel, ylabel='word', legend='all',
+                 invert_yaxis=True)
+        plt.rcParams['legend.fontsize'] = fontsize_old
+
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
         """draw comparison plots for multiple datasets"""
@@ -238,10 +289,9 @@ class Plotter(object):
     def plot_split(self):
         print('plot_split()')
         df = self.data['Wikispeedia']
-        # df = df[df['node'] != 'United_States']
         data = [
             {
-                'all': df,
+                # 'all': df,
                 'easy games': df[~df['above_pl_mission_mean']],
                 'hard games': df[df['above_pl_mission_mean']],
             },
@@ -252,7 +302,11 @@ class Plotter(object):
             # },
         ]
         labels = [
-            ['all', 'easy games', 'hard games'],
+            [
+                # 'all',
+                'easy games',
+                'hard games'
+            ],
             # ['all', 'fast users', 'slow users'],
         ]
         suffices = [
@@ -260,7 +314,8 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            self.plot_linkpos(dataset, label, fname_suffix=suffix)
+            self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
+                                           full=False)
             # self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
@@ -359,39 +414,93 @@ class Plotter(object):
                 plt.savefig(os.path.join(self.plot_folder,
                                          'correlation', fname))
 
-    def mutual_information(self):
-        def nmi(self, a, b):
-            pass
-
-        df = self.data['Wikispeedia']
-        a, b = df['ngram'], df['degree_in']
-        pdb.set_trace()
-        sklearn.metrics.cluster.normalized_mutual_info_score
-
 
 def plot_models():
-    markers = ['o', 'h', 'd', 'v', 's', 'x']
+    markers = ['o', '*', 'd', 'v', '^', 's', 'h', '8', '+', '*']
+    colors = ['black', "#A03003", "#FB6023", "#235847", "#46AF8E", "#8DA0CB"]
+    model_labels = [
+        'Random',
+        'Degree',
+        'TF-IDF',
+        'N-gram',
+        'View Count',
+        'Linkpos',
+        # 'Category',
+        # 'LinkPosDegree',
+        # 'LinkPosNgram',
+        # 'LinkPosViewCount',
+    ]
     path = os.path.join('data', 'Wikispeedia', 'models.obj')
     df_full = pd.read_pickle(path)
-
+    df_full['model'] = df_full['model'].apply(lambda x: x.replace(' 0.40', ''))
+    df_full['model'] = df_full['model'].apply(lambda x: x.replace('Ngram', 'N-gram'))
+    df_full['distance-to-go'] = df_full['pl'] - 1 - df_full['step']
+    label2title = {
+        'all': 'All Games',
+        'no usa': 'Games not passing through to the U.S. article',
+    }
     for label in [
         'all',
-        'usa',
+        # 'usa',
         'no usa',
     ]:
         print(label)
         df_label = df_full[df_full['df'] == label]
-        # pdb.set_trace()
         p = Plot(nrows=1, ncols=len(df_label['pl'].unique()))
         for col_idx, pl in enumerate(sorted(df_label['pl'].unique())):
             df = df_label[(df_label['pl'] == pl)]
-            for mdl, m, c in zip(df['model'].unique(), markers, colors):
+            for mdl, m, c in zip(model_labels, markers, colors):
                 data = df[df['model'] == mdl]['kld'].tolist()
-                p.add_plot(data, col=col_idx, label=mdl, marker=m, color=c)
-        titles = np.array([str(l) for l in sorted(df_label['pl'].unique())])
-        fpath = os.path.join('plots', 'models_' + label + '.png')
-        p.finish(fpath, suptitle=label, titles=titles,
-                 xlabel='step in game', ylabel='KL divergence', legend=True)
+                x = df[df['model'] == mdl]['distance-to-go'].tolist()
+                ls = '--' if mdl == 'Random' else '-'
+                p.add_plot(x, data, col=col_idx, label=mdl, marker=m, color=c,
+                           ls=ls)
+        titles = np.array([['Game length ' + str(int(l))
+                            for l in sorted(df_label['pl'].unique())]])
+        fpath = os.path.join('plots', 'models_' +
+                             label.replace(' ', '_') + '.png')
+        p.finish(fpath, suptitle=label2title[label], titles=titles,
+                 legend='single', xlabel='Distance to-go to target',
+                 ylabel='KL divergence (bits)')
+
+
+def print_models():
+    path = os.path.join('data', 'Wikispeedia', 'models.obj')
+    df_full = pd.read_pickle(path)
+    df_full['model'] = df_full['model'].apply(lambda x: x.replace(' 0.40', ''))
+
+    model_labels = [
+        'Random',
+        'Degree',
+        'Ngram',
+        'View Count',
+        'TF-IDF',
+        'Linkpos',
+        # 'Category',
+        # 'LinkPosDegree',
+        # 'LinkPosNgram',
+        # 'LinkPosViewCount',
+    ]
+
+    for label in [
+        'all',
+        # 'usa',
+        'no usa',
+    ]:
+        print('\n', label.upper(), '------------------------------------------')
+        df_label = df_full[df_full['df'] == label]
+        for col_idx, pl in enumerate(sorted(df_label['pl'].unique())):
+            print('    PATH LENGTH:', pl, '--------------------------')
+            df = df_label[(df_label['pl'] == pl)]
+            for step in range(int(pl) - 1):
+                print('        STEP', step)
+                df_step = df[df['step'] == step]
+                results = {mdl[1]['model']: mdl[1]['kld']
+                           for mdl in df_step.iterrows()}
+                # pdb.set_trace()
+                results = {k: v for k, v in results.items() if k in model_labels}
+                for r in sorted(results.items(), key=operator.itemgetter(1)):
+                    print('            %.2f\t%s' % (r[1], r[0]))
 
 
 class Plot(object):
@@ -412,11 +521,27 @@ class Plot(object):
         sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
                    value=value, estimator=np.nanmean, **kwargs)
 
-    def add_plot(self, data, **kwargs):
+    def add_plot(self, x, y, **kwargs):
         row = kwargs.pop('row', 0)
         col = kwargs.pop('col', 0)
         ax = self.axes[row, col]
-        ax.plot(data, **kwargs)
+        if not ax.xaxis_inverted():
+            ax.invert_xaxis()
+        ax.plot(x, y, **kwargs)
+
+    def add_fill_between(self, x, first, second, **kwargs):
+        row = kwargs.pop('row', 0)
+        col = kwargs.pop('col', 0)
+        ax = self.axes[row, col]
+        if not ax.xaxis_inverted():
+            ax.invert_xaxis()
+        label = kwargs.pop('label', None)
+        gl = kwargs.pop('gl', False)
+        if label:
+            ax.plot(None, label=' ', lw=10, alpha=0.0, **kwargs)
+            ax.plot(None, label='GL %s' % gl, lw=10, alpha=0.0, **kwargs)
+            ax.plot(None, label=label, lw=10, alpha=0.2, **kwargs)
+        ax.fill_between(x, first, second, alpha=0.2, **kwargs)
 
     def match_ylim(self):
         for row in range(self.axes.shape[0]):
@@ -442,8 +567,26 @@ class Plot(object):
                             ylim[1] + np.abs(0.05 * length))
                 xlim = ax.get_xlim()
                 length = xlim[1] - xlim[0]
-                ax.set_xlim(xlim[0] - np.abs(0.05 * length),
-                            xlim[1] + np.abs(0.05 * length))
+                margin = np.abs(0.05 * length)
+                margin0 = margin * - 1 if xlim[0] < xlim[1] else margin
+                margin1 = margin * - 1 if xlim[0] > xlim[1] else margin
+                ax.set_xlim(xlim[0] + margin0,
+                            xlim[1] + margin1)
+
+    def set_only_integer_xticks(self):
+        for row in range(self.axes.shape[0]):
+            for col in range(self.axes.shape[1]):
+                ax = self.axes[row, col].get_xaxis()
+                ax.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+
+    def add_legend(self, legend):
+        if legend == 'single':
+            plt.legend(loc=0)
+        elif legend == 'all':
+            for row in range(self.axes.shape[0]):
+                for col in range(self.axes.shape[1]):
+                    ax = self.axes[row, col]
+                    ax.legend(loc=0)
 
     def finish(self, fname, **kwargs):
         """perform some beautification"""
@@ -474,9 +617,8 @@ class Plot(object):
                     ax.set_title('')
         plt.suptitle(suptitle, size='xx-large')
         sns.despine(fig=self.fig)
-        legend = kwargs.pop('legend', False)
-        if legend:
-            plt.legend()
+        self.add_legend(kwargs.pop('legend', False))
+        self.set_only_integer_xticks()
         self.fig.subplots_adjust(left=0.1, bottom=0.15, right=0.95, top=0.85,
                                  wspace=0.3, hspace=0.2)
         if self.axes.shape[1] == 1:
@@ -486,25 +628,25 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    # for pt in [
-        # Plotter(['Wikispeedia']),
+    for pt in [
+        Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
         # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
-    # ]:
+    ]:
         # pdb.set_trace()
-        # pt.plot_linkpos()
+        # pt.plot_linkpos_fill_between()
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.print_click_stats()
-        # pt.plot_split()
+        pt.plot_split()
         # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()
         # pt.mutual_information()
 
-    plot_models()
-
+    # plot_models()
+    # print_models()

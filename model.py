@@ -176,7 +176,7 @@ class LinkPosModel(NavigationModel):
     def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
         super(LinkPosModel, self).__init__(start, pos, wikigame,
-                                           'Linkpos %.2f' % lead_weight)
+                                           'Linkpos')
 
     def compute(self):
         for i, node in enumerate(self.start):
@@ -198,8 +198,7 @@ class LinkPosDegreeModel(NavigationModel):
     def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
         super(LinkPosDegreeModel, self).__init__(start, pos, wikigame,
-                                                 'LinkPosDegree %.2f' %
-                                                 lead_weight)
+                                                 'LinkPosDegree')
     def compute(self):
         for i, node in enumerate(self.start):
             node = self.wikigame.id2name[node]
@@ -225,8 +224,7 @@ class LinkPosNgramModel(NavigationModel):
     def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
         super(LinkPosNgramModel, self).__init__(start, pos, wikigame,
-                                                      'LinkPosNgram %.2f'
-                                                      % lead_weight)
+                                                      'LinkPosNgram')
 
     def compute(self):
         ng = ngram.ngram_frequency
@@ -257,8 +255,7 @@ class LinkPosViewCountModel(NavigationModel):
     def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
         super(LinkPosViewCountModel, self).__init__(start, pos, wikigame,
-                                                      'LinkPosViewCount %.2f'
-                                                      % lead_weight)
+                                                      'LinkPosViewCount')
 
     def compute(self):
         vc = viewcounts.viewcount
