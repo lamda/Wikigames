@@ -596,12 +596,12 @@ class Wikigame(object):
         category_depth = lambda n: self.get_category_depth(n)
         df['category_depth'] = df['node_id'].apply(category_depth)
 
-        print('    getting ngram frequencies...')
-        ngrams = []
-        for i, n in enumerate(df['node']):
-            print('   ', i+1, '/', len(df['node']), end='\r')
-            ngrams.append(ngram.ngram_frequency.get_frequency(n))
-        df['ngram'] = ngrams
+        # print('    getting ngram frequencies...')
+        # ngrams = []
+        # for i, n in enumerate(df['node']):
+        #     print('   ', i+1, '/', len(df['node']), end='\r')
+        #     ngrams.append(ngram.ngram_frequency.get_frequency(n))
+        # df['ngram'] = ngrams
 
         print('    getting view counts...')
         view_counts = []
@@ -610,7 +610,7 @@ class Wikigame(object):
             view_counts.append(viewcounts.viewcount.get_frequency(n))
         df['view_count'] = view_counts
 
-        df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
+        # df.to_pickle(os.path.join('data', self.label, 'data_correlation.obj'))
 
     def compare_models_lead(self):
         self.load_data()
@@ -628,12 +628,12 @@ class Wikigame(object):
             model.RandomModel,
             model.DegreeModel,
             model.ViewCountModel,
-            model.FamiliarityModel,
+            model.NgramModel,
             model.CategoryModel,
             model.TfidfModel,
             # model.LinkPosModel,
             # model.LinkPosDegreeModel,
-            # model.LinkPosFamiliarityModel,
+            # model.LinkPosNgramModel,
             # model.LinkPosViewCountModel,
         ]:
             mdls.append(mdl(first, pos, self))
@@ -650,83 +650,69 @@ class Wikigame(object):
 
     def compare_models_stepwise(self):
         self.load_data()
+        # self.data = pd.read_pickle('data/Wikispeedia/data_3.obj')
+        # pdb.set_trace()
         self.load_link_positions()
-        self.id2deg_in[4298] = 100
-        # for label, df in [
-        #     ('all', self.data),
-        #     ('easy games', self.data[~self.data['above_pl_mission_mean']]),
-        #     ('hard games', self.data[self.data['above_pl_mission_mean']]),
-        # ]:
-        #     print('\n--------', label, '--------')
-
-        for pl in [
-            4,
-            5,
-            6,
-            7
+        df_result = pd.DataFrame(columns=['df', 'pl', 'step', 'model', 'kld'])
+        for label, df_full in [
+            ('all', self.data),
+            ('usa', self.data[self.data['usa']]),
+            ('no usa', self.data[~self.data['usa']]),
         ]:
-            df = self.data[self.data['pl'] == pl]
-            print('----------------PATH LENGTH', pl, '----------------')
-            for step in range(pl):
-                print('\n--------', step, '--------')
-                first = df[df['step'] == step]['node_id']
-                pos = df[df['step'] == step]['linkpos_first']
-                second = df[df['step'] == step+1]['node_id']
-                gm = model.GroundTruthModel(first, pos, second, self)
-                gm.compute()
-                mdls = []
-                for mdl in [
-                    model.RandomModel,
-                    model.DegreeModel,
-                    model.ViewCountModel,
-                    model.FamiliarityModel,
-                    model.CategoryModel,
-                    model.TfidfModel,
-                    model.LinkPosModel,
-                    model.LinkPosDegreeModel,
-                    model.LinkPosFamiliarityModel,
-                    model.LinkPosViewCountModel,
-                ]:
-                    mdls.append(mdl(first, pos, self))
+            print('+++++++++++++++++', label, '+++++++++++++++++')
+            for pl in [
+                4,
+                5,
+                6,
+                7
+            ]:
+                df = df_full[df_full['pl'] == pl]
+                print('----------------PATH LENGTH', pl, '----------------')
+                for step in range(pl-1):
+                    print('\n--------', step, '--------')
+                    first = df[df['step'] == step]['node_id']
+                    pos = df[df['step'] == step]['linkpos_first']
+                    second = df[df['step'] == step+1]['node_id']
+                    gm = model.GroundTruthModel(first, pos, second, self)
+                    gm.compute()
+                    mdls = []
+                    for mdl in [
+                        model.RandomModel,
+                        model.DegreeModel,
+                        model.ViewCountModel,
+                        model.NgramModel,
+                        model.CategoryModel,
+                        model.TfidfModel,
+                        model.LinkPosModel,
+                        model.LinkPosDegreeModel,
+                        model.LinkPosNgramModel,
+                        model.LinkPosViewCountModel,
+                    ]:
+                        mdls.append(mdl(first, pos, self))
 
-                # compare models
-                # print('\n', gm.label, 'Link Window: +/-', gm.window, 'words')
-                results = {}
-                for n in mdls:
-                    n.compute()
-                    # gm.compare_to(n)
-                    results[n.label] = gm.get_kld(n)
-                for r in sorted(results.items(), key=operator.itemgetter(1)):
-                    print('%.2f\t%s' % (r[1], r[0]))
-
-
-        # import matplotlib.pyplot as plt
-        # window_range = range(1, 21)
-        # window_range = range(4, 11)
-        # window_range = [None]
-        # for mdl in mdls:
-        #     print(mdl.label)
-        #     result = []
-        #     for window in window_range:
-        #         mdl.window = window
-        #         mdl.node2weight = {n: 0.000001 for n in self.id2name}
-        #         mdl.compute()
-        #         result.append(gm.get_kld(mdl))
-        #         print('    ', window if window is not None else 'None',
-        #               '\t%.2f' % gm.get_kld(mdl))
-        #         pdb.set_trace()
-        #     plt.plot(window_range, result, label=mdl.label, marker='o')
-        # plt.legend()
-        # plt.savefig(os.path.join('plots', 'kl.png'))
+                    # compare models
+                    results = {}
+                    for n in mdls:
+                        n.compute()
+                        kld = gm.get_kld(n)
+                        results[n.label] = kld
+                        idx = df_result.index.shape[0]
+                        df_result.loc[idx] = [label, pl, step, n.label, kld]
+                    for r in sorted(results.items(), key=operator.itemgetter(1)):
+                        print('%.2f\t%s' % (r[1], r[0]))
+        df_result.to_pickle(os.path.join('data', self.label, 'models.obj'))
 
     def compare_models_first(self):
         self.load_data()
         self.load_link_positions()
         step = 0
-        for df in [
-            self.data[self.data['usa']],
-            self.data[~self.data['usa']],
+        pdb.set_trace()
+        for label, df in [
+            ('all', self.data),
+            ('usa', self.data[self.data['usa']]),
+            ('no usa', self.data[~self.data['usa']]),
         ]:
+            print(label)
             first = df[df['step'] == step]['node_id']
             pos = df[df['step'] == step]['linkpos_first']
             second = df[df['step'] == step+1]['node_id']
@@ -737,18 +723,17 @@ class Wikigame(object):
                 model.RandomModel,
                 model.DegreeModel,
                 model.ViewCountModel,
-                model.FamiliarityModel,
+                model.NgramModel,
                 model.CategoryModel,
                 model.TfidfModel,
                 model.LinkPosModel,
                 model.LinkPosDegreeModel,
-                model.LinkPosFamiliarityModel,
+                model.LinkPosNgramModel,
                 model.LinkPosViewCountModel,
             ]:
                 mdls.append(mdl(first, pos, self))
 
             # compare models
-            # print('\n', gm.label, 'Link Window: +/-', gm.window, 'words')
             results = {}
             for n in mdls:
                 n.compute()
@@ -1198,7 +1183,6 @@ if __name__ == '__main__':
     ]:
         # wg.compute_link_positions()
         # wg.create_correlation_data()
-
         # wg.create_dataframe()
         # wg.complete_dataframe()
         # wg.add_link_context()

@@ -131,10 +131,10 @@ class ViewCountModel(NavigationModel):
         self.set_data()
 
 
-class FamiliarityModel(NavigationModel):
+class NgramModel(NavigationModel):
     def __init__(self, start, pos, wikigame):
-        super(FamiliarityModel, self).__init__(start, pos, wikigame,
-                                               'Familiarity')
+        super(NgramModel, self).__init__(start, pos, wikigame,
+                                               'Ngram')
 
     def compute(self):
         ng = ngram.ngram_frequency
@@ -221,11 +221,11 @@ class LinkPosDegreeModel(NavigationModel):
         self.set_data()
 
 
-class LinkPosFamiliarityModel(NavigationModel):
+class LinkPosNgramModel(NavigationModel):
     def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
-        super(LinkPosFamiliarityModel, self).__init__(start, pos, wikigame,
-                                                      'LinkPosFamiliarity %.2f'
+        super(LinkPosNgramModel, self).__init__(start, pos, wikigame,
+                                                      'LinkPosNgram %.2f'
                                                       % lead_weight)
 
     def compute(self):

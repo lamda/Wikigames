@@ -369,6 +369,31 @@ class Plotter(object):
         sklearn.metrics.cluster.normalized_mutual_info_score
 
 
+def plot_models():
+    markers = ['o', 'h', 'd', 'v', 's', 'x']
+    path = os.path.join('data', 'Wikispeedia', 'models.obj')
+    df_full = pd.read_pickle(path)
+
+    for label in [
+        'all',
+        'usa',
+        'no usa',
+    ]:
+        print(label)
+        df_label = df_full[df_full['df'] == label]
+        # pdb.set_trace()
+        p = Plot(nrows=1, ncols=len(df_label['pl'].unique()))
+        for col_idx, pl in enumerate(sorted(df_label['pl'].unique())):
+            df = df_label[(df_label['pl'] == pl)]
+            for mdl, m, c in zip(df['model'].unique(), markers, colors):
+                data = df[df['model'] == mdl]['kld'].tolist()
+                p.add_plot(data, col=col_idx, label=mdl, marker=m, color=c)
+        titles = np.array([str(l) for l in sorted(df_label['pl'].unique())])
+        fpath = os.path.join('plots', 'models_' + label + '.png')
+        p.finish(fpath, suptitle=label, titles=titles,
+                 xlabel='step in game', ylabel='KL divergence', legend=True)
+
+
 class Plot(object):
     def __init__(self, nrows=1, ncols=1, rowsize=4.25, colsize=4.5):
         """create the plot"""
@@ -386,6 +411,12 @@ class Plot(object):
             ax.invert_xaxis()
         sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
                    value=value, estimator=np.nanmean, **kwargs)
+
+    def add_plot(self, data, **kwargs):
+        row = kwargs.pop('row', 0)
+        col = kwargs.pop('col', 0)
+        ax = self.axes[row, col]
+        ax.plot(data, **kwargs)
 
     def match_ylim(self):
         for row in range(self.axes.shape[0]):
@@ -443,6 +474,9 @@ class Plot(object):
                     ax.set_title('')
         plt.suptitle(suptitle, size='xx-large')
         sns.despine(fig=self.fig)
+        legend = kwargs.pop('legend', False)
+        if legend:
+            plt.legend()
         self.fig.subplots_adjust(left=0.1, bottom=0.15, right=0.95, top=0.85,
                                  wspace=0.3, hspace=0.2)
         if self.axes.shape[1] == 1:
@@ -452,18 +486,18 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    for pt in [
+    # for pt in [
         # Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
-        Plotter(['WIKTI']),
+        # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
-    ]:
+    # ]:
         # pdb.set_trace()
         # pt.plot_linkpos()
         # pt.plot_comparison()
-        pt.plot_wikti()
+        # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.print_click_stats()
         # pt.plot_split()
@@ -471,4 +505,6 @@ if __name__ == '__main__':
         # pt.correlation_all()
         # pt.correlation_max()
         # pt.mutual_information()
+
+    plot_models()
 
