@@ -22,7 +22,7 @@ class WikipediaViewCounts(object):
     def retrieve_frequency(self, title):
         title = title.replace(' ', '_').replace('%2F', '/')
         # months = [unicode(i).zfill(2) for i in range(1, 13)]
-        months = [unicode(i).zfill(2) for i in [9]]
+        months = [unicode(i).zfill(2) for i in [11]]
         views = 0
         for month in months:
             url = self.url + month + '/' + title

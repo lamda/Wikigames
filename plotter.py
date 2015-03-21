@@ -16,7 +16,8 @@ import seaborn as sns
 # set a few options
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
-colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71",
+# colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71",
+colors = [ "#2ecc71","#3498db", "#e74c3c", "#9b59b6",  "#34495e", "#95a5a6",
           "#4C72B0", "#55A868", "#C44E52", "#8172B2", "#CCB974", "#64B5CD"]
 sns.set_palette(sns.color_palette(colors))
 
@@ -150,8 +151,8 @@ class Plotter(object):
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
             # ('degree_in', 'Indegree', 'indegree'),
-            ('ngram', 'N-Gram Occurrences (Query)', 'occurrences'),
-            ('view_count', 'View Count', ''),
+            ('ngram', 'N-Gram Occurrences', 'occurrences (log)'),
+            # ('view_count', 'View Count', ''),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
             # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
@@ -179,6 +180,7 @@ class Plotter(object):
                     df = dataset[dataset['pl'] == k]
                     if not df.shape[0]:
                         continue
+                    df['ngram'] = df['ngram'].apply(np.log)
                     df = df[['distance-to-go', 'subject', 'pl', feature]]
                     df.rename(columns={'pl': 'Game length'}, inplace=True)
                     p.add_tsplot(df, col=x, time='distance-to-go',
@@ -291,7 +293,7 @@ class Plotter(object):
         df = self.data['Wikispeedia']
         data = [
             {
-                # 'all': df,
+                'all': df,
                 'easy games': df[~df['above_pl_mission_mean']],
                 'hard games': df[df['above_pl_mission_mean']],
             },
@@ -303,7 +305,7 @@ class Plotter(object):
         ]
         labels = [
             [
-                # 'all',
+                'all',
                 'easy games',
                 'hard games'
             ],
@@ -314,9 +316,9 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
-                                           full=False)
-            # self.plot_comparison(dataset, label, fname_suffix=suffix)
+            # self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
+            #                                full=False)
+            self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -629,10 +631,10 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        Plotter(['Wikispeedia']),
+        # Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
         # Plotter(['WIKTI']),
-        # Plotter(['WIKTI', 'Wikispeedia']),
+        Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
