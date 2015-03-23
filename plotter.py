@@ -50,46 +50,6 @@ class Plotter(object):
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
-    def plot_linkpos(self, data=None, labels=None, fname_suffix=''):
-        fontsize_old = plt.rcParams['legend.fontsize']
-        plt.rcParams['legend.fontsize'] = 7.5
-        if data is None:
-            data = self.data
-        if labels is None:
-            labels = self.labels
-        print('linkpos()')
-        xlabel = 'Distance to-go to target'
-        titles = np.array([labels])
-        p = Plot(1, len(data), rowsize=6, colsize=6)
-        for k, c in zip([4, 5, 6, 7], self.colors):
-            for feature, ylabel, m, ls in [
-                ('linkpos_first', 'first occurrence', 'v', 'solid'),
-                ('linkpos_actual', 'click position', 'o', 'dashed'),
-                ('linkpos_last', 'last occurrence', '^', 'solid'),
-                ('word_count', 'article length', '', 'dotted')
-            ]:
-                for label, dataset in data.items():
-                    if feature not in dataset:
-                        print(feature, 'not present')
-                        continue
-                    x = labels.index(label)
-                    df = dataset[dataset['pl'] == k]
-                    df = df[['distance-to-go', 'subject', 'pl', feature]]
-                    df['pl'] = df['pl'].apply(lambda l: str(l) +
-                                              ' (' + ylabel + ')')
-                    df.rename(columns={'pl': 'Game length'}, inplace=True)
-                    if df.empty:
-                        continue
-                    p.add_tsplot(df, col=x, time='distance-to-go',
-                                 unit='subject', condition='Game length', ci=0,
-                                 value=feature, marker=m, color=c, linestyle=ls,
-                                 legend='single')
-        path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
-        p.finish(path, suptitle='Clicked Link Position', titles=titles,
-                 xlabel=xlabel, ylabel='word',
-                 invert_xaxis=True, invert_yaxis=True)
-        plt.rcParams['legend.fontsize'] = fontsize_old
-
     def plot_linkpos_fill_between(self, data=None, labels=None, fname_suffix='',
                                   full=True):
         fontsize_old = plt.rcParams['legend.fontsize']
@@ -136,7 +96,6 @@ class Plotter(object):
                  xlabel=xlabel, ylabel='word', legend='all',
                  invert_yaxis=True)
         plt.rcParams['legend.fontsize'] = fontsize_old
-
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
         """draw comparison plots for multiple datasets"""

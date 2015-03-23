@@ -639,46 +639,8 @@ class Wikigame(object):
             print(label)
             print('    Lead & IB:\t%.4f\n    Rest:\t\t%.4f\n' % (lead_ib, rest))
 
-    def compare_models_lead(self):
-        self.load_data()
-        self.load_link_positions()
-        df = self.data
-        df.index = range(df.shape[0])
-        step = 0
-        first = df[(df['step'] == step) & (df['linkpos_lead'])]['node_id']
-        pos = df[(df['step'] == step) & (df['linkpos_lead'])]['linkpos_first']
-        second = df.iloc[first.index + 1]['node_id']
-        gm = model.GroundTruthModel(first, pos, second, self)
-        gm.compute()
-        mdls = []
-        for mdl in [
-            model.RandomModel,
-            model.DegreeModel,
-            model.ViewCountModel,
-            model.NgramModel,
-            model.CategoryModel,
-            model.TfidfModel,
-            # model.LinkPosModel,
-            # model.LinkPosDegreeModel,
-            # model.LinkPosNgramModel,
-            # model.LinkPosViewCountModel,
-        ]:
-            mdls.append(mdl(first, pos, self))
-
-        # compare models
-        # print('\n', gm.label, 'Link Window: +/-', gm.window, 'words')
-        results = {}
-        for n in mdls:
-            n.compute()
-            # gm.compare_to(n)
-            results[n.label] = gm.get_kld(n)
-        for r in sorted(results.items(), key=operator.itemgetter(1)):
-            print('%.2f\t%s' % (r[1], r[0]))
-
     def compare_models_stepwise(self):
         self.load_data()
-        # self.data = pd.read_pickle('data/Wikispeedia/data_3.obj')
-        # pdb.set_trace()
         self.load_link_positions()
         df_result = pd.DataFrame(columns=['df', 'pl', 'step', 'model', 'kld'])
         for label, df_full in [
@@ -728,46 +690,6 @@ class Wikigame(object):
                     for r in sorted(results.items(), key=operator.itemgetter(1)):
                         print('%.2f\t%s' % (r[1], r[0]))
         df_result.to_pickle(os.path.join('data', self.label, 'models.obj'))
-
-    def compare_models_first(self):
-        self.load_data()
-        self.load_link_positions()
-        step = 0
-        pdb.set_trace()
-        for label, df in [
-            ('all', self.data),
-            ('usa', self.data[self.data['usa']]),
-            ('no usa', self.data[~self.data['usa']]),
-        ]:
-            print(label)
-            first = df[df['step'] == step]['node_id']
-            pos = df[df['step'] == step]['linkpos_first']
-            second = df[df['step'] == step+1]['node_id']
-            gm = model.GroundTruthModel(first, pos, second, self)
-            gm.compute()
-            mdls = []
-            for mdl in [
-                model.RandomModel,
-                model.DegreeModel,
-                model.ViewCountModel,
-                model.NgramModel,
-                model.CategoryModel,
-                model.TfidfModel,
-                model.LinkPosModel,
-                model.LinkPosDegreeModel,
-                model.LinkPosNgramModel,
-                model.LinkPosViewCountModel,
-            ]:
-                mdls.append(mdl(first, pos, self))
-
-            # compare models
-            results = {}
-            for n in mdls:
-                n.compute()
-                # gm.compare_to(n)
-                results[n.label] = gm.get_kld(n)
-            for r in sorted(results.items(), key=operator.itemgetter(1)):
-                print('%.2f\t%s' % (r[1], r[0]))
 
     def compare_mi(self):
         self.load_data()
@@ -1222,6 +1144,5 @@ if __name__ == '__main__':
         # wg.compare_mi()
 
         # wg.lead_links()
-        # pdb.set_trace()
 
 
