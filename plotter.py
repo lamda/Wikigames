@@ -61,8 +61,7 @@ class Plotter(object):
         print('linkpos()')
         xlabel = 'Distance to-go to target'
         titles = np.array([labels])
-        p = Plot(1, len(data), rowsize=6, colsize=6)
-        # for k, c in zip([4, 5, 6, 7], self.colors):
+        p = Plot(labels, len(data))
         for k, c, m in zip([4, 5, 6], self.colors, self.markers):
             for label, dataset in data.items():
                 col = labels.index(label)
@@ -91,7 +90,7 @@ class Plotter(object):
                 p.add_plot(x, length, color=c, col=col, label='article length',
                            ls='dotted')
 
-        path = os.path.join(self.plot_folder, 'linkpos'+fname_suffix+'.png')
+        path = os.path.join(self.plot_folder, 'linkpos' + fname_suffix)
         p.finish(path, suptitle='Clicked Link Position', titles=titles,
                  xlabel=xlabel, ylabel='word', legend='all',
                  invert_yaxis=True)
@@ -109,13 +108,13 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            # ('degree_in', 'Indegree', 'indegree'),
+            ('degree_in', 'Indegree', 'indegree'),
             ('ngram', 'N-Gram Occurrences', 'occurrences (log)'),
-            # ('view_count', 'View Count', ''),
+            ('view_count', 'View Count', ''),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
-            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
             # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links'),
 
             # ('perc_deg_in', 'Indegree Percentage', ''),
@@ -131,7 +130,7 @@ class Plotter(object):
             # ('dev_md_view_count', 'View Count Deviation from Median', ''),
         ]:
             print(feature)
-            p = Plot(nrows=1, ncols=len(data))
+            p = Plot(labels, len(data))
             for label, dataset in data.items():
                 x = labels.index(label)
                 for k, m, c in zip([4, 5, 6, 7, 8, 9], self.markers, self.colors):
@@ -152,7 +151,7 @@ class Plotter(object):
                 ylim = (0, 0.5)
             else:
                 ylim = None
-            path = os.path.join(self.plot_folder, feature+fname_suffix+'.png')
+            path = os.path.join(self.plot_folder, feature + fname_suffix)
             p.finish(path, suptitle=title, titles=titles, xlabel=xlabel,
                      ylabel=ylabel, invert_xaxis=True, invert_yaxis=yinv,
                      ylim=ylim)
@@ -202,7 +201,7 @@ class Plotter(object):
                                  unit='subject', condition='Game length',
                                  value=feature, marker=m, color=c)
             titles = np.array([titles])
-            path = os.path.join(self.plot_folder, '_'.join(features) + '.png')
+            path = os.path.join(self.plot_folder, '_'.join(features))
             p.finish(path, titles=titles, xlabel=xlabel, ylabel=ylabel,
                      invert_xaxis=True, suptitle=suptitle)
 
@@ -253,8 +252,8 @@ class Plotter(object):
         data = [
             {
                 'all': df,
-                'easy games': df[~df['above_pl_mission_mean']],
-                'hard games': df[df['above_pl_mission_mean']],
+                'easy': df[~df['above_pl_mission_mean']],
+                'hard': df[df['above_pl_mission_mean']],
             },
             # {
             #     'all': df,
@@ -265,8 +264,8 @@ class Plotter(object):
         labels = [
             [
                 'all',
-                'easy games',
-                'hard games'
+                'easy',
+                'hard'
             ],
             # ['all', 'fast users', 'slow users'],
         ]
@@ -275,8 +274,8 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            # self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
-            #                                full=False)
+            self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
+                                           full=False)
             self.plot_comparison(dataset, label, fname_suffix=suffix)
 
     def feature_combinations(self, features):
@@ -407,7 +406,7 @@ def plot_models():
     ]:
         print(label)
         df_label = df_full[df_full['df'] == label]
-        p = Plot(nrows=1, ncols=len(df_label['pl'].unique()))
+        p = Plot(['gl_4', 'gl_5', 'gl_6', 'gl_7'], len(df_label['pl'].unique()))
         for col_idx, pl in enumerate(sorted(df_label['pl'].unique())):
             df = df_label[(df_label['pl'] == pl)]
             for mdl, m, c in zip(model_labels, markers, colors):
@@ -418,8 +417,7 @@ def plot_models():
                            ls=ls)
         titles = np.array([['Game length ' + str(int(l))
                             for l in sorted(df_label['pl'].unique())]])
-        fpath = os.path.join('plots', 'models_' +
-                             label.replace(' ', '_') + '.png')
+        fpath = os.path.join('plots', 'models_' + label.replace(' ', '_'))
         p.finish(fpath, suptitle=label2title[label], titles=titles,
                  legend='single', xlabel='Distance to-go to target',
                  ylabel='KL divergence (bits)')
@@ -465,39 +463,35 @@ def print_models():
 
 
 class Plot(object):
-    def __init__(self, nrows=1, ncols=1, rowsize=4.25, colsize=4.5):
+    def __init__(self, labels, ncols=1, filextension='.pdf'):
         """create the plot"""
-        if ncols == 1:
-            rowsize += 0.5
-        self.fig, self.axes = plt.subplots(nrows, ncols, squeeze=False,
-                                           figsize=(0.5 + rowsize * ncols,
-                                                    colsize))
+        self.filextension = filextension
+        self.figs = [plt.figure() for n in range(ncols)]
+        self.labels = [l.lower() for l in labels]
+        self.axes = [f.add_subplot(111) for f in self.figs]
 
     def add_tsplot(self, data, time, unit, condition, value, **kwargs):
-        row = kwargs.pop('row', 0)
         col = kwargs.pop('col', 0)
-        ax = self.axes[row, col]
+        fig, ax = self.figs[col], self.axes[col]
         if not ax.xaxis_inverted():
             ax.invert_xaxis()
         sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
                    value=value, estimator=np.nanmean, **kwargs)
 
     def add_plot(self, x, y, **kwargs):
-        row = kwargs.pop('row', 0)
         col = kwargs.pop('col', 0)
-        ax = self.axes[row, col]
+        fig, ax = self.figs[col], self.axes[col]
         if not ax.xaxis_inverted():
             ax.invert_xaxis()
         ax.plot(x, y, **kwargs)
 
     def add_fill_between(self, x, first, second, **kwargs):
-        row = kwargs.pop('row', 0)
         col = kwargs.pop('col', 0)
-        ax = self.axes[row, col]
+        fig, ax = self.figs[col], self.axes[col]
         if not ax.xaxis_inverted():
             ax.invert_xaxis()
-        label = kwargs.pop('label', None)
         gl = kwargs.pop('gl', False)
+        label = kwargs.pop('label', None)
         if label:
             ax.plot(None, label=' ', lw=10, alpha=0.0, **kwargs)
             ax.plot(None, label='GL %s' % gl, lw=10, alpha=0.0, **kwargs)
@@ -505,34 +499,28 @@ class Plot(object):
         ax.fill_between(x, first, second, alpha=0.2, **kwargs)
 
     def match_ylim(self):
-        for row in range(self.axes.shape[0]):
-            ylim_lower = min(a.get_ylim()[0] for a in self.axes[row])
-            ylim_upper = max(a.get_ylim()[1] for a in self.axes[row])
-            for col in range(self.axes.shape[1]):
-                ax = self.axes[row, col]
-                ax.set_ylim(ylim_lower, ylim_upper)
+        ylim_lower = min(a.get_ylim()[0] for a in self.axes)
+        ylim_upper = max(a.get_ylim()[1] for a in self.axes)
+        for ax in self.axes:
+            ax.set_ylim(ylim_lower, ylim_upper)
 
     def set_ylim(self, ylim):
-        for row in range(self.axes.shape[0]):
-            for col in range(self.axes.shape[1]):
-                ax = self.axes[row, col]
-                ax.set_ylim(ylim[0], ylim[1])
+        for ax in self.axes:
+            ax.set_ylim(ylim[0], ylim[1])
 
     def add_margin(self, margin=0.05):
-        for row in range(self.axes.shape[0]):
-            for col in range(self.axes.shape[1]):
-                ax = self.axes[row, col]
-                ylim = ax.get_ylim()
-                length = ylim[1] - ylim[0]
-                ax.set_ylim(ylim[0] - np.abs(0.05 * length),
-                            ylim[1] + np.abs(0.05 * length))
-                xlim = ax.get_xlim()
-                length = xlim[1] - xlim[0]
-                margin = np.abs(0.05 * length)
-                margin0 = margin * - 1 if xlim[0] < xlim[1] else margin
-                margin1 = margin * - 1 if xlim[0] > xlim[1] else margin
-                ax.set_xlim(xlim[0] + margin0,
-                            xlim[1] + margin1)
+        for ax in self.axes:
+            ylim = ax.get_ylim()
+            length = ylim[1] - ylim[0]
+            ax.set_ylim(ylim[0] - np.abs(0.05 * length),
+                        ylim[1] + np.abs(0.05 * length))
+            xlim = ax.get_xlim()
+            length = xlim[1] - xlim[0]
+            margin = np.abs(0.05 * length)
+            margin0 = margin * - 1 if xlim[0] < xlim[1] else margin
+            margin1 = margin * - 1 if xlim[0] > xlim[1] else margin
+            ax.set_xlim(xlim[0] + margin0,
+                        xlim[1] + margin1)
 
     def set_only_integer_xticks(self):
         for row in range(self.axes.shape[0]):
@@ -549,9 +537,18 @@ class Plot(object):
                     ax = self.axes[row, col]
                     ax.legend(loc=0)
 
+    def plot_legend(self, fig_data, fname):
+        # plot the legend in a separate plot
+        fig = plt.figure()
+        lgd = plt.figlegend(*fig_data.axes[0].get_legend_handles_labels(), loc=10)
+        fig.canvas.draw()
+        bbi = lgd.get_window_extent()  # legend bounding box in display units
+        bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
+        bbit_exp = bbit.expanded(1.1, 1.1)  # expanded
+        fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
+
     def finish(self, fname, **kwargs):
         """perform some beautification"""
-        titles = kwargs.pop('titles', '')
         suptitle = kwargs.pop('suptitle', '')
         xlabel = kwargs.pop('xlabel', '')
         ylabel = kwargs.pop('ylabel', suptitle)
@@ -563,29 +560,23 @@ class Plot(object):
         else:
             self.match_ylim()
         self.add_margin()
-        for row in range(self.axes.shape[0]):
-            for col in range(self.axes.shape[1]):
-                ax = self.axes[row, col]
-                if invert_xaxis:
-                    ax.invert_xaxis()
-                if invert_yaxis:
-                    ax.invert_yaxis()
-                ax.set_xlabel(xlabel)
-                ax.set_ylabel(ylabel)
-                try:
-                    ax.set_title(titles[row, col])
-                except (IndexError, TypeError):
-                    ax.set_title('')
-        plt.suptitle(suptitle, size='xx-large')
-        sns.despine(fig=self.fig)
-        self.add_legend(kwargs.pop('legend', False))
-        self.set_only_integer_xticks()
-        self.fig.subplots_adjust(left=0.1, bottom=0.15, right=0.95, top=0.85,
-                                 wspace=0.3, hspace=0.2)
-        if self.axes.shape[1] == 1:
-            self.fig.subplots_adjust(left=0.15)
-        plt.savefig(fname)
-        plt.close(self.fig)
+        for ax in self.axes:
+            if invert_xaxis:
+                ax.invert_xaxis()
+            if invert_yaxis:
+                ax.invert_yaxis()
+            ax.set_xlabel(xlabel)
+            ax.set_ylabel(ylabel)
+
+        # sns.despine(fig=self.fig)
+        self.plot_legend(self.figs[0], fname)
+        # self.set_only_integer_xticks()
+        # self.fig.subplots_adjust(left=0.1, bottom=0.15, right=0.95, top=0.85,
+        #                          wspace=0.3, hspace=0.2)
+
+        for fig, label in zip(self.figs, self.labels):
+            fig.savefig(fname + '_' + label + self.filextension)
+            plt.close(fig)
 
 
 if __name__ == '__main__':
@@ -597,17 +588,17 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        # pdb.set_trace()
-        # pt.plot_linkpos_fill_between()
+        pt.plot_linkpos_fill_between()
+        pt.plot_split()
+
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.print_click_stats()
-        pt.plot_split()
         # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()
         # pt.mutual_information()
 
-    # plot_models()
+    plot_models()
     # print_models()
