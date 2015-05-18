@@ -109,12 +109,12 @@ class Plotter(object):
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
             ('degree_in', 'Indegree', 'indegree'),
-            ('ngram', 'N-Gram Occurrences', 'occurrences (log)'),
-            ('view_count', 'View Count', ''),
+            # ('ngram', 'N-Gram Occurrences', 'occurrences (log)'),
+            # ('view_count', 'View Count', 'view count'),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
-            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
             # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links'),
 
             # ('perc_deg_in', 'Indegree Percentage', ''),
@@ -154,7 +154,7 @@ class Plotter(object):
             path = os.path.join(self.plot_folder, feature + fname_suffix)
             p.finish(path, suptitle=title, titles=titles, xlabel=xlabel,
                      ylabel=ylabel, invert_xaxis=True, invert_yaxis=yinv,
-                     ylim=ylim)
+                     ylim=ylim, ylabeltok=True)
 
     def plot_wikti(self):
         """draw plots for features within the WIKTI dataset"""
@@ -274,9 +274,12 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
-                                           full=False)
             self.plot_comparison(dataset, label, fname_suffix=suffix)
+
+            # del data[0]['all']
+            # del labels[0][0]
+            # self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
+            #                                full=False)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -466,7 +469,15 @@ class Plot(object):
     def __init__(self, labels, ncols=1, filextension='.pdf'):
         """create the plot"""
         self.filextension = filextension
-        self.figs = [plt.figure() for n in range(ncols)]
+        self.figsizes = {
+            2: (5, 3),
+            3: (5, 3)
+        }
+        self.adjusts = {
+            2: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.95},
+            3: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.95}
+        }
+        self.figs = [plt.figure(figsize=self.figsizes[ncols]) for n in range(ncols)]
         self.labels = [l.lower() for l in labels]
         self.axes = [f.add_subplot(111) for f in self.figs]
 
@@ -476,7 +487,7 @@ class Plot(object):
         if not ax.xaxis_inverted():
             ax.invert_xaxis()
         sns.tsplot(data, ax=ax, time=time, unit=unit, condition=condition,
-                   value=value, estimator=np.nanmean, **kwargs)
+                   value=value, estimator=np.nanmean, legend=False, **kwargs)
 
     def add_plot(self, x, y, **kwargs):
         col = kwargs.pop('col', 0)
@@ -523,10 +534,14 @@ class Plot(object):
                         xlim[1] + margin1)
 
     def set_only_integer_xticks(self):
-        for row in range(self.axes.shape[0]):
-            for col in range(self.axes.shape[1]):
-                ax = self.axes[row, col].get_xaxis()
-                ax.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+        for ax in self.axes:
+            xx = ax.get_xaxis()
+            xx.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+
+    def set_only_integer_yticks(self):
+        for ax in self.axes:
+            xx = ax.get_yaxis()
+            xx.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
 
     def add_legend(self, legend):
         if legend == 'single':
@@ -537,15 +552,32 @@ class Plot(object):
                     ax = self.axes[row, col]
                     ax.legend(loc=0)
 
-    def plot_legend(self, fig_data, fname):
+    def ylabeltok(self):
+        for fig, ax in zip(self.figs, self.axes):
+            fig.canvas.draw()
+            ytl = [l.get_text() for l in ax.get_yticklabels()]
+            ytl = [str(int(int(l) / 1000)) + 'k' if l else '' for l in ytl]
+            ax.set_yticklabels(ytl)
+
+    def plot_legend(self, fig_data, fname, horizontal=True):
         # plot the legend in a separate plot
         fig = plt.figure()
-        lgd = plt.figlegend(*fig_data.axes[0].get_legend_handles_labels(), loc=10)
-        fig.canvas.draw()
-        bbi = lgd.get_window_extent()  # legend bounding box in display units
-        bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
-        bbit_exp = bbit.expanded(1.1, 1.1)  # expanded
-        fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
+        if horizontal:
+            data = fig_data.axes[0].get_legend_handles_labels()
+            lgd = plt.figlegend(*data, loc=10, ncol=len(data[0]))
+            fig.canvas.draw()
+            bbi = lgd.get_window_extent()  # legend bounding box in display units
+            bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
+            bbit_exp = bbit.expanded(1, 1)  # expanded
+            fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
+        else:
+            lgd = plt.figlegend(*fig_data.axes[0].get_legend_handles_labels(), loc=10)
+            fig.canvas.draw()
+            bbi = lgd.get_window_extent()  # legend bounding box in display units
+            bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
+            bbit_exp = bbit.expanded(1.1, 1.1)  # expanded
+            fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
+        plt.close(fig)
 
     def finish(self, fname, **kwargs):
         """perform some beautification"""
@@ -569,12 +601,15 @@ class Plot(object):
             ax.set_ylabel(ylabel)
 
         # sns.despine(fig=self.fig)
+        # pdb.set_trace()
         self.plot_legend(self.figs[0], fname)
         # self.set_only_integer_xticks()
-        # self.fig.subplots_adjust(left=0.1, bottom=0.15, right=0.95, top=0.85,
-        #                          wspace=0.3, hspace=0.2)
+        # self.set_only_integer_yticks()
+        # if kwargs.pop('ylabeltok', False):
+        #     self.ylabeltok()
 
         for fig, label in zip(self.figs, self.labels):
+            fig.subplots_adjust(**self.adjusts[len(self.figs)])
             fig.savefig(fname + '_' + label + self.filextension)
             plt.close(fig)
 
@@ -588,7 +623,7 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_linkpos_fill_between()
+        # pt.plot_linkpos_fill_between()
         pt.plot_split()
 
         # pt.plot_comparison()
@@ -600,5 +635,5 @@ if __name__ == '__main__':
         # pt.correlation_max()
         # pt.mutual_information()
 
-    plot_models()
+    # plot_models()
     # print_models()
