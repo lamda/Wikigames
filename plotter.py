@@ -74,6 +74,11 @@ class Plotter(object):
                         for dtg in range(1, k)]
                 length = [df[df['distance-to-go'] == dtg]['word_count'].mean()
                           for dtg in range(1, k)]
+
+                # normalization
+                first = [e/l for e, l in zip(first, length)]
+                last = [e/l for e, l in zip(last, length)]
+                # pdb.set_trace()
                 if full:
                     p.add_fill_between(x, first, last, color=c, col=col, gl=k,
                                        label='link occurrence')
@@ -82,17 +87,19 @@ class Plotter(object):
                     if 'linkpos_actual' in df.columns:
                         actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].mean()
                                   for dtg in range(1, k)]
+                        # normalization
+                        actual = [e/l for e, l in zip(actual, length)]
                         p.add_plot(x, actual, color=c, col=col,
                                    label='actual link position', ls='dashed')
                 else:
                     p.add_plot(x, first, color=c, marker=m, col=col,
                                label='link position')
-                p.add_plot(x, length, color=c, col=col, label='article length',
-                           ls='dotted')
+                # p.add_plot(x, length, color=c, col=col, label='article length',
+                #            ls='dotted')
 
         path = os.path.join(self.plot_folder, 'linkpos' + fname_suffix)
         p.finish(path, suptitle='Clicked Link Position', titles=titles,
-                 xlabel=xlabel, ylabel='word', legend='all',
+                 xlabel=xlabel, ylabel='Fraction of article length', legend='all',
                  invert_yaxis=True)
         plt.rcParams['legend.fontsize'] = fontsize_old
 
@@ -274,12 +281,12 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            self.plot_comparison(dataset, label, fname_suffix=suffix)
+            # self.plot_comparison(dataset, label, fname_suffix=suffix)
 
-            # del data[0]['all']
-            # del labels[0][0]
-            # self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
-            #                                full=False)
+            del data[0]['all']
+            del labels[0][0]
+            self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
+                                           full=False)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -387,7 +394,7 @@ def plot_models():
         'TF-IDF',
         'N-gram',
         'View Count',
-        'Linkpos',
+        'Lead + IB',
         # 'Category',
         # 'LinkPosDegree',
         # 'LinkPosNgram',
@@ -471,11 +478,13 @@ class Plot(object):
         self.filextension = filextension
         self.figsizes = {
             2: (5, 3),
-            3: (5, 3)
+            3: (5, 3),
+            4: (5, 3)
         }
         self.adjusts = {
-            2: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.95},
-            3: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.95}
+            2: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90},
+            3: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90},
+            4: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90}
         }
         self.figs = [plt.figure(figsize=self.figsizes[ncols]) for n in range(ncols)]
         self.labels = [l.lower() for l in labels]
@@ -505,7 +514,7 @@ class Plot(object):
         label = kwargs.pop('label', None)
         if label:
             ax.plot(None, label=' ', lw=10, alpha=0.0, **kwargs)
-            ax.plot(None, label='GL %s' % gl, lw=10, alpha=0.0, **kwargs)
+            ax.plot(None, label='Game Length %s' % gl, lw=10, alpha=0.0, **kwargs)
             ax.plot(None, label=label, lw=10, alpha=0.2, **kwargs)
         ax.fill_between(x, first, second, alpha=0.2, **kwargs)
 
@@ -564,11 +573,11 @@ class Plot(object):
         fig = plt.figure()
         if horizontal:
             data = fig_data.axes[0].get_legend_handles_labels()
-            lgd = plt.figlegend(*data, loc=10, ncol=len(data[0]))
+            lgd = plt.figlegend(*data, loc=10, ncol=6)
             fig.canvas.draw()
             bbi = lgd.get_window_extent()  # legend bounding box in display units
             bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
-            bbit_exp = bbit.expanded(1, 1)  # expanded
+            bbit_exp = bbit.expanded(1.1, 1.1)  # expanded
             fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
         else:
             lgd = plt.figlegend(*fig_data.axes[0].get_legend_handles_labels(), loc=10)
@@ -587,6 +596,11 @@ class Plot(object):
         invert_xaxis = kwargs.pop('invert_xaxis', False)
         invert_yaxis = kwargs.pop('invert_yaxis', False)
         ylim = kwargs.pop('ylim', False)
+        titles = kwargs.pop('titles', False)
+        # pdb.set_trace()
+        if titles is not None:
+            for ax, title in zip(self.axes, titles[0]):
+                ax.set_title(title)
         if ylim:
             self.set_ylim(ylim)
         else:
@@ -598,7 +612,10 @@ class Plot(object):
             if invert_yaxis:
                 ax.invert_yaxis()
             ax.set_xlabel(xlabel)
-            ax.set_ylabel(ylabel)
+
+        self.axes[0].set_ylabel(ylabel)
+        plt.setp(self.axes[1].get_yticklabels(), visible=False)
+        # plt.setp(self.axes[2].get_yticklabels(), visible=False)
 
         # sns.despine(fig=self.fig)
         # pdb.set_trace()
@@ -611,6 +628,7 @@ class Plot(object):
         for fig, label in zip(self.figs, self.labels):
             fig.subplots_adjust(**self.adjusts[len(self.figs)])
             fig.savefig(fname + '_' + label + self.filextension)
+            # plt.show()
             plt.close(fig)
 
 
@@ -623,8 +641,8 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        # pt.plot_linkpos_fill_between()
-        pt.plot_split()
+        pt.plot_linkpos_fill_between()
+        # pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()
