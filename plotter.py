@@ -70,6 +70,7 @@ class Plotter(object):
                 x = sorted(df['distance-to-go'].unique().tolist())
                 first = [df[df['distance-to-go'] == dtg]['linkpos_first'].mean()
                          for dtg in range(1, k)]
+                pdb.set_trace()
                 last = [df[df['distance-to-go'] == dtg]['linkpos_last'].mean()
                         for dtg in range(1, k)]
                 length = [df[df['distance-to-go'] == dtg]['word_count'].mean()
@@ -78,7 +79,6 @@ class Plotter(object):
                 # normalization
                 first = [e/l for e, l in zip(first, length)]
                 last = [e/l for e, l in zip(last, length)]
-                # pdb.set_trace()
                 if full:
                     p.add_fill_between(x, first, last, color=c, col=col, gl=k,
                                        label='link occurrence')
@@ -98,9 +98,9 @@ class Plotter(object):
                 #            ls='dotted')
 
         path = os.path.join(self.plot_folder, 'linkpos' + fname_suffix)
-        p.finish(path, suptitle='Clicked Link Position', titles=titles,
+        p.finish(path, suptitle='Clicked Link Position', # titles=titles,
                  xlabel=xlabel, ylabel='Fraction of article length', legend='all',
-                 invert_yaxis=True)
+                 invert_yaxis=True, ylim=(0,1))
         plt.rcParams['legend.fontsize'] = fontsize_old
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
@@ -577,7 +577,7 @@ class Plot(object):
             fig.canvas.draw()
             bbi = lgd.get_window_extent()  # legend bounding box in display units
             bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
-            bbit_exp = bbit.expanded(1.1, 1.1)  # expanded
+            bbit_exp = bbit.expanded(1.0, 1.0)  # expanded
             fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
         else:
             lgd = plt.figlegend(*fig_data.axes[0].get_legend_handles_labels(), loc=10)
@@ -598,7 +598,7 @@ class Plot(object):
         ylim = kwargs.pop('ylim', False)
         titles = kwargs.pop('titles', False)
         # pdb.set_trace()
-        if titles is not None:
+        if titles:
             for ax, title in zip(self.axes, titles[0]):
                 ax.set_title(title)
         if ylim:
@@ -614,7 +614,7 @@ class Plot(object):
             ax.set_xlabel(xlabel)
 
         self.axes[0].set_ylabel(ylabel)
-        plt.setp(self.axes[1].get_yticklabels(), visible=False)
+        # plt.setp(self.axes[1].get_yticklabels(), visible=False)
         # plt.setp(self.axes[2].get_yticklabels(), visible=False)
 
         # sns.despine(fig=self.fig)
@@ -642,7 +642,7 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
         pt.plot_linkpos_fill_between()
-        # pt.plot_split()
+        pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()
