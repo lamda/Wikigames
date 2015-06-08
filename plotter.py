@@ -17,7 +17,7 @@ import seaborn as sns
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
 # colors = ["#9b59b6", "#3498db", "#95a5a6", "#e74c3c", "#34495e", "#2ecc71",
-colors = [ "#2ecc71","#3498db", "#e74c3c", "#9b59b6",  "#34495e", "#95a5a6",
+colors = ["#2ecc71","#3498db", "#e74c3c", "#9b59b6",  "#34495e", "#95a5a6",
           "#4C72B0", "#55A868", "#C44E52", "#8172B2", "#CCB974", "#64B5CD"]
 sns.set_palette(sns.color_palette(colors))
 
@@ -50,7 +50,51 @@ class Plotter(object):
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
-    def plot_linkpos_fill_between(self, data=None, labels=None, fname_suffix='',
+    def plot_linkpos_fill_between(self, fname_suffix='', full=True):
+        print('plot_linkpos_fill_between()')
+        xlabel = 'Distance to-go to target'
+        game_lengths = [4, 5, 6]
+        labels = ['GL_%s' % gl for gl in game_lengths]
+        for label, dataset in self.data.items():
+            p = Plot(labels, len(game_lengths))
+            for col, k, c, m in zip(range(len(game_lengths)), game_lengths,
+                                    self.colors, self.markers):
+                df = dataset[dataset['pl'] == k]
+                df = df.dropna()
+                x = sorted(df['distance-to-go'].unique().tolist())
+                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].median()
+                         for dtg in range(1, k)]
+                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].median()
+                        for dtg in range(1, k)]
+                length = [df[df['distance-to-go'] == dtg]['word_count'].median()
+                          for dtg in range(1, k)]
+                # normalization
+                first = [e/l for e, l in zip(first, length)]
+                last = [e/l for e, l in zip(last, length)]
+
+                if full:
+                    p.add_fill_between(x, first, last, color=c, col=col, gl=k,
+                                       label='possible link position')
+                    p.add_plot(x, first, color=c, col=col, lw=0.5)
+                    p.add_plot(x, last, color=c, col=col, lw=0.5)
+                    if 'linkpos_actual' in df.columns:
+                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].median()
+                                  for dtg in range(1, k)]
+                        # normalization
+                        actual = [e/l for e, l in zip(actual, length)]
+                        p.add_plot(x, actual, color=c, col=col,
+                                   label='actual link position', ls='dashed')
+                else:
+                    p.add_plot(x, first, color=c, marker=m, col=col,
+                               label='link position')
+
+            path = os.path.join(self.plot_folder,
+                                'linkpos_' + label + fname_suffix)
+            p.finish(path, legend='all', xlabel=xlabel, ylim=(0, 1),
+                     ylabel='Fraction of article length',
+                     invert_xaxis=True, invert_yaxis=True)
+
+    def plot_linkpos_fill_between_old(self, data=None, labels=None, fname_suffix='',
                                   full=True):
         fontsize_old = plt.rcParams['legend.fontsize']
         plt.rcParams['legend.fontsize'] = 7.5
@@ -476,17 +520,9 @@ class Plot(object):
     def __init__(self, labels, ncols=1, filextension='.pdf'):
         """create the plot"""
         self.filextension = filextension
-        self.figsizes = {
-            2: (5, 3),
-            3: (5, 3),
-            4: (5, 3)
-        }
-        self.adjusts = {
-            2: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90},
-            3: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90},
-            4: {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90}
-        }
-        self.figs = [plt.figure(figsize=self.figsizes[ncols]) for n in range(ncols)]
+        self.figsize = (5, 3)
+        self.adjust = {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90}
+        self.figs = [plt.figure(figsize=self.figsize) for n in range(ncols)]
         self.labels = [l.lower() for l in labels]
         self.axes = [f.add_subplot(111) for f in self.figs]
 
@@ -513,20 +549,30 @@ class Plot(object):
         gl = kwargs.pop('gl', False)
         label = kwargs.pop('label', None)
         if label:
-            ax.plot(None, label=' ', lw=10, alpha=0.0, **kwargs)
-            ax.plot(None, label='Game Length %s' % gl, lw=10, alpha=0.0, **kwargs)
+            # ax.plot(None, label=' ', lw=10, alpha=0.0, **kwargs)
+            # ax.plot(None, label='Game Length %s' % gl, lw=10, alpha=0.0, **kwargs)
             ax.plot(None, label=label, lw=10, alpha=0.2, **kwargs)
         ax.fill_between(x, first, second, alpha=0.2, **kwargs)
 
-    def match_ylim(self):
-        ylim_lower = min(a.get_ylim()[0] for a in self.axes)
-        ylim_upper = max(a.get_ylim()[1] for a in self.axes)
+    def set_xlim(self, xlim):
         for ax in self.axes:
-            ax.set_ylim(ylim_lower, ylim_upper)
+            ax.set_ylim(xlim[0], xlim[1])
 
     def set_ylim(self, ylim):
         for ax in self.axes:
             ax.set_ylim(ylim[0], ylim[1])
+
+    def match_xlim(self):
+        xlim_lower = min(min(a.get_xlim()) for a in self.axes)
+        xlim_upper = max(max(a.get_xlim()) for a in self.axes)
+        for ax in self.axes:
+            ax.set_xlim(xlim_lower, xlim_upper)
+
+    def match_ylim(self):
+        ylim_lower = min(min(a.get_ylim()) for a in self.axes)
+        ylim_upper = max(max(a.get_ylim()) for a in self.axes)
+        for ax in self.axes:
+            ax.set_ylim(ylim_lower, ylim_upper)
 
     def add_margin(self, margin=0.05):
         for ax in self.axes:
@@ -573,6 +619,8 @@ class Plot(object):
         fig = plt.figure()
         if horizontal:
             data = fig_data.axes[0].get_legend_handles_labels()
+            for d in data[0]:
+                d.set_color('#555555')
             lgd = plt.figlegend(*data, loc=10, ncol=6)
             fig.canvas.draw()
             bbi = lgd.get_window_extent()  # legend bounding box in display units
@@ -595,16 +643,20 @@ class Plot(object):
         ylabel = kwargs.pop('ylabel', suptitle)
         invert_xaxis = kwargs.pop('invert_xaxis', False)
         invert_yaxis = kwargs.pop('invert_yaxis', False)
-        ylim = kwargs.pop('ylim', False)
         titles = kwargs.pop('titles', False)
-        # pdb.set_trace()
+
         if titles:
             for ax, title in zip(self.axes, titles[0]):
                 ax.set_title(title)
-        if ylim:
-            self.set_ylim(ylim)
+        if 'xlim' in kwargs:
+            self.set_xlim(kwargs['xlim'])
+        else:
+            self.match_xlim()
+        if 'ylim' in kwargs:
+            self.set_ylim(kwargs['ylim'])
         else:
             self.match_ylim()
+
         self.add_margin()
         for ax in self.axes:
             if invert_xaxis:
@@ -612,8 +664,10 @@ class Plot(object):
             if invert_yaxis:
                 ax.invert_yaxis()
             ax.set_xlabel(xlabel)
+            if ylabel:
+                ax.set_ylabel(ylabel)
 
-        self.axes[0].set_ylabel(ylabel)
+        # self.axes[0].set_ylabel(ylabel)
         # plt.setp(self.axes[1].get_yticklabels(), visible=False)
         # plt.setp(self.axes[2].get_yticklabels(), visible=False)
 
@@ -626,7 +680,7 @@ class Plot(object):
         #     self.ylabeltok()
 
         for fig, label in zip(self.figs, self.labels):
-            fig.subplots_adjust(**self.adjusts[len(self.figs)])
+            fig.subplots_adjust(**self.adjust)
             fig.savefig(fname + '_' + label + self.filextension)
             # plt.show()
             plt.close(fig)
@@ -642,7 +696,7 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
         pt.plot_linkpos_fill_between()
-        pt.plot_split()
+        # pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()
