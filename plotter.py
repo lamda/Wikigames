@@ -159,13 +159,13 @@ class Plotter(object):
             # ('spl_target', 'Shortest Path Length to Target', ''),
             # ('tfidf_target', 'TF-IDF similarity to Target', ''),
             # ('degree_out', 'Outdegree', ''),
-            ('degree_in', 'Indegree', 'indegree'),
+            # ('degree_in', 'Indegree', 'indegree'),
             # ('ngram', 'N-Gram Occurrences', 'occurrences (log)'),
             # ('view_count', 'View Count', 'view count'),
             # ('category_depth', 'Category Specificity', 'category depth'),
             # ('category_target', 'Category Distance to target', ''),
-            # ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
-            # ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
+            ('linkpos_ib', 'Fraction of clicked Links in Infobox', 'Fraction of links'),
+            ('linkpos_lead', 'Fraction of clicked Links in Lead', 'Fraction of links'),
             # ('link_context', 'Number of Links +/- 10 words from clicked link', 'Number of links'),
 
             # ('perc_deg_in', 'Indegree Percentage', ''),
@@ -199,7 +199,7 @@ class Plotter(object):
             if 'perc' in feature:
                 ylim = (0.2, 0.7)
             elif 'linkpos' in feature:
-                ylim = (0, 0.5)
+                ylim = (0, 0.55)
             else:
                 ylim = None
             path = os.path.join(self.plot_folder, feature + fname_suffix)
@@ -325,12 +325,12 @@ class Plotter(object):
             # '_users',
         ]
         for dataset, label, suffix in zip(data, labels, suffices):
-            # self.plot_comparison(dataset, label, fname_suffix=suffix)
+            self.plot_comparison(dataset, label, fname_suffix=suffix)
 
-            del data[0]['all']
-            del labels[0][0]
-            self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
-                                           full=False)
+            # del data[0]['all']
+            # del labels[0][0]
+            # self.plot_linkpos_fill_between(dataset, label, fname_suffix=suffix,
+            #                                full=False)
 
     def feature_combinations(self, features):
         for ai, a in enumerate(features):
@@ -472,9 +472,9 @@ def plot_models():
         titles = np.array([['Game length ' + str(int(l))
                             for l in sorted(df_label['pl'].unique())]])
         fpath = os.path.join('plots', 'models_' + label.replace(' ', '_'))
-        p.finish(fpath, suptitle=label2title[label], titles=titles,
+        p.finish(fpath, suptitle=label2title[label],
                  legend='single', xlabel='Distance to-go to target',
-                 ylabel='KL divergence (bits)')
+                 ylabel='KL divergence (bits)', invert_xaxis=True)
 
 
 def print_models():
@@ -614,13 +614,15 @@ class Plot(object):
             ytl = [str(int(int(l) / 1000)) + 'k' if l else '' for l in ytl]
             ax.set_yticklabels(ytl)
 
-    def plot_legend(self, fig_data, fname, horizontal=True):
+    def plot_legend(self, fig_data, fname, horizontal=True, grayscales=False):
         # plot the legend in a separate plot
         fig = plt.figure()
-        if horizontal:
-            data = fig_data.axes[0].get_legend_handles_labels()
+        data = fig_data.axes[0].get_legend_handles_labels()
+        if grayscales:
             for d in data[0]:
                 d.set_color('#555555')
+
+        if horizontal:
             lgd = plt.figlegend(*data, loc=10, ncol=6)
             fig.canvas.draw()
             bbi = lgd.get_window_extent()  # legend bounding box in display units
@@ -628,7 +630,7 @@ class Plot(object):
             bbit_exp = bbit.expanded(1.0, 1.0)  # expanded
             fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
         else:
-            lgd = plt.figlegend(*fig_data.axes[0].get_legend_handles_labels(), loc=10)
+            lgd = plt.figlegend(*data, loc=10)
             fig.canvas.draw()
             bbi = lgd.get_window_extent()  # legend bounding box in display units
             bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
@@ -643,9 +645,9 @@ class Plot(object):
         ylabel = kwargs.pop('ylabel', suptitle)
         invert_xaxis = kwargs.pop('invert_xaxis', False)
         invert_yaxis = kwargs.pop('invert_yaxis', False)
-        titles = kwargs.pop('titles', False)
+        titles = kwargs.pop('titles', None)
 
-        if titles:
+        if titles is not None:
             for ax, title in zip(self.axes, titles[0]):
                 ax.set_title(title)
         if 'xlim' in kwargs:
@@ -695,8 +697,8 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_linkpos_fill_between()
-        # pt.plot_split()
+        # pt.plot_linkpos_fill_between()
+        pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()
