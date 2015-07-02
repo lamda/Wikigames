@@ -83,7 +83,7 @@ class Plotter(object):
                         # normalization
                         actual = [e/l for e, l in zip(actual, length)]
                         p.add_plot(x, actual, color=c, col=col,
-                                   label='actual link position', ls='dashed')
+                                   label='clicked link position', ls='dashed')
                 else:
                     p.add_plot(x, first, color=c, marker=m, col=col,
                                label='link position')
@@ -92,60 +92,8 @@ class Plotter(object):
                                 'linkpos_' + label + fname_suffix)
             p.finish(path, legend='all', xlabel=xlabel, ylim=(0, 1),
                      ylabel='Fraction of article length',
-                     invert_xaxis=True, invert_yaxis=True)
-
-    def plot_linkpos_fill_between_old(self, data=None, labels=None, fname_suffix='',
-                                  full=True):
-        fontsize_old = plt.rcParams['legend.fontsize']
-        plt.rcParams['legend.fontsize'] = 7.5
-        if data is None:
-            data = self.data
-        if labels is None:
-            labels = self.labels
-        print('linkpos()')
-        xlabel = 'Distance to-go to target'
-        titles = np.array([labels])
-        p = Plot(labels, len(data))
-        for k, c, m in zip([4, 5, 6], self.colors, self.markers):
-            for label, dataset in data.items():
-                col = labels.index(label)
-                df = dataset[dataset['pl'] == k]
-                df = df.dropna()
-                x = sorted(df['distance-to-go'].unique().tolist())
-                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].mean()
-                         for dtg in range(1, k)]
-                pdb.set_trace()
-                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].mean()
-                        for dtg in range(1, k)]
-                length = [df[df['distance-to-go'] == dtg]['word_count'].mean()
-                          for dtg in range(1, k)]
-
-                # normalization
-                first = [e/l for e, l in zip(first, length)]
-                last = [e/l for e, l in zip(last, length)]
-                if full:
-                    p.add_fill_between(x, first, last, color=c, col=col, gl=k,
-                                       label='link occurrence')
-                    p.add_plot(x, first, color=c, col=col, lw=0.5)
-                    p.add_plot(x, last, color=c, col=col, lw=0.5)
-                    if 'linkpos_actual' in df.columns:
-                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].mean()
-                                  for dtg in range(1, k)]
-                        # normalization
-                        actual = [e/l for e, l in zip(actual, length)]
-                        p.add_plot(x, actual, color=c, col=col,
-                                   label='actual link position', ls='dashed')
-                else:
-                    p.add_plot(x, first, color=c, marker=m, col=col,
-                               label='link position')
-                # p.add_plot(x, length, color=c, col=col, label='article length',
-                #            ls='dotted')
-
-        path = os.path.join(self.plot_folder, 'linkpos' + fname_suffix)
-        p.finish(path, suptitle='Clicked Link Position', # titles=titles,
-                 xlabel=xlabel, ylabel='Fraction of article length', legend='all',
-                 invert_yaxis=True, ylim=(0,1))
-        plt.rcParams['legend.fontsize'] = fontsize_old
+                     invert_xaxis=True, invert_yaxis=True,
+                     legend_grayscales=True)
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
         """draw comparison plots for multiple datasets"""
@@ -354,6 +302,7 @@ class Plotter(object):
                 r = scipy.stats.pearsonr(df[f1], df[f2])[0]
                 rho = scipy.stats.spearmanr(df[f1], df[f2])[0]
                 tau = scipy.stats.kendalltau(df[f1], df[f2])[0]
+                df.corr()
 
                 print('    r = %.2f, rho = %.2f, tau = %.2f\n' % (r, rho, tau))
 
@@ -674,8 +623,9 @@ class Plot(object):
         # plt.setp(self.axes[2].get_yticklabels(), visible=False)
 
         # sns.despine(fig=self.fig)
-        # pdb.set_trace()
-        self.plot_legend(self.figs[0], fname)
+
+        legend_grayscales = kwargs.pop('legend_grayscales', False)
+        self.plot_legend(self.figs[0], fname, grayscales=legend_grayscales)
         # self.set_only_integer_xticks()
         # self.set_only_integer_yticks()
         # if kwargs.pop('ylabeltok', False):
@@ -697,8 +647,8 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        # pt.plot_linkpos_fill_between()
-        pt.plot_split()
+        pt.plot_linkpos_fill_between()
+        # pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()

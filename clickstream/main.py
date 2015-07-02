@@ -13,7 +13,7 @@ import random
 import re
 import urllib2
 
-import numpy as np
+# import numpy as np
 import pandas as pd
 
 
@@ -21,6 +21,18 @@ import pandas as pd
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
 url_opener = urllib2.build_opener()
+
+
+def get_internal_clicks():
+    fname = '2015_02_clickstream_preview.tsv'
+    # fname = '2015_02_clickstream.tsv'
+    df = pd.read_csv(fname, sep='\t')
+    df = df[['prev_id', 'curr_id', 'n', 'type']]
+    # total = df['n'].sum()
+    link = df[df['type'] == 'link']['n'].sum()
+    other = df[df['type'] == 'other']['n'].sum()
+    print('total=%d, link=%d, other=%d' % (link+other, link, other))
+    pdb.set_trace()
 
 
 def convert_clickstream_to_pandas():
@@ -307,7 +319,7 @@ if __name__ == '__main__':
     # analyze_clicks(titles, split_type='first')
     # analyze_click_positions(titles)
 
-    print_results()
+    # print_results()
 
-
+    get_internal_clicks()
 
