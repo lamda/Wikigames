@@ -246,18 +246,42 @@ class Plotter(object):
             print(label, df['mission'].value_counts(), df.shape)
 
     def print_ambiguous_click_stats(self):
-        print('Statistics for WIKTI')
-        df = self.data['WIKTI']
-        pdb.set_trace()
+        for label in self.data:
+            df = self.data[label]
+            print('Statistics for', label)
 
-        df = df[['linkpos_first', 'linkpos_last', 'linkpos_actual',
-                 'degree_out', 'degree_in', 'ngram',
-                 # 'view_count'
-                 ]]
-        df['ambiguous'] = df['linkpos_first'] != df['linkpos_last']
-        df['degree_out_next'] = 1 TODO
+            features = [
+                'degree_out',
+                'degree_in',
+                'ngram',
+                # 'view_count',
+            ]
+            base = ['linkpos_first', 'linkpos_last', 'subject']
+            if 'linkpos_actual' in df.columns:
+                base += ['linkpos_actual']
+            df = df[base + features]
+            df['ambiguous'] = df['linkpos_first'] != df['linkpos_last']
+            for f in features:
+                df[f + '_next'] = df[f].shift(-1)
+            df = df.dropna()
+            ctr = df['ambiguous'].value_counts()
+            total = ctr.sum()
 
-        pdb.set_trace()
+            print('%d clicks total' % total)
+            print('%.2f%% (%d) unambiguous clicks' %
+                  (100*ctr[False]/total, ctr[False]))
+            print('%.2f%% (%d) ambiguous clicks' %
+                  (100*ctr[True]/total, ctr[True]))
+
+            df_amb = df[df['ambiguous']]
+            df_unamb = df[~df['ambiguous']]
+
+            for f in features:
+                print('%.2f (amb.), %.2f (unamb.) for %s'
+                      % (df_amb[f].mean(), df_unamb[f].mean(), f))
+            print('\n\n')
+
+    # pdb.set_trace()
 
     def plot_split(self):
         print('plot_split()')
@@ -656,8 +680,8 @@ if __name__ == '__main__':
     for pt in [
         # Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
-        Plotter(['WIKTI']),
-        # Plotter(['WIKTI', 'Wikispeedia']),
+        # Plotter(['WIKTI']),
+        Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
