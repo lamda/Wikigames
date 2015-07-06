@@ -245,6 +245,20 @@ class Plotter(object):
             df['mission'] = df['start'] + '-' + df['target']
             print(label, df['mission'].value_counts(), df.shape)
 
+    def print_ambiguous_click_stats(self):
+        print('Statistics for WIKTI')
+        df = self.data['WIKTI']
+        pdb.set_trace()
+
+        df = df[['linkpos_first', 'linkpos_last', 'linkpos_actual',
+                 'degree_out', 'degree_in', 'ngram',
+                 # 'view_count'
+                 ]]
+        df['ambiguous'] = df['linkpos_first'] != df['linkpos_last']
+        df['degree_out_next'] = 1 TODO
+
+        pdb.set_trace()
+
     def plot_split(self):
         print('plot_split()')
         df = self.data['Wikispeedia']
@@ -642,18 +656,19 @@ if __name__ == '__main__':
     for pt in [
         # Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
-        # Plotter(['WIKTI']),
-        Plotter(['WIKTI', 'Wikispeedia']),
+        Plotter(['WIKTI']),
+        # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        pt.plot_linkpos_fill_between()
+        # pt.plot_linkpos_fill_between()
         # pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.print_click_stats()
+        pt.print_ambiguous_click_stats()
         # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()
