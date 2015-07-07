@@ -46,7 +46,7 @@ class Plotter(object):
             ]
             print(label, 'data loaded\n')
 
-        self.plot_folder = os.path.join('plots')
+        self.plot_folder = 'plots'
         if not os.path.exists(self.plot_folder):
             os.makedirs(self.plot_folder)
 
@@ -248,6 +248,7 @@ class Plotter(object):
     def print_ambiguous_click_stats(self):
         for label in self.data:
             df = self.data[label]
+            df = df[~df['backtrack']]
             print('Statistics for', label)
 
             features = [
@@ -256,7 +257,7 @@ class Plotter(object):
                 'ngram',
                 # 'view_count',
             ]
-            base = ['linkpos_first', 'linkpos_last', 'subject']
+            base = ['linkpos_first', 'linkpos_last', 'subject', 'word_count']
             if 'linkpos_actual' in df.columns:
                 base += ['linkpos_actual']
             df = df[base + features]
@@ -281,7 +282,24 @@ class Plotter(object):
                       % (df_amb[f].mean(), df_unamb[f].mean(), f))
             print('\n\n')
 
-    # pdb.set_trace()
+            ylim = (0, 0.00035)
+
+            fig = plt.figure()
+            df_unamb['linkpos_first'].plot(kind='kde', label='linkpos_first')
+            df_unamb['word_count'].plot(kind='kde', label='word count')
+            plt.legend()
+            plt.ylim(ylim)
+            plt.savefig(os.path.join(self.plot_folder, 'unamb.png'))
+            plt.close(fig)
+
+            fig = plt.figure()
+            df_amb['linkpos_first'].plot(kind='kde', label='linkpos_first')
+            df_amb['word_count'].plot(kind='kde', label='word count')
+            df_amb['linkpos_last'].plot(kind='kde', label='linkpos_last')
+            plt.legend()
+            plt.ylim(ylim)
+            plt.savefig(os.path.join(self.plot_folder, 'amb.png'))
+            plt.close(fig)
 
     def plot_split(self):
         print('plot_split()')
@@ -680,8 +698,8 @@ if __name__ == '__main__':
     for pt in [
         # Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
-        # Plotter(['WIKTI']),
-        Plotter(['WIKTI', 'Wikispeedia']),
+        Plotter(['WIKTI']),
+        # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
