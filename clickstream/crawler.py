@@ -25,6 +25,7 @@ class Crawler(object):
             # not relevant
             'Newshounds', 'Directdebit', 'Wowpurchase', 'Friend_Directdebit',
             'Sponsorship_Directdebit',
+            'Wikipedia_Text_of_the_GNU_Free_Documentation_License',
             # missing
             'Bionicle__Mask_of_Light',
             'Star_Wars_Episode_IV__A_New_Hope',
@@ -36,6 +37,7 @@ class Crawler(object):
             'Anne_of_Great_Britain',
             'Bantu',
             'Battle_of_Amiens',
+            'Battle_of_Normandy',
             'Bj%C3%B8rn%C3%B8ya',
             'Blackbird',
             'Boa',
@@ -50,6 +52,7 @@ class Crawler(object):
             'Extinct_birds',
             'Firecrest',
             'Forth',
+            'Gallery_of_the_Kings_and_Queens_of_England',
             'Garage_%28dance_music%29',
             'Green_Woodpecker',
             'Helen',
@@ -72,6 +75,7 @@ class Crawler(object):
             'Sputnik_program',
             'Weymouth',
             'William_Gilbert',
+            'Winfield_Scott_%2528ship%2529',
             'Woodruff',
             'Wood_Pigeon',
             'Zulu',
@@ -103,6 +107,7 @@ class Crawler(object):
             'UK_garage',
             'European_green_woodpecker',
             'Helen_of_Troy',
+            'List_of_English_monarchs',
             'European_herring_gull',
             'Lake_Albert_(Africa)',
             'Market_(economics)',
@@ -113,6 +118,7 @@ class Crawler(object):
             'Recorder_(musical_instrument)',
             'Reseau_Express_Regional',
             'City_of_Salford',
+            'Operation_Overlord',
             'Outwash_plain',
             'Scent_of_a_Woman_(1992_film)',
             'Sequoia_(genus)',
@@ -123,9 +129,14 @@ class Crawler(object):
             'William_Gilbert_(astronomer)',
             'Galium_odoratum',
             'Common_wood_pigeon',
+            'SS_Winfield_Scott',
             'Zulu_people',
         }
         titles_all = (titles_all - titles_wrong) | titles_right
+        with io.open('../data/Wikispeedia/wpcd/wp_titles.txt', 'w',
+                     encoding='utf-8') as outfile:
+            for t in sorted(titles_all):
+                outfile.write(t + '\n')
         print(len(titles_all), 'titles total')
         file_titles = set(f[:-4] for f in os.listdir(self.data_dir))
         self.titles = titles_all - file_titles
@@ -181,7 +192,5 @@ class Logger(object):
 
 
 if __name__ == '__main__':
-    # c = Crawler(limit=1)
     c = Crawler()
     c.crawl_twisted()
-    # TODO: many downloaded files have different titles because of redirects

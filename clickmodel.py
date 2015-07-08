@@ -36,7 +36,6 @@ class ClickModel(object):
         self.data = [self.data[k] / total for k in sorted(self.data)]
 
 
-
 class GroundTruthModel(ClickModel):
     def __init__(self, df):
         self.label = 'GroundTruth'

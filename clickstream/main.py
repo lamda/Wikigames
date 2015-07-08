@@ -306,15 +306,14 @@ def print_results():
 
 
 if __name__ == '__main__':
+    titles = get_titles()
+    get_wiki_pages(titles)
+    # compute_link_positions(titles)
 
     # pos2link, lead_length = pd.read_pickle('link_positions.obj')
     # id2title = pd.read_pickle('id2title.obj')
     # title2id = {v: k for k, v in id2title.iteritems()}
     # title2redirect = pd.read_pickle('title2redirect.obj')
-
-    # titles = get_titles()
-    # get_wiki_pages(titles)
-    # compute_link_positions(titles)
 
     # analyze_clicks(titles, split_type='first')
     # analyze_click_positions(titles)
