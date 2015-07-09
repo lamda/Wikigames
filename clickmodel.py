@@ -61,6 +61,7 @@ class UniformModel(ClickModel):
             print(kidx, '/', len(keys), end='\r')
             df_sub = grouped.get_group(key)
             targets = set(df_sub['node_next'])
+            pdb.set_trace()
             for t in targets:
                 self.data[t] += len(df_sub) / len(targets)
         self.normalize()
@@ -127,33 +128,28 @@ class InverseModel(ClickModel):
         self.normalize()
 
 
-def get_df():
+def get_df_w4s():
+    # includes both successful and unsuccessful games, all for spl = 3
     path = os.path.join('data', 'WIKTI', 'data.obj')
     # path = os.path.join('data', 'Wikispeedia', 'data.obj')
     df = pd.read_pickle(path)
+    df = df[['node', 'node_id', 'linkpos_first', 'linkpos_last',
+             'backtrack', 'subject']]
+    df['target'] = df['node'].shift(-1)
+    df['target_id'] = df['node_id'].shift(-1)
+    df.columns = ['source', 'source_id'] + df.columns[2:].tolist()
     df = df[~df['backtrack']]
-    # includes both successful and unsuccessful games, all for spl = 3
-    features = [
-        'degree_out',
-        'degree_in',
-        'ngram',
-        'view_count',
-    ]
-    base = ['node', 'linkpos_first', 'linkpos_last', 'subject', 'word_count']
-    if 'linkpos_actual' in df.columns:
-        base += ['linkpos_actual']
-    df = df[base + features]
-    df['ambiguous'] = df['linkpos_first'] != df['linkpos_last']
-    # for f in features:
-    #     df[f + '_next'] = df[f].shift(-1)
-    # df = df.dropna()
-
-    df['node_next'] = df['node'].shift(-1)
+    df = df[['source', 'source_id', 'linkpos_first', 'linkpos_last',
+             'target', 'target_id']]
+    df['linkpos_ambig'] = df['linkpos_first'] != df['linkpos_last']
     df = df.dropna()
+    df['amount'] = df.groupby(['source', 'target']).transform('count')['source_id']
+    df = df.drop_duplicates(subset=['source', 'target'])
     return df
 
+
 if __name__ == '__main__':
-    df = get_df()
+    df = get_df_w4s()
     gt = GroundTruthModel(df)
     models = [
         UniformModel,
