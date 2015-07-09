@@ -40,6 +40,7 @@ class GroundTruthModel(ClickModel):
     def __init__(self, df):
         self.label = 'GroundTruth'
         super(GroundTruthModel, self).__init__(df)
+        # TODO: sum over targets
         self.data = {k: v
                      for k, v in df['node_next'].value_counts().iteritems()}
         self.normalize()
@@ -148,9 +149,17 @@ def get_df_w4s():
     return df
 
 
+def get_df_wikipedia():
+    # includes all paths of length > 1
+    path = os.path.join('clickstream', 'DataHandler_aggregate_clicks.obj')
+    df = pd.read_pickle(path).values()[0]
+    return df
+
 if __name__ == '__main__':
     df = get_df_w4s()
+    # df = get_df_wikipedia()
     gt = GroundTruthModel(df)
+
     models = [
         UniformModel,
         # IndirectProportionModel,
