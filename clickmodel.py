@@ -16,16 +16,6 @@ pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 400)
 
 
-# load dataframe, group by page
-#     what fraction of pages are visited in our games?
-# compute ground truth model
-#     resulting in a distribution to page visits excluding the start pages
-# compute uniform click model
-# compute linear link pos click model
-# compare distributions with KLD
-# compute pskip model (or something similar)
-
-
 class ClickModel(object):
     def __init__(self, df):
         self.df = df
@@ -121,6 +111,15 @@ class InverseModel(ClickModel):
             for k, v in node2p.items():
                 self.data[k] += v * self.total_clicks[key] / total
         self.normalize()
+
+
+class PSkipModel(ClickModel):
+    def __init__(self):
+        # introduce a parameter to only run models on unambiguous clicks
+        # estimate on all unambiguous clicks and apply to all clicks
+        # for each click: get r=number of skipped possible clicks before click
+        # learn alpha = (\sum_i (r_i p(x_i))) / (\sum_i (1+r_i) p(x_i))
+        pass
 
 
 def get_df_w4s(wikti=False):
