@@ -13,6 +13,9 @@ import pandas as pd
 import scipy
 import seaborn as sns
 
+from clickmodel import get_df_wikigame, get_df_wikipedia
+
+
 # set a few options
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 1000)
@@ -533,6 +536,22 @@ def print_models():
                     print('            %.2f\t%s' % (r[1], r[0]))
 
 
+def plot_click_models():
+    for df, label in [
+        (get_df_wikigame(), 'Wikispeedia'),
+        (get_df_wikipedia(), 'Wikipedia'),
+    ]:
+        amount = df['amount'].sum()
+        first = sum(df['linkpos_first'] * df['amount']) / amount
+        last = sum(df['linkpos_last'] * df['amount']) / amount
+        uniform = np.dot(map(np.mean, df['linkpos_all']), df['amount']) / amount
+        length = sum(df['word_count'] * df['amount']) / amount
+        print('%s (absolute): %.2f (first), %.2f (uniform), %.2f (last)' %
+              (label, first, uniform, last))
+        print('%s (relative): %.2f (first), %.2f (uniform), %.2f (last)' %
+              (label, first/length, uniform/length, last/length))
+
+
 class Plot(object):
     def __init__(self, labels, ncols=1, filextension='.pdf'):
         """create the plot"""
@@ -708,9 +727,9 @@ class Plot(object):
 
 if __name__ == '__main__':
     for pt in [
-        # Plotter(['Wikispeedia']),
+        Plotter(['Wikispeedia']),
         # Plotter(['Wikispeedia'], 4),
-        Plotter(['WIKTI']),
+        # Plotter(['WIKTI']),
         # Plotter(['WIKTI', 'Wikispeedia']),
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
@@ -730,3 +749,5 @@ if __name__ == '__main__':
 
     # plot_models()
     # print_models()
+
+    #plot_click_positions()

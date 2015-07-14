@@ -124,21 +124,21 @@ class PSkipModel(ClickModel):
         pass
 
 
-def get_df_w4s(wikti=False):
+def get_df_wikigame(wikti=False):
     # includes both successful and unsuccessful games, all for spl = 3
     if wikti:
         path = os.path.join('data', 'WIKTI', 'data.obj')
     else:
         path = os.path.join('data', 'Wikispeedia', 'data.obj')
     df = pd.read_pickle(path)
-    df = df[['node', 'node_id', 'linkpos_first', 'linkpos_last',
+    df = df[['node', 'node_id', 'linkpos_first', 'linkpos_last', 'linkpos_all',
              'backtrack', 'subject', 'word_count']]
     df['target'] = df['node'].shift(-1)
     df['target_id'] = df['node_id'].shift(-1)
     df.columns = ['source', 'source_id'] + df.columns[2:].tolist()
     df = df[~df['backtrack']]
     df = df[['source', 'source_id', 'linkpos_first', 'linkpos_last',
-             'word_count', 'target', 'target_id']]
+             'linkpos_all', 'word_count', 'target', 'target_id']]
     df['linkpos_ambig'] = df['linkpos_first'] != df['linkpos_last']
     df = df.dropna()
     df['amount'] = df.groupby(['source', 'target']).transform('count')['source_id']
@@ -155,8 +155,8 @@ def get_df_wikipedia():
 
 if __name__ == '__main__':
     unambig = True
-    df = get_df_w4s(wikti=True)
-    # df = get_df_wikipedia()
+    df = get_df_wikigame(wikti=True)
+    df = get_df_wikipedia()
     gt = GroundTruthModel(df, unambig=unambig)
 
     models = [
