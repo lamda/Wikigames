@@ -541,47 +541,29 @@ class Wikigame(object):
         self.data = df
         self.save_data()
 
-    def add_percentages(self):
+    def add_all_linkpos(self):
+        self.load_link_positions()
+        link2pos_all = {}
+        for article, article_dict in self.pos2link.iteritems():
+            link2pos = defaultdict(list)
+            for k, v in article_dict.iteritems():
+                link2pos[v].append(k)
+            link2pos_all[article] = link2pos
         self.load_data()
         df = self.data
-        self.load_link_positions()
-
-        for label, func in [
-            ('deg_in',
-             lambda x: self.id2deg_in[x]),
-
-            ('ngram',
-             lambda x: ngram.ngram_frequency.get_frequency(self.id2name[x])),
-
-            ('view_count',
-             lambda x: viewcounts.viewcount.get_frequency(self.id2name[x]))
-        ]:
-            print('     getting', label, 'percentage...')
-            perc, av, md = [], [], []
-            for i in range(df.shape[0] - 1):
-                print('         ', i+1, '/', df.shape[0], end='\r')
-                if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
-                        df.iloc[i]['backtrack']:
-                        # data belongs to different missions or is a backtrack
-                    perc.append(np.NaN)
-                    av.append(np.NaN)
-                    md.append(np.NaN)
-                else:
-                    a = df.iloc[i]['node']
-                    b = df.iloc[i+1]['node_id']
-                    data = sorted(func(v) for v in self.pos2link[a].values())
-                    clicked = func(b)
-                    pos = bisect.bisect_left(data, clicked)
-                    perc.append(pos / len(data))
-                    av.append(np.abs(np.mean(data) - clicked))
-                    md.append(np.abs(np.median(data) - clicked))
-            perc.append(np.NaN)
-            av.append(np.NaN)
-            md.append(np.NaN)
-            df['perc_' + label] = perc
-            df['dev_av_' + label] = av
-            df['dev_md_' + label] = md
-
+        links_all = []
+        for i in range(df.shape[0] - 1):
+            print('   ', i+1, '/', df.shape[0], end='\r')
+            if df.iloc[i]['subject'] != df.iloc[i+1]['subject'] or\
+                    df.iloc[i]['backtrack']:
+                    # if data belongs to different missions or is a backtrack
+                links_all.append(np.NaN)
+            else:
+                a = df.iloc[i]['node']
+                b = df.iloc[i+1]['node_id']
+                links_all.append(link2pos_all[a][b])
+        links_all.append(np.NaN)
+        df['linkpos_all'] = links_all
         self.data = df
         self.save_data()
 
@@ -670,12 +652,12 @@ class Wikigame(object):
                         model.DegreeModel,
                         model.ViewCountModel,
                         model.NgramModel,
-                        model.CategoryModel,
+                        # model.CategoryModel,
                         model.TfidfModel,
                         model.LinkPosModel,
-                        model.LinkPosDegreeModel,
-                        model.LinkPosNgramModel,
-                        model.LinkPosViewCountModel,
+                        # model.LinkPosDegreeModel,
+                        # model.LinkPosNgramModel,
+                        # model.LinkPosViewCountModel,
                     ]:
                         mdls.append(mdl(first, pos, self))
 
@@ -1131,12 +1113,12 @@ if __name__ == '__main__':
         # Wikispeedia(successful=False),
     ]:
         # wg.compute_link_positions()
-        wg.create_correlation_data()
+        # wg.create_correlation_data()
         # wg.create_dataframe()
         # wg.complete_dataframe()
         # wg.add_link_context()
         # wg.add_means()
-        # wg.add_percentages()
+        wg.add_all_linkpos()
 
         # wg.compare_models_lead()
         # wg.compare_models_stepwise()

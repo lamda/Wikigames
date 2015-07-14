@@ -62,23 +62,35 @@ class Plotter(object):
                 df = dataset[dataset['pl'] == k]
                 df = df.dropna()
                 x = sorted(df['distance-to-go'].unique().tolist())
-                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].median()
+                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].mean()
                          for dtg in range(1, k)]
-                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].median()
+                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].mean()
                         for dtg in range(1, k)]
-                length = [df[df['distance-to-go'] == dtg]['word_count'].median()
+                length = [df[df['distance-to-go'] == dtg]['word_count'].mean()
                           for dtg in range(1, k)]
+                uniform = [
+                    np.mean(
+                        map(
+                            np.mean,
+                            df[df['distance-to-go'] == dtg]['linkpos_all']
+                        )
+                    )
+                    for dtg in range(1, k)
+                    ]
+
                 # normalization
                 first = [e/l for e, l in zip(first, length)]
                 last = [e/l for e, l in zip(last, length)]
+                uniform = [e/l for e, l in zip(uniform, length)]
 
                 if full:
                     p.add_fill_between(x, first, last, color=c, col=col, gl=k,
                                        label='possible link position')
                     p.add_plot(x, first, color=c, col=col, lw=0.5)
                     p.add_plot(x, last, color=c, col=col, lw=0.5)
+                    p.add_plot(x, uniform, color=c, col=col, lw=0.5, ls='--')
                     if 'linkpos_actual' in df.columns:
-                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].median()
+                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].mean()
                                   for dtg in range(1, k)]
                         # normalization
                         actual = [e/l for e, l in zip(actual, length)]
@@ -703,14 +715,14 @@ if __name__ == '__main__':
         # Plotter(['WIKTI', 'WIKTI2']),
         # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
     ]:
-        # pt.plot_linkpos_fill_between()
+        pt.plot_linkpos_fill_between()
         # pt.plot_split()
 
         # pt.plot_comparison()
         # pt.plot_wikti()
         # pt.print_game_stats()
         # pt.print_click_stats()
-        pt.print_ambiguous_click_stats()
+        # pt.print_ambiguous_click_stats()
         # pt.correlation_clicked()
         # pt.correlation_all()
         # pt.correlation_max()

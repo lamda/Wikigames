@@ -17,8 +17,10 @@ pd.set_option('display.width', 400)
 
 
 class ClickModel(object):
-    def __init__(self, df):
+    def __init__(self, df, unambig=False):
         self.df = df
+        if unambig:
+            pdb.set_trace()
         self.data = collections.defaultdict(float)
         self.keys = set(df['source'])
         self.grouped = df.groupby('source')
@@ -31,9 +33,9 @@ class ClickModel(object):
 
 
 class GroundTruthModel(ClickModel):
-    def __init__(self, df):
+    def __init__(self, df, unambig=False):
         self.label = 'GroundTruth'
-        super(GroundTruthModel, self).__init__(df)
+        super(GroundTruthModel, self).__init__(df, unambig)
         self.data = {k: v for
                      k, v in df.groupby('target')['amount'].sum().iteritems()}
         self.normalize()
@@ -152,9 +154,10 @@ def get_df_wikipedia():
 
 
 if __name__ == '__main__':
-    df = get_df_w4s(wikti=False)
+    unambig = True
+    df = get_df_w4s(wikti=True)
     # df = get_df_wikipedia()
-    gt = GroundTruthModel(df)
+    gt = GroundTruthModel(df, unambig=unambig)
 
     models = [
         UniformModel,
@@ -162,6 +165,6 @@ if __name__ == '__main__':
         InverseRankModel,
         InverseModel,
     ]
-    models = [m(df) for m in models]
+    models = [m(df, unambig=unambig) for m in models]
     for m in models:
         gt.compare(m)

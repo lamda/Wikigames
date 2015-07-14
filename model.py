@@ -176,7 +176,7 @@ class LinkPosModel(NavigationModel):
     def __init__(self, start, pos, wikigame, lead_weight=0.4):
         self.lead_weight = lead_weight
         super(LinkPosModel, self).__init__(start, pos, wikigame,
-                                           'Linkpos')
+                                           'Lead + IB')
 
     def compute(self):
         for i, node in enumerate(self.start):
