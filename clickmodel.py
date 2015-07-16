@@ -129,6 +129,7 @@ def get_df_wikigame(wikti=False):
     if wikti:
         path = os.path.join('data', 'WIKTI', 'data.obj')
     else:
+        # path = os.path.join('data', 'Wikispeedia', 'data_sample.obj')
         path = os.path.join('data', 'Wikispeedia', 'data.obj')
     df = pd.read_pickle(path)
     df = df[['node', 'node_id', 'linkpos_first', 'linkpos_last', 'linkpos_all',
@@ -146,10 +147,13 @@ def get_df_wikigame(wikti=False):
     return df
 
 
-def get_df_wikipedia():
+def get_df_wikipedia(smoothed=False):
     # includes all paths of length > 1
-    path = os.path.join('clickstream', 'DataHandler_aggregate_clicks.obj')
+    fname = 'DataHandler_aggregate_clicks' + ('_smoothed' if smoothed else '')
+    path = os.path.join('clickstream', fname + '.obj')
     df = pd.read_pickle(path).values()[0]
+    if smoothed:
+        df.ix[df['amount'] == 0, 'amount'] = 10
     return df
 
 

@@ -7,6 +7,7 @@ import os
 import pdb
 
 import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -65,16 +66,16 @@ class Plotter(object):
                 df = dataset[dataset['pl'] == k]
                 df = df.dropna()
                 x = sorted(df['distance-to-go'].unique().tolist())
-                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].mean()
+                first = [df[df['distance-to-go'] == dtg]['linkpos_first'].median()
                          for dtg in range(1, k)]
-                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].mean()
+                last = [df[df['distance-to-go'] == dtg]['linkpos_last'].median()
                         for dtg in range(1, k)]
-                length = [df[df['distance-to-go'] == dtg]['word_count'].mean()
+                length = [df[df['distance-to-go'] == dtg]['word_count'].median()
                           for dtg in range(1, k)]
                 uniform = [
-                    np.mean(
+                    np.median(
                         map(
-                            np.mean,
+                            np.median,
                             df[df['distance-to-go'] == dtg]['linkpos_all']
                         )
                     )
@@ -93,7 +94,7 @@ class Plotter(object):
                     p.add_plot(x, last, color=c, col=col, lw=0.5)
                     p.add_plot(x, uniform, color=c, col=col, lw=0.5, ls='--')
                     if 'linkpos_actual' in df.columns:
-                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].mean()
+                        actual = [df[df['distance-to-go'] == dtg]['linkpos_actual'].median()
                                   for dtg in range(1, k)]
                         # normalization
                         actual = [e/l for e, l in zip(actual, length)]
@@ -538,18 +539,55 @@ def print_models():
 
 def plot_click_models():
     for df, label in [
-        (get_df_wikigame(), 'Wikispeedia'),
-        (get_df_wikipedia(), 'Wikipedia'),
+        # (get_df_wikigame(), 'Wikispeedia'),
+        # (get_df_wikipedia(), 'Wikipedia'),
+        (get_df_wikipedia(smoothed=True), 'Wikipedia (smoothed)'),
     ]:
-        amount = df['amount'].sum()
-        first = sum(df['linkpos_first'] * df['amount']) / amount
-        last = sum(df['linkpos_last'] * df['amount']) / amount
-        uniform = np.dot(map(np.mean, df['linkpos_all']), df['amount']) / amount
-        length = sum(df['word_count'] * df['amount']) / amount
-        print('%s (absolute): %.2f (first), %.2f (uniform), %.2f (last)' %
-              (label, first, uniform, last))
-        print('%s (relative): %.2f (first), %.2f (uniform), %.2f (last)' %
-              (label, first/length, uniform/length, last/length))
+        print(label)
+        # # df = df[df['amount'] >= 10]
+        # amount = df['amount'].sum()
+        # first = sum(df['linkpos_first'] * df['amount']) / amount
+        # last = sum(df['linkpos_last'] * df['amount']) / amount
+        # uniform = np.dot(map(np.mean, df['linkpos_all']), df['amount']) / amount
+        # length = sum(df['word_count'] * df['amount']) / amount
+        # print('%s (absolute): %.2f (first), %.2f (uniform), %.2f (last)' %
+        #       (label, first, uniform, last))
+        # print('%s (relative): %.2f (first), %.2f (uniform), %.2f (last)' %
+        #       (label, first/length, uniform/length, last/length))
+
+        # df = df.iloc[:25]
+        first_a, uniform_a, last_a = [], [], []
+        first_r, uniform_r, last_r = [], [], []
+        for ridx, row in enumerate(df.iterrows()):
+            print ('   ', ridx+1, '/', df.shape[0], end='\r')
+            row = row[1]
+            first_a += [row['linkpos_first']] * row['amount']
+            first_r += [row['linkpos_first']/row['word_count']] * row['amount']
+
+            last_a += [row['linkpos_last']] * row['amount']
+            last_r += [row['linkpos_last']/row['word_count']] * row['amount']
+
+            for i in range(row['amount']):
+                pos = np.random.choice(row['linkpos_all'])
+                uniform_a.append(pos)
+                uniform_r.append(pos/row['word_count'])
+
+        for data, suffix, ylim in [
+            ([first_a, uniform_a, last_a], 'absolute', (-400, 16400)),
+            ([first_r, uniform_r, last_r], 'relative', (-0.025, 1.025)),
+        ]:
+            df = pd.DataFrame(data=zip(*data),
+                              columns=['first', 'uniform', 'last'])
+            fpath = os.path.join('data', 'clickmodels')
+            if not os.path.exists(fpath):
+                os.makedirs(fpath)
+            df.to_pickle(os.path.join(fpath, suffix + '_' + label + '.obj'))
+            plt.clf()
+            sns.boxplot(data=df)
+            plt.title(label + ' (' + suffix + ')')
+            fname = 'clicks_' + suffix + '_' + label + '.pdf'
+            plt.ylim(ylim)
+            plt.savefig(os.path.join('plots', fname))
 
 
 class Plot(object):
@@ -726,15 +764,15 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    for pt in [
-        Plotter(['Wikispeedia']),
-        # Plotter(['Wikispeedia'], 4),
-        # Plotter(['WIKTI']),
-        # Plotter(['WIKTI', 'Wikispeedia']),
-        # Plotter(['WIKTI', 'WIKTI2']),
-        # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
-    ]:
-        pt.plot_linkpos_fill_between()
+    # for pt in [
+        # Plotter(['Wikispeedia']),
+    #     # Plotter(['Wikispeedia'], 4),
+    #     # Plotter(['WIKTI']),
+    #     # Plotter(['WIKTI', 'Wikispeedia']),
+    #     # Plotter(['WIKTI', 'WIKTI2']),
+    #     # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
+    # ]:
+        # pt.plot_linkpos_fill_between()
         # pt.plot_split()
 
         # pt.plot_comparison()
@@ -750,4 +788,4 @@ if __name__ == '__main__':
     # plot_models()
     # print_models()
 
-    #plot_click_positions()
+    plot_click_models()
