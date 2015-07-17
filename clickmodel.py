@@ -129,7 +129,6 @@ def get_df_wikigame(wikti=False):
     if wikti:
         path = os.path.join('data', 'WIKTI', 'data.obj')
     else:
-        # path = os.path.join('data', 'Wikispeedia', 'data_sample.obj')
         path = os.path.join('data', 'Wikispeedia', 'data.obj')
     df = pd.read_pickle(path)
     df = df[['node', 'node_id', 'linkpos_first', 'linkpos_last', 'linkpos_all',

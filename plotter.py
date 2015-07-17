@@ -539,23 +539,23 @@ def print_models():
 
 def plot_click_models():
     for df, label in [
-        # (get_df_wikigame(), 'Wikispeedia'),
-        # (get_df_wikipedia(), 'Wikipedia'),
+        (get_df_wikigame(), 'Wikispeedia'),
+        (get_df_wikipedia(), 'Wikipedia'),
         (get_df_wikipedia(smoothed=True), 'Wikipedia (smoothed)'),
     ]:
         print(label)
-        # # df = df[df['amount'] >= 10]
-        # amount = df['amount'].sum()
-        # first = sum(df['linkpos_first'] * df['amount']) / amount
-        # last = sum(df['linkpos_last'] * df['amount']) / amount
-        # uniform = np.dot(map(np.mean, df['linkpos_all']), df['amount']) / amount
-        # length = sum(df['word_count'] * df['amount']) / amount
-        # print('%s (absolute): %.2f (first), %.2f (uniform), %.2f (last)' %
-        #       (label, first, uniform, last))
-        # print('%s (relative): %.2f (first), %.2f (uniform), %.2f (last)' %
-        #       (label, first/length, uniform/length, last/length))
+        # df = df[df['amount'] >= 10]
+        amount = df['amount'].sum()
+        first = sum(df['linkpos_first'] * df['amount']) / amount
+        last = sum(df['linkpos_last'] * df['amount']) / amount
+        uniform = np.dot(map(np.mean, df['linkpos_all']), df['amount']) / amount
+        length = sum(df['word_count'] * df['amount']) / amount
+        print('%s (absolute): %.2f (first), %.2f (uniform), %.2f (last)' %
+              (label, first, uniform, last))
+        print('%s (relative): %.2f (first), %.2f (uniform), %.2f (last)' %
+              (label, first/length, uniform/length, last/length))
 
-        # df = df.iloc[:25]
+        df = df.iloc[:25]
         first_a, uniform_a, last_a = [], [], []
         first_r, uniform_r, last_r = [], [], []
         for ridx, row in enumerate(df.iterrows()):
@@ -582,10 +582,26 @@ def plot_click_models():
             if not os.path.exists(fpath):
                 os.makedirs(fpath)
             df.to_pickle(os.path.join(fpath, suffix + '_' + label + '.obj'))
+
+    for label in [
+        'Wikispeedia',
+        'Wikipedia',
+        'Wikipedia (smoothed)',
+    ]:
+        print(label)
+        for suffix, ylim in [
+            ('absolute', (-400, 16400)),
+            ('relative', (-0.025, 1.025)),
+        ]:
+            print('   ', suffix)
+            fpath = os.path.join('data', 'clickmodels',
+                suffix + '_' + label + '.obj')
+            df = pd.read_pickle(fpath)
+            print('       loaded')
             plt.clf()
             sns.boxplot(data=df)
             plt.title(label + ' (' + suffix + ')')
-            fname = 'clicks_' + suffix + '_' + label + '.pdf'
+            fname = 'clicks_' + suffix + '_' + label + '.png'
             plt.ylim(ylim)
             plt.savefig(os.path.join('plots', fname))
 
@@ -788,4 +804,4 @@ if __name__ == '__main__':
     # plot_models()
     # print_models()
 
-    plot_click_models()
+    # plot_click_models()
