@@ -35,7 +35,7 @@ class DbConnector(object):
         self.db_connection = pymysql.connect(host=self.db_host,
                                              port=3306,
                                              user='root',
-                                             passwd='',
+                                             passwd='master',
                                              db=db,
                                              charset='utf8')
         self.db_cursor = self.db_connection.cursor(pymysql.cursors.DictCursor)

@@ -7,7 +7,7 @@ import os
 import pdb
 
 import matplotlib
-matplotlib.use('Agg')
+# matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -54,7 +54,7 @@ class Plotter(object):
     def plot_linkpos_fill_between(self, fname_suffix='', full=True):
         print('plot_linkpos_fill_between()')
         xlabel = 'Distance to-go to target'
-        game_lengths = [4, 5, 6]
+        game_lengths = [4, 5, 6, 7]
         labels = ['GL_%s' % gl for gl in game_lengths]
         for label, dataset in self.data.items():
             p = Plot(labels, len(game_lengths))
@@ -104,8 +104,8 @@ class Plotter(object):
             path = os.path.join(self.plot_folder,
                                 'linkpos_' + label + fname_suffix)
             p.finish(path, legend='all', xlabel=xlabel, ylim=(0, 1),
-                     ylabel='Fraction of article length',
-                     invert_xaxis=True, invert_yaxis=True,
+                     ylabel='Fraction of article length', invert_xaxis=True,
+                     invert_yaxis=True, keepx=False,
                      legend_grayscales=True)
 
     def plot_comparison(self, data=None, labels=None, fname_suffix=''):
@@ -670,6 +670,8 @@ class Plot(object):
                 ax.set_title(title)
         if 'xlim' in kwargs:
             self.set_xlim(kwargs['xlim'])
+        elif 'keepx' in kwargs and kwargs['keepx']:
+            pass
         else:
             self.match_xlim()
         if 'ylim' in kwargs:
@@ -686,6 +688,7 @@ class Plot(object):
             ax.set_xlabel(xlabel)
             if ylabel:
                 ax.set_ylabel(ylabel)
+        # plt.show()
 
         # self.axes[0].set_ylabel(ylabel)
         # plt.setp(self.axes[1].get_yticklabels(), visible=False)
@@ -708,15 +711,15 @@ class Plot(object):
 
 
 if __name__ == '__main__':
-    # for pt in [
-        # Plotter(['Wikispeedia']),
+    for pt in [
+        Plotter(['Wikispeedia']),
     #     # Plotter(['Wikispeedia'], 4),
     #     # Plotter(['WIKTI']),
     #     # Plotter(['WIKTI', 'Wikispeedia']),
     #     # Plotter(['WIKTI', 'WIKTI2']),
     #     # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
-    # ]:
-        # pt.plot_linkpos_fill_between()
+    ]:
+        pt.plot_linkpos_fill_between()
         # pt.plot_split()
 
         # pt.plot_comparison()
@@ -731,5 +734,3 @@ if __name__ == '__main__':
 
     # plot_models()
     # print_models()
-
-    plot_click_models()
