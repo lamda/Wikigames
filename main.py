@@ -749,6 +749,8 @@ class Wikigame(object):
         results = []
         for idx, key in enumerate(sorted(self.length.keys())):
             print(idx+1, '/', len(self.length), key, end='\r')
+            ib_length = self.ib_length[key]
+            lead_length = self.lead_length[key]
             targets = sorted(set(self.link2pos_first[key].keys()))
             target2amount = {k: 0 for k in targets}
             try:
@@ -766,24 +768,44 @@ class Wikigame(object):
             source = [key] * len(link2pos)
             source_id = [self.name2id[key]] * len(link2pos)
             linkpos_first = [link2pos[t][0] for t in targets]
-            linkpos_all = [link2pos[t] for t in targets]
             linkpos_last = [link2pos[t][-1] for t in targets]
+            linkpos_ib = [
+                [l for l in link2pos[t] if l < ib_length] for t in targets
+            ]
+            linkpos_lead = [
+                [l for l in link2pos[t] if ib_length < l < lead_length]
+                for t in targets
+            ]
+            linkpos_not_ib = [
+                [l for l in link2pos[t] if l > ib_length] for t in targets
+            ]
+            linkpos_not_lead = [
+                [l for l in link2pos[t] if l > lead_length or l < ib_length]
+                for t in targets
+            ]
+            linkpos_not_ib_lead = [
+                [l for l in link2pos[t] if l > lead_length] for t in targets
+            ]
+            linkpos_all = [link2pos[t] for t in targets]
             word_count = [self.length[key]] * len(link2pos)
             target = [self.id2name[t] for t in targets]
             target_id = targets
             amount = [target2amount[t] for t in targets]
             df = pd.DataFrame(
-                data=zip(source, source_id,
-                         linkpos_first, linkpos_last,
-                         linkpos_all,
+                data=zip(source, source_id, linkpos_first, linkpos_last,
+                         linkpos_ib, linkpos_lead, linkpos_not_ib,
+                         linkpos_not_lead, linkpos_not_ib_lead,  linkpos_all,
                          word_count, target, target_id, amount),
                 columns=['source', 'source_id', 'linkpos_first', 'linkpos_last',
-                         'linkpos_all', 'word_count', 'target', 'target_id',
-                         'amount']
+                         'linkpos_ib', 'linkpos_lead', 'linkpos_not_ib',
+                         'linkpos_not_lead', 'linkpos_not_ib_lead',
+                         'linkpos_all',
+                         'word_count', 'target', 'target_id', 'amount']
             )
             results.append(df)
         df = pd.concat(results)
-        return df, self.ib_length, self.lead_length
+        keys = self.ib_length.keys()
+        return df, keys
 
 
 class WIKTI(Wikigame):
