@@ -31,6 +31,11 @@ class ClickModel(object):
         total = sum(self.data.values())
         self.data = [self.data[k] / total for k in sorted(self.data)]
 
+    def compare(self, mdl):
+        kl = np.abs(scipy.stats.entropy(self.data, mdl.data, base=2))
+        lab = self.label + '\t' + mdl.label
+        print('\t%.4f\t%s' % (kl, lab))
+
 
 class GroundTruthModel(ClickModel):
     def __init__(self, df):
@@ -41,11 +46,6 @@ class GroundTruthModel(ClickModel):
         self.normalize()
         print('click data for %d pages' % len(self.data))
 
-    def compare(self, mdl):
-        kl = np.abs(scipy.stats.entropy(self.data, mdl.data, base=2))
-        lab = self.label + '\t' + mdl.label
-        print('\t%.4f\t%s' % (kl, lab))
-
 
 class UniformModel(ClickModel):
     def __init__(self, df):
@@ -55,6 +55,21 @@ class UniformModel(ClickModel):
             print(kidx+1, '/', len(self.keys), end='\r')
             df_sub = self.grouped.get_group(key)
             targets = len(df_sub['target'])
+            for ridx, row in df_sub.iterrows():
+                self.data[row['target']] += self.total_clicks[key]/targets
+        self.normalize()
+
+
+class LeadModel(ClickModel):
+    def __init__(self, df, leadp=70):
+        super(LeadModel, self).__init__(df)
+        self.label = 'Uniform'
+        self.leadp = 70
+        for kidx, key in enumerate(self.keys):
+            print(kidx+1, '/', len(self.keys), end='\r')
+            df_sub = self.grouped.get_group(key)
+            targets = len(df_sub['target'])
+            pdb.set_trace()
             for ridx, row in df_sub.iterrows():
                 self.data[row['target']] += self.total_clicks[key]/targets
         self.normalize()
@@ -349,21 +364,21 @@ def get_ambiguous_links():
                100 * total_ambig_amount / total_amount))
 
 if __name__ == '__main__':
-    # unambig = True
-    # df = get_df_wikigame()[0]
+    df = get_df_wikigame()[0]
     # # df = get_df_wikipedia()[0]
-    # gt = GroundTruthModel(df)
+    gt = GroundTruthModel(df)
     #
-    # models = [
-    #     UniformModel,
+    models = [
+        UniformModel,
     #     IndirectProportionModel,
     #     InverseRankModel,
     #     InverseModel,
-    # ]
-    # models = [m(df) for m in models]
-    # for m in models:
-    #     gt.compare(m)
+        LeadModel,
+    ]
+    models = [m(df) for m in models]
+    for m in models:
+        gt.compare(m)
 
-    # plot_click_pos()
+    plot_click_pos()
     # plot_ib_lead_clicks()
-    get_ambiguous_links()
+    # get_ambiguous_links()

@@ -3,7 +3,7 @@
 from __future__ import division, print_function
 import atexit
 import bisect
-from collections import defaultdict
+import collections
 import cPickle as pickle
 import datetime
 import HTMLParser
@@ -79,9 +79,9 @@ class Wikigame(object):
         self.plaintext_folder = os.path.join('data', label, 'wpcd', 'plaintext')
         self.cache_folder = os.path.join('data', label, 'cache')
 
-        self.link2pos_first, self.link2pos_last = None, None
-        self.length, self.pos2link, self.pos2linklength = None, None, None
-        self.ib_length, self.lead_length = None, None
+        self.link2pos_first, self.link2pos_last = {}, {}
+        self.length, self.pos2link, self.pos2linklength = {}, {}, {}
+        self.ib_length, self.lead_length = {}, {}
         self.link_context, self.link_sets = None, None
 
         # build some mappings from the database
@@ -120,7 +120,7 @@ class Wikigame(object):
         if gt is None:
             import graph_tool.all as gt
         graph = gt.Graph(directed=directed)
-        id_mapping = defaultdict(lambda: graph.add_vertex())
+        id_mapping = collections.defaultdict(lambda: graph.add_vertex())
         graph.vertex_properties['NodeId'] = graph.new_vertex_property('string')
         with io.open(filename, encoding='utf-8') as infile:
             for line in infile:
@@ -362,7 +362,7 @@ class Wikigame(object):
                          pos2linklength, ib_length, lead_length], outfile, -1)
 
     def load_link_positions(self):
-        if self.link2pos_first is None:
+        if not self.link2pos_first:
             path = os.path.join('data', self.label, 'link_positions.obj')
             with open(path, 'rb') as infile:
                 self.link2pos_first, self.link2pos_last, self.length,\
@@ -454,7 +454,7 @@ class Wikigame(object):
         print('     getting link positions...')
         link2pos_all = {}
         for article, article_dict in self.pos2link.iteritems():
-            link2pos = defaultdict(list)
+            link2pos = collections.defaultdict(list)
             for k, v in article_dict.iteritems():
                 link2pos[v].append(k)
             link2pos_all[article] = link2pos
@@ -555,7 +555,7 @@ class Wikigame(object):
         self.load_link_positions()
         link2pos_all = {}
         for article, article_dict in self.pos2link.iteritems():
-            link2pos = defaultdict(list)
+            link2pos = collections.defaultdict(list)
             for k, v in article_dict.iteritems():
                 link2pos[v].append(k)
             link2pos_all[article] = link2pos
@@ -722,6 +722,68 @@ class Wikigame(object):
         cmi = je(x, z) + je(y, z) - je3(x, y, z) - entropy(np.histogram(z)[0])
         print('degs ngrams nodes %.4f' % cmi)
         pdb.set_trace()
+
+    @decorators.Cached
+    def get_source2target(self):
+        self.load_data()
+        df = self.data[['node', 'node_id', 'backtrack', 'linkpos_first']]
+        df['target'] = df['node'].shift(-1)
+        df['target_id'] = df['node_id'].shift(-1)
+        df.columns = ['source', 'source_id'] + df.columns[2:].tolist()
+        df = df[~df['backtrack']]
+        df = df.dropna()
+        df = df[['source', 'source_id', 'target', 'target_id']]
+        df['amount'] = df.groupby(['source', 'target']).transform('count')['source_id']
+        df = df.drop_duplicates(subset=['source', 'target'])
+        source2target = {}
+        for source in set(df['source']):
+            df_sub = df[df['source'] == source]
+            zipped = zip(df_sub['target'], df_sub['amount'])
+            source2target[source] = {self.name2id[k]: v for k, v in zipped}
+        return source2target
+
+    @decorators.Cached
+    def get_model_df(self):
+        source2target = self.get_source2target()
+        self.load_link_positions()
+        results = []
+        for idx, key in enumerate(sorted(self.length.keys())):
+            print(idx+1, '/', len(self.length), key, end='\r')
+            targets = sorted(set(self.link2pos_first[key].keys()))
+            target2amount = {k: 0 for k in targets}
+            try:
+                target2amount.update(source2target[key])
+            except KeyError:
+                pass
+            link2pos = collections.defaultdict(list)
+            for pos, link in self.pos2link[key].iteritems():
+                if link in targets:
+                    link2pos[link].append(pos)
+            link2pos = {k: sorted(v) for k, v in link2pos.iteritems()}
+            if not link2pos:
+                # no outlinks on page
+                continue
+            source = [key] * len(link2pos)
+            source_id = [self.name2id[key]] * len(link2pos)
+            linkpos_first = [link2pos[t][0] for t in targets]
+            linkpos_all = [link2pos[t] for t in targets]
+            linkpos_last = [link2pos[t][-1] for t in targets]
+            word_count = [self.length[key]] * len(link2pos)
+            target = [self.id2name[t] for t in targets]
+            target_id = targets
+            amount = [target2amount[t] for t in targets]
+            df = pd.DataFrame(
+                data=zip(source, source_id,
+                         linkpos_first, linkpos_last,
+                         linkpos_all,
+                         word_count, target, target_id, amount),
+                columns=['source', 'source_id', 'linkpos_first', 'linkpos_last',
+                         'linkpos_all', 'word_count', 'target', 'target_id',
+                         'amount']
+            )
+            results.append(df)
+        df = pd.concat(results)
+        return df, self.ib_length, self.lead_length
 
 
 class WIKTI(Wikigame):
@@ -1124,11 +1186,12 @@ if __name__ == '__main__':
         # wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
-
+        # wg.get_source2target()
+        wg.get_model_df()
         # wg.lead_links()
 
-        wg.load_link_positions()
-        wc = wg.length.values()
-        pdb.set_trace()
+        # wg.load_link_positions()
+        # wc = wg.length.values()
+        # pdb.set_trace()
 
 
