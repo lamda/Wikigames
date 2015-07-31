@@ -724,8 +724,12 @@ class Wikigame(object):
         pdb.set_trace()
 
     @decorators.Cached
-    def get_source2target(self):
+    def get_source2target(self, kind='all'):
         self.load_data()
+        if kind == 'successful':
+            self.data = self.data[self.data['successful']]
+        elif kind == 'unsuccessful':
+            self.data = self.data[~self.data['successful']]
         df = self.data[['node', 'node_id', 'backtrack', 'linkpos_first']]
         df['target'] = df['node'].shift(-1)
         df['target_id'] = df['node_id'].shift(-1)
@@ -743,8 +747,8 @@ class Wikigame(object):
         return source2target
 
     @decorators.Cached
-    def get_model_df(self):
-        source2target = self.get_source2target()
+    def get_model_df(self, kind='all'):
+        source2target = self.get_source2target(kind)
         self.load_link_positions()
         results = []
         for idx, key in enumerate(sorted(self.length.keys())):
@@ -776,6 +780,10 @@ class Wikigame(object):
                 [l for l in link2pos[t] if ib_length < l < lead_length]
                 for t in targets
             ]
+            linkpos_ib_lead = [
+                [l for l in link2pos[t] if l < lead_length]
+                for t in targets
+            ]
             linkpos_not_ib = [
                 [l for l in link2pos[t] if l > ib_length] for t in targets
             ]
@@ -793,19 +801,20 @@ class Wikigame(object):
             amount = [target2amount[t] for t in targets]
             df = pd.DataFrame(
                 data=zip(source, source_id, linkpos_first, linkpos_last,
-                         linkpos_ib, linkpos_lead, linkpos_not_ib,
-                         linkpos_not_lead, linkpos_not_ib_lead,  linkpos_all,
+                         linkpos_ib, linkpos_lead, linkpos_ib_lead,
+                         linkpos_not_ib, linkpos_not_lead, linkpos_not_ib_lead,
+                         linkpos_all,
                          word_count, target, target_id, amount),
                 columns=['source', 'source_id', 'linkpos_first', 'linkpos_last',
-                         'linkpos_ib', 'linkpos_lead', 'linkpos_not_ib',
+                         'linkpos_ib', 'linkpos_lead', 'linkpos_ib_lead',
+                         'linkpos_not_ib',
                          'linkpos_not_lead', 'linkpos_not_ib_lead',
                          'linkpos_all',
                          'word_count', 'target', 'target_id', 'amount']
             )
             results.append(df)
         df = pd.concat(results)
-        keys = self.ib_length.keys()
-        return df, keys
+        return df
 
 
 class WIKTI(Wikigame):
@@ -1208,8 +1217,9 @@ if __name__ == '__main__':
         # wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
-        # wg.get_source2target()
-        wg.get_model_df()
+        wg.get_model_df('all')
+        # wg.get_model_df('successful')
+        # wg.get_model_df('unsuccessful')
         # wg.lead_links()
 
         # wg.load_link_positions()
