@@ -13,8 +13,6 @@ import pdb
 import scipy.stats
 import seaborn as sns
 
-from main import Wikispeedia
-
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 400)
 
@@ -23,74 +21,128 @@ class ClickModel(object):
     def __init__(self, df):
         self.label = ''
         self.df = df
-        self.data = {k: 0.01 for k in set(df['target'])}
+        with open('data/clickmodels/wikispeedia_stats.obj', 'rb') as infile:
+            self.stats = pickle.load(infile)
+        self.sources = set(df['source'])
+        self.targets = set(df['target'])
+        self.keys = sorted(self.sources | self.targets)
+        func_dict = lambda: {k: 0.01 for k in self.keys}
+        self.data = collections.defaultdict(func_dict)
+        self.df_source = df.groupby('source')
+        self.df_target = df.groupby('target')
+        self.clicks = {key: self.df_source.get_group(key)['amount'].sum()
+                       for key in self.sources}
+        self.clicks = {k: v for k, v in self.clicks.items() if v > 0}
 
-    def update_data(self, data2):
+    def update_data(self, label, data2):
         for k, v in data2.iteritems():
-            self.data[k] += v
+            self.data[label][k] += v
 
     def normalize(self):
-        total = sum(self.data.values())
-        self.data = [self.data[k] / total for k in sorted(self.data)]
+        for label in self.data:
+            total = sum(self.data[label].values())
+            self.data[label] = [self.data[label][k] / total for k in self.keys]
 
-    def compare(self, mdl):
-        kl = np.abs(scipy.stats.entropy(self.data, mdl.data, base=2))
-        lab = self.label + '\t' + mdl.label
-        print('\t%.4f\t%s' % (kl, lab))
+    def compare(self, m2):
+        m1 = 'Ground Truth'
+        kl = np.abs(scipy.stats.entropy(self.data[m1], self.data[m2], base=2))
+        print('\t%.4f\t%s' % (kl, m2))
+        return kl
 
-
-class GroundTruthModel(ClickModel):
-    def __init__(self, df):
-        self.label = 'GroundTruth'
-        print(self.label)
-        super(GroundTruthModel, self).__init__(df)
-        iterable = df.groupby('target')['amount'].sum().iteritems()
-        self.update_data({k: v for k, v in iterable})
+    def compare_all(self):
         self.normalize()
+        for key in sorted(self.data):
+            self.compare(key)
 
+    def ground_truth(self):
+        iterable = self.df_target['amount'].sum().iteritems()
+        self.update_data('Ground Truth', {k: v for k, v in iterable})
 
-class UniformModel(ClickModel):
-    def __init__(self, df):
-        self.label = 'Uniform'
-        print(self.label)
-        super(UniformModel, self).__init__(df)
-        vals = pd.DataFrame(data=zip(df['target'], df['linkpos_all'].apply(len)), columns=['node', 'amount'])
-        groupby = vals.groupby('node').sum()
-        result = {k: v for k, v in zip(groupby.index, groupby['amount'])}
-        self.update_data(result)
+    def uniform(self):
+        for key, clicks_total in self.clicks.items():
+            df_sub = self.df_source.get_group(key)
+            lps = df_sub['linkpos_all'].apply(len)
+            lp_total = lps.sum()
+            for k, v in zip(df_sub['target'], lps):
+                self.data['Uniform'][k] += clicks_total * v / lp_total
+
+    def area(self, area, leadp=0.5):
+        assert leadp <= 1
+        for key, clicks_total in self.clicks.items():
+            df_sub = self.df_source.get_group(key)
+            dkey = area + '_' + unicode(leadp)
+
+            # links within area of interest
+            lps = df_sub['linkpos_' + area].apply(len)
+            lp_total = lps.sum()
+            if lp_total != 0:
+                for k, v in zip(df_sub['target'], lps):
+                    self.data[dkey][k] += leadp * clicks_total * v / lp_total
+
+            # links outside area of interest
+            not_area = 'not_' + area if 'not' not in area else area[4:]
+            lps = df_sub['linkpos_' + not_area].apply(len)
+            lp_total = lps.sum()
+            if lp_total != 0:
+                for k, v in zip(df_sub['target'], lps):
+                    self.data[dkey][k] += (1-leadp) * clicks_total * v / lp_total
+
+    def proportional(self, stat, stat_label):
+        for key, clicks_total in self.clicks.items():
+            df_sub = self.df_source.get_group(key)
+            lps = df_sub['linkpos_all'].apply(len)
+            prop = df_sub['target'].apply(lambda x: self.stats[stat][x])
+            total = np.dot(lps, prop)
+            for k, l, d in zip(df_sub['target'], lps, prop):
+                self.data[stat_label][k] += clicks_total * l * d / total
+
+    def run(self):
+        self.ground_truth()
+        self.uniform()
+        self.proportional('ngram', 'N-Gram')
+        self.proportional('deg_in', 'In-Degree')
+        self.proportional('view_count', 'View Count')
+
+        self.compare_all()
+
+    def run_all(self):
+        self.ground_truth()
+        self.uniform()
+        self.proportional('ngram', 'N-Gram')
+        self.proportional('deg_in', 'In-Degree')
+        self.proportional('view_count', 'View Count')
+        for area in [
+            'lead',
+            'ib',
+            'ib_lead',
+        ]:
+            print('    ', area)
+            for areap in [
+                0.9,
+                0.8,
+                0.7,
+                0.6,
+                0.5,
+                0.4,
+                0.3,
+                0.2,
+                0.1
+            ]:
+                print('        ', areap)
+                self.area(area, areap)
+        print()
         self.normalize()
+        result = {}
+        for key in sorted(self.data):
+            kl = self.compare(key)
+            result[key] = kl
 
-
-class LeadModel(ClickModel):
-    def __init__(self, df, leadp=60):
-        super(LeadModel, self).__init__(df)
-        self.label = 'Lead (' + unicode(leadp) + '% weight on lead links)'
-
-        # Lead links
-        vals = pd.DataFrame(
-            data=zip(df['target'], df['linkpos_ib_lead'].apply(len)),
-            columns=['node', 'amount']
-        )
-        groupby = vals.groupby('node').sum()
-        result = {k: v * leadp
-                  for k, v in zip(groupby.index, groupby['amount'])}
-        self.update_data(result)
-
-        # Not-Lead links
-        vals = pd.DataFrame(
-            data=zip(df['target'], df['linkpos_not_ib_lead'].apply(len)),
-            columns=['node', 'amount']
-        )
-        groupby = vals.groupby('node').sum()
-        result = {k: v * (100-leadp)
-                  for k, v in zip(groupby.index, groupby['amount'])}
-        self.update_data(result)
-        self.normalize()
+        with open('data/clickmodels/wikispeedia_results.obj', 'wb') as outfile:
+            pickle.dump(result, outfile, -1)
 
 
 def get_df_wikigame(kind):
-    wg = Wikispeedia()
-    df = wg.get_model_df(kind)
+    df = pd.read_pickle('data/clickmodels/wikispeedia_' + kind + '.obj')
     return df
 
 
@@ -102,29 +154,6 @@ def get_df_wikipedia():
 
 
 if __name__ == '__main__':
-    # df = get_df_wikipedia()
-    for kind in [
-        'all',
-        'successful',
-        'unsuccessful'
-    ]:
-        print('\n\n' + kind)
-        df = get_df_wikigame(kind)
-        gt = GroundTruthModel(df)
-        um = UniformModel(df)
-        gt.compare(um)
-        for leadp in [
-            90,
-            88,
-            86,
-            84,
-            82,
-            80,
-            70,
-            60,
-            50,
-            40,
-        ]:
-            lm = LeadModel(df, leadp)
-            gt.compare(lm)
-
+    df = get_df_wikigame('all')  # all
+    cm = ClickModel(df)
+    cm.run_all()

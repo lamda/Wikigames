@@ -71,7 +71,7 @@ class DbConnector(object):
 
 class Wikigame(object):
     def __init__(self, label):
-        print(label)
+        # print(label)
         self.label = label
         self.data = None
         self.graph = None
@@ -389,8 +389,8 @@ class Wikigame(object):
     def get_link_length(self, start, pos):
         return self.pos2linklength[start][pos]
 
-    def load_data(self):
-        if self.data is None:
+    def load_data(self, force=False):
+        if force or self.data is None:
             path = os.path.join('data', self.label, 'data.obj')
             self.data = pd.read_pickle(path)
 
@@ -723,9 +723,9 @@ class Wikigame(object):
         print('degs ngrams nodes %.4f' % cmi)
         pdb.set_trace()
 
-    @decorators.Cached
+    # @decorators.Cached
     def get_source2target(self, kind='all'):
-        self.load_data()
+        self.load_data(force=True)
         if kind == 'successful':
             self.data = self.data[self.data['successful']]
         elif kind == 'unsuccessful':
@@ -746,7 +746,7 @@ class Wikigame(object):
             source2target[source] = {self.name2id[k]: v for k, v in zipped}
         return source2target
 
-    @decorators.Cached
+    # @decorators.Cached
     def get_model_df(self, kind='all'):
         source2target = self.get_source2target(kind)
         self.load_link_positions()
@@ -814,7 +814,21 @@ class Wikigame(object):
             )
             results.append(df)
         df = pd.concat(results)
-        return df
+        df.to_pickle('data/clickmodels/wikispeedia_' + kind + '.obj')
+
+    def get_stats(self):
+        stats = {
+            'deg_in':
+                {n: self.id2deg_in[i] for i,n  in self.id2name.iteritems()},
+            'view_count':
+                {n: viewcounts.viewcount.get_frequency(n)
+                 for n in self.name2id},
+            'ngram':
+                {n: np.exp(ngram.ngram_frequency.get_frequency(n))
+                 for n in self.name2id},
+        }
+        with open('data/clickmodels/wikispeedia_stats.obj', 'wb') as outfile:
+            pickle.dump(stats, outfile, -1)
 
 
 class WIKTI(Wikigame):
@@ -1217,13 +1231,13 @@ if __name__ == '__main__':
         # wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
-        wg.get_model_df('all')
+
+        # wg.get_model_df('all')
         # wg.get_model_df('successful')
         # wg.get_model_df('unsuccessful')
-        # wg.lead_links()
 
-        # wg.load_link_positions()
-        # wc = wg.length.values()
+        wg.get_stats()
+
         # pdb.set_trace()
 
 
