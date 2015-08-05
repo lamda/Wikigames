@@ -4,35 +4,53 @@ from __future__ import division, print_function, unicode_literals
 
 import collections
 import cPickle as pickle
-import matplotlib
 import matplotlib.pyplot as plt
+plt.style.use('ggplot')  # TODO
 import numpy as np
 import os
 import pandas as pd
 import pdb
 import scipy.stats
-import seaborn as sns
+# import seaborn as sns
 
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 400)
 
 
 class ClickModel(object):
-    def __init__(self, df):
-        self.label = ''
-        self.df = df
-        with open('data/clickmodels/wikispeedia_stats.obj', 'rb') as infile:
+    def __init__(self, dataset, kind=None):
+        self.dataset = dataset
+        self.kind = kind
+        if dataset == 'wikispeedia':
+            fpath = 'data/clickmodels/wikispeedia_' + kind + '.obj'
+        elif dataset == 'wikipedia':
+            fpath = 'clickstream/DataHandler_aggregate_clicks_smoothed.obj'
+        else:
+            print('unrecognized parameter')
+            raise NotImplemented
+        self.df = pd.read_pickle(fpath)
+        with open('data/clickmodels/' + dataset + '_stats.obj', 'rb') as infile:
             self.stats = pickle.load(infile)
-        self.sources = set(df['source'])
-        self.targets = set(df['target'])
+        self.sources = set(self.df['source'])
+        self.targets = set(self.df['target'])
         self.keys = sorted(self.sources | self.targets)
         func_dict = lambda: {k: 0.01 for k in self.keys}
         self.data = collections.defaultdict(func_dict)
-        self.df_source = df.groupby('source')
-        self.df_target = df.groupby('target')
+        self.df_source = self.df.groupby('source')
+        self.df_target = self.df.groupby('target')
         self.clicks = {key: self.df_source.get_group(key)['amount'].sum()
                        for key in self.sources}
         self.clicks = {k: v for k, v in self.clicks.items() if v > 0}
+
+    def get_df_wikigame(self, kind):
+        df = pd.read_pickle('data/clickmodels/wikispeedia_' + kind + '.obj')
+        return df
+
+    def get_df_wikipedia(self):
+        fpath = os.path.join('clickstream',
+                             'DataHandler_aggregate_clicks_smoothed.obj')
+        df = pd.read_pickle(fpath).values()[0]
+        return df
 
     def update_data(self, label, data2):
         for k, v in data2.iteritems():
@@ -117,43 +135,51 @@ class ClickModel(object):
             'ib_lead',
         ]:
             print('    ', area)
-            for areap in [
-                0.9,
-                0.8,
-                0.7,
-                0.6,
-                0.5,
-                0.4,
-                0.3,
-                0.2,
-                0.1
-            ]:
+            for areap in np.arange(0, 1, 0.01):
                 print('        ', areap)
                 self.area(area, areap)
         print()
         self.normalize()
-        result = {}
-        for key in sorted(self.data):
-            kl = self.compare(key)
-            result[key] = kl
-
-        with open('data/clickmodels/wikispeedia_results.obj', 'wb') as outfile:
-            pickle.dump(result, outfile, -1)
-
-
-def get_df_wikigame(kind):
-    df = pd.read_pickle('data/clickmodels/wikispeedia_' + kind + '.obj')
-    return df
+        columns = sorted(self.data)
+        columns.remove('Ground Truth')
+        data = [self.compare(key) for key in columns]
+        se = pd.Series(data=data, index=columns)
+        se.to_pickle(
+            'data/clickmodels/' + self.dataset + '_results' +
+            ('_' + self.kind if self.kind is not None else '') + '.obj'
+        )
 
 
-def get_df_wikipedia():
-    fpath = os.path.join('clickstream',
-                         'DataHandler_aggregate_clicks_smoothed.obj')
-    df = pd.read_pickle(fpath).values()[0]
-    return df
-
+def plot(dataset, kind=None, other=True):
+    se_full = pd.read_pickle(
+        'data/clickmodels/' + dataset + '_results' +
+        ('_' + kind if kind is not None else '') + '.obj'
+    )
+    se_filtered = se_full[[c for c in se_full.index if '.' not in c]]
+    keys = ['ib', 'lead', 'ib_lead']
+    if other:
+        data, columns = se_filtered.values.tolist(), se_filtered.index.tolist()
+    else:
+        data, columns = [], []
+    for key in keys:
+        data.append(se_full.filter(regex=key + '_\d').min())
+        columns.append(se_full.filter(regex=key + '_\d').idxmin())
+    se = pd.Series(data=data, index=columns)
+    ax = plt.subplot(111)
+    se.plot(ax=ax, kind='bar', legend=False, width=0.5, rot=70)
+    plt.tight_layout()
+    # plt.show()
+    plt.savefig(
+        'plots/clickmodels_' + dataset +
+        ('_' + kind if kind is not None else '') + '.png'
+    )
 
 if __name__ == '__main__':
-    df = get_df_wikigame('all')  # all
-    cm = ClickModel(df)
-    cm.run_all()
+    # cm = ClickModel('wikipedia'); cm.run_all()
+    for kind in [
+        # 'all',
+        # 'successful',
+        'unsuccessful'
+    ]:
+        cm = ClickModel('wikispeedia', kind); cm.run_all()
+        plot('wikispeedia', kind)
