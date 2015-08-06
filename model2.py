@@ -24,7 +24,7 @@ class ClickModel(object):
         if dataset == 'wikispeedia':
             fpath = 'data/clickmodels/wikispeedia_' + kind + '.obj'
         elif dataset == 'wikipedia':
-            fpath = 'clickstream/DataHandler_aggregate_clicks_smoothed.obj'
+            fpath = 'data/clickmodels/wikipedia.obj'
         else:
             print('unrecognized parameter')
             raise NotImplemented
@@ -41,16 +41,6 @@ class ClickModel(object):
         self.clicks = {key: self.df_source.get_group(key)['amount'].sum()
                        for key in self.sources}
         self.clicks = {k: v for k, v in self.clicks.items() if v > 0}
-
-    def get_df_wikigame(self, kind):
-        df = pd.read_pickle('data/clickmodels/wikispeedia_' + kind + '.obj')
-        return df
-
-    def get_df_wikipedia(self):
-        fpath = os.path.join('clickstream',
-                             'DataHandler_aggregate_clicks_smoothed.obj')
-        df = pd.read_pickle(fpath).values()[0]
-        return df
 
     def update_data(self, label, data2):
         for k, v in data2.iteritems():
@@ -168,18 +158,29 @@ def plot(dataset, kind=None, other=True):
     ax = plt.subplot(111)
     se.plot(ax=ax, kind='bar', legend=False, width=0.5, rot=70)
     plt.tight_layout()
+    plt.ylim(0, 1)
     # plt.show()
     plt.savefig(
         'plots/clickmodels_' + dataset +
         ('_' + kind if kind is not None else '') + '.png'
     )
 
+
+def get_area_importance():
+    for dataset in ['wikispeedia', 'wikipedia']:
+        df = pd.read_pickle('data/clickmodels/' + dataset + '_all.obj')
+        lp_ib = df['linkpos_ib'].apply(len).sum()
+        lp_lead = df['linkpos_lead'].apply(len).sum()
+        lp_all = df['linkpos_all'].apply(len).sum()
+        print('%.2f (IB) %.2f (LEAD)' % (lp_ib/lp_all, lp_lead/lp_all))
+
 if __name__ == '__main__':
-    # cm = ClickModel('wikipedia'); cm.run_all()
-    for kind in [
-        # 'all',
-        # 'successful',
-        'unsuccessful'
-    ]:
-        cm = ClickModel('wikispeedia', kind); cm.run_all()
-        plot('wikispeedia', kind)
+    # get_area_importance()
+    cm = ClickModel('wikipedia'); cm.run_all()
+    # for kind in [
+    #     'all',
+    #     'successful',
+    #     'unsuccessful'
+    # ]:
+    #     cm = ClickModel('wikispeedia', kind); cm.run_all()
+    #     plot('wikispeedia', kind)

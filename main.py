@@ -819,7 +819,7 @@ class Wikigame(object):
     def get_stats(self):
         stats = {
             'deg_in':
-                {n: self.id2deg_in[i] for i,n  in self.id2name.iteritems()},
+                {n: self.id2deg_in[i] for i, n in self.id2name.iteritems()},
             'view_count':
                 {n: viewcounts.viewcount.get_frequency(n)
                  for n in self.name2id},
@@ -1213,14 +1213,43 @@ class Wikispeedia(Wikigame):
         self.save_data(data)
 
 
+def get_stats_wikipedia():
+    # df = pd.read_pickle('data/clickmodels/wikipedia_all.obj')
+    # targets = set(df['target'])
+    # with open('data/clickmodels/wikipedia_targets.obj', 'wb') as outfile:
+    #     pickle.dump(targets, outfile, -1)
+    # sys.exit()
+    with open('data/clickmodels/wikipedia_targets.obj', 'rb') as infile:
+        targets = pickle.load(infile)
+
+    #  ngrams = {n: ngram.ngram_frequency.get_frequency(n) for n in targets}
+
+
+def get_wikipedia_view_counts(start=None, end=None):
+    print(start, end)
+    with open('data/clickmodels/wikipedia_targets.obj', 'rb') as infile:
+        targets = pickle.load(infile)
+    targets = targets - {None}
+    view_counts = {}
+    for idx, t in enumerate(sorted(targets)[start:end]):
+        print(idx+1, '/', len(targets), end='\r')
+        view_counts[t] = viewcounts.viewcount.get_frequency(t)
+
+    fname = 'data/clickmodels/wikipedia_view_counts_' + unicode(start) + '_' +\
+            unicode(end) + '.obj'
+    with open(fname, 'wb') as outfile:
+        pickle.dump(view_counts, outfile, -1)
+
+
 if __name__ == '__main__':
 
-    # Cached.clear_cache()
+    get_wikipedia_view_counts(500000, None)
+    # get_stats_wikipedia()
 
-    for wg in [
+    # for wg in [
         # WIKTI(successful=True),
-        Wikispeedia()
-    ]:
+        # Wikispeedia()
+    # ]:
         # wg.compute_link_positions()
         # wg.create_correlation_data()
         # wg.create_dataframe(limit=None)
@@ -1235,9 +1264,3 @@ if __name__ == '__main__':
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
         # wg.get_model_df('unsuccessful')
-
-        wg.get_stats()
-
-        # pdb.set_trace()
-
-
