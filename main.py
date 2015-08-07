@@ -1221,8 +1221,72 @@ def get_stats_wikipedia():
     # sys.exit()
     with open('data/clickmodels/wikipedia_targets.obj', 'rb') as infile:
         targets = pickle.load(infile)
+    with open('data/clickmodels/wikipedia_indegrees.obj', 'rb') as infile:
+        name2deg_in = pickle.load(infile)
+    with open('data/clickmodels/wikipedia_view_counts.obj', 'rb') as infile:
+        name2vc = pickle.load(infile)
+    stats = {
+        'deg_in':
+            {t: (name2deg_in[t] if t in name2deg_in else 0) for t in targets},
+        'view_count':
+            {t: (name2vc[t] if t in name2vc else 0) for t in targets},
+        # 'ngram':
+        #     {n: np.exp(ngram.ngram_frequency.get_frequency(n))
+        #      for n in self.name2id},
+    }
+    with open('data/clickmodels/wikipedia_stats.obj', 'wb') as outfile:
+        pickle.dump(stats, outfile, -1)
 
-    #  ngrams = {n: ngram.ngram_frequency.get_frequency(n) for n in targets}
+
+def get_wikipedia_ngrams(start=None, end=None):
+    print(start, end)
+    with open('data/clickmodels/wikipedia_targets.obj', 'rb') as infile:
+        targets = pickle.load(infile)
+    targets = targets - {None}
+    ngrams = {}
+    for idx, t in enumerate(sorted(targets)[start:end]):
+        print(idx+1, '/', len(targets), end='\r')
+        ngrams[t] = ngram.ngram_frequency.get_frequency(t.encode('utf-8'))
+
+    fname = 'data/clickmodels/wikipedia_ngrams_' + unicode(start) + '_' +\
+            unicode(end) + '.obj'
+    with open(fname, 'wb') as outfile:
+        pickle.dump(ngrams, outfile, -1)
+
+
+def combine_stats():
+    # view_counts = {}
+    # for suffix in [
+    #     '0_100000',
+    #     '100000_200000',
+    #     '200000_300000',
+    #     '300000_400000',
+    #     '400000_500000',
+    #     '500000_None',
+    # ]:
+    #     fname = 'data/clickmodels/wikipedia_view_counts_' + suffix + '.obj'
+    #     with open(fname, 'rb') as infile:
+    #         d = pickle.load(infile)
+    #     view_counts.update(d)
+    #
+    # with open('data/clickmodels/wikipedia_view_counts.obj', 'wb') as outfile:
+    #     pickle.dump(view_counts, outfile, -1)
+    ngrams = {}
+    for suffix in [
+        '0_100000',
+        '100000_200000',
+        '200000_300000',
+        '300000_400000',
+        '400000_500000',
+        '500000_None',
+    ]:
+        fname = 'data/clickmodels/wikipedia_ngrams_' + suffix + '.obj'
+        with open(fname, 'rb') as infile:
+            d = pickle.load(infile)
+        ngrams.update(d)
+
+    with open('data/clickmodels/wikipedia_vngrams.obj', 'wb') as outfile:
+        pickle.dump(ngrams, outfile, -1)
 
 
 def get_wikipedia_view_counts(start=None, end=None):
@@ -1233,7 +1297,7 @@ def get_wikipedia_view_counts(start=None, end=None):
     view_counts = {}
     for idx, t in enumerate(sorted(targets)[start:end]):
         print(idx+1, '/', len(targets), end='\r')
-        view_counts[t] = viewcounts.viewcount.get_frequency(t)
+        view_counts[t] = viewcounts.viewcount.get_frequency(t.encode('utf-8'))
 
     fname = 'data/clickmodels/wikipedia_view_counts_' + unicode(start) + '_' +\
             unicode(end) + '.obj'
@@ -1243,8 +1307,11 @@ def get_wikipedia_view_counts(start=None, end=None):
 
 if __name__ == '__main__':
 
-    get_wikipedia_view_counts(500000, None)
-    # get_stats_wikipedia()
+    # get_wikipedia_ngrams(500000, None)
+    # get_wikipedia_view_counts(500000, None)
+    # combine_stats()
+    get_stats_wikipedia()
+
 
     # for wg in [
         # WIKTI(successful=True),
@@ -1264,3 +1331,4 @@ if __name__ == '__main__':
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
         # wg.get_model_df('unsuccessful')
+        # wg.get_stats()

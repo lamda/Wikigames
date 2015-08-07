@@ -24,7 +24,7 @@ class ClickModel(object):
         if dataset == 'wikispeedia':
             fpath = 'data/clickmodels/wikispeedia_' + kind + '.obj'
         elif dataset == 'wikipedia':
-            fpath = 'data/clickmodels/wikipedia.obj'
+            fpath = 'data/clickmodels/wikipedia_all.obj'
         else:
             print('unrecognized parameter')
             raise NotImplemented
@@ -114,18 +114,26 @@ class ClickModel(object):
         self.compare_all()
 
     def run_all(self):
+        print('getting Ground Truth...')
         self.ground_truth()
+        print('getting Uniform...')
         self.uniform()
-        self.proportional('ngram', 'N-Gram')
+        print('getting degree...')
         self.proportional('deg_in', 'In-Degree')
+        self.compare('In-Degree')
+        print('getting N-Gram...')
+        self.proportional('ngram', 'N-Gram')
+        print('getting View Count...')
         self.proportional('view_count', 'View Count')
+        print('getting areas...')
         for area in [
             'lead',
             'ib',
             'ib_lead',
         ]:
             print('    ', area)
-            for areap in np.arange(0, 1, 0.01):
+            # for areap in np.arange(0, 1, 0.01):
+            for areap in np.arange(0, 1, 0.25):
                 print('        ', areap)
                 self.area(area, areap)
         print()
@@ -158,8 +166,9 @@ def plot(dataset, kind=None, other=True):
     ax = plt.subplot(111)
     se.plot(ax=ax, kind='bar', legend=False, width=0.5, rot=70)
     plt.tight_layout()
-    plt.ylim(0, 1)
+    plt.ylim(0, 1.6)
     # plt.show()
+    # pdb.set_trace()
     plt.savefig(
         'plots/clickmodels_' + dataset +
         ('_' + kind if kind is not None else '') + '.png'
@@ -177,6 +186,7 @@ def get_area_importance():
 if __name__ == '__main__':
     # get_area_importance()
     cm = ClickModel('wikipedia'); cm.run_all()
+    # plot('wikipedia')
     # for kind in [
     #     'all',
     #     'successful',

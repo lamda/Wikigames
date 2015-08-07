@@ -15,7 +15,7 @@ class WikipediaViewCounts(object):
         self.count = {}
         self.url = 'http://stats.grok.se/en/2015'
 
-    # @Cached
+    @Cached
     def get_frequency(self, title):
         return self.retrieve_frequency(title)
 
@@ -27,7 +27,7 @@ class WikipediaViewCounts(object):
         views, trials = 0, 0
         data = ''
         for month in months:
-            url = self.url + month + '/' + urllib2.quote(title.encode('utf-8'))
+            url = self.url + month + '/' + urllib2.quote(title)
             while not data:
                 try:
                     data = urllib2.urlopen(url).read()
