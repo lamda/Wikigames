@@ -120,7 +120,6 @@ class ClickModel(object):
         self.uniform()
         print('getting degree...')
         self.proportional('deg_in', 'In-Degree')
-        self.compare('In-Degree')
         print('getting N-Gram...')
         self.proportional('ngram', 'N-Gram')
         print('getting View Count...')
@@ -129,11 +128,11 @@ class ClickModel(object):
         for area in [
             'lead',
             'ib',
-            'ib_lead',
+            # 'ib_lead',
         ]:
             print('    ', area)
-            # for areap in np.arange(0, 1, 0.01):
-            for areap in np.arange(0, 1, 0.25):
+            for areap in np.arange(0, 1, 0.01):
+            # for areap in np.arange(0, 1, 0.25):
                 print('        ', areap)
                 self.area(area, areap)
         print()
@@ -148,31 +147,50 @@ class ClickModel(object):
         )
 
 
-def plot(dataset, kind=None, other=True):
+def plot_results(dataset, kind=None, other=True, normalized=False):
     se_full = pd.read_pickle(
         'data/clickmodels/' + dataset + '_results' +
         ('_' + kind if kind is not None else '') + '.obj'
     )
     se_filtered = se_full[[c for c in se_full.index if '.' not in c]]
-    keys = ['ib', 'lead', 'ib_lead']
+    keys = [
+        'ib',
+        'lead',
+        # 'ib_lead',
+    ]
     if other:
-        data, columns = se_filtered.values.tolist(), se_filtered.index.tolist()
+        # data, columns = se_filtered.values.tolist(), se_filtered.index.tolist()
+        # make sure View Count comes before Uniform
+        columns = ['Indegree', 'View Count', 'Bing N-Grams', 'Uniform']
+        data = se_filtered[columns].values.tolist()
     else:
         data, columns = [], []
     for key in keys:
-        data.append(se_full.filter(regex=key + '_\d').min())
-        columns.append(se_full.filter(regex=key + '_\d').idxmin())
+        data.append(se_full.filter(regex=r'^' + key + '_\d').min())
+        columns.append(se_full.filter(regex=r'^' + key + '_\d').idxmin())
     se = pd.Series(data=data, index=columns)
+    if normalized:
+        # via http://math.stackexchange.com/questions/51482
+        se = se.apply(lambda x: 1 - np.exp(-x))
+    print('\n\n', dataset, kind, '\n', se)
     ax = plt.subplot(111)
-    se.plot(ax=ax, kind='bar', legend=False, width=0.5, rot=70)
+    se.plot(ax=ax, kind='bar', legend=False, width=0.6, rot=70, fontsize=18)
     plt.tight_layout()
-    plt.ylim(0, 1.6)
-    # plt.show()
-    # pdb.set_trace()
-    plt.savefig(
-        'plots/clickmodels_' + dataset +
-        ('_' + kind if kind is not None else '') + '.png'
-    )
+    plt.ylim(0, max(se) * 1.075)
+    label_offset = max(se) * 0.01
+    for p in ax.patches:
+        ax.annotate(
+            '%.2f' % p.get_height(),
+            (p.get_x() + p.get_width() / 2., p.get_height() + label_offset),
+            ha='center',
+            fontsize=14,
+        )
+    ofname = 'plots/clickmodels_' + dataset +\
+             ('_normalized' if normalized else '') +\
+             ('_' + kind if kind is not None else '')
+    plt.savefig(ofname + '.pdf')
+    plt.savefig(ofname + '.png')
+    plt.close()
 
 
 def get_area_importance():
@@ -183,14 +201,17 @@ def get_area_importance():
         lp_all = df['linkpos_all'].apply(len).sum()
         print('%.2f (IB) %.2f (LEAD)' % (lp_ib/lp_all, lp_lead/lp_all))
 
+
 if __name__ == '__main__':
     # get_area_importance()
-    cm = ClickModel('wikipedia'); cm.run_all()
-    # plot('wikipedia')
-    # for kind in [
-    #     'all',
-    #     'successful',
-    #     'unsuccessful'
-    # ]:
+
+    # cm = ClickModel('wikipedia'); cm.run_all()
+    plot_results('wikipedia', normalized=False)
+
+    for kind in [
+        'all',
+        'successful',
+        'unsuccessful'
+    ]:
     #     cm = ClickModel('wikispeedia', kind); cm.run_all()
-    #     plot('wikispeedia', kind)
+        plot_results('wikispeedia', kind, normalized=False)
