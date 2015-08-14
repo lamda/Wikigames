@@ -13,16 +13,23 @@ import pdb
 import scipy.stats
 # import seaborn as sns
 
+import decorators
+
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 400)
 
 
 class ClickModel(object):
-    def __init__(self, dataset, kind=None):
+    def __init__(self, dataset, kind=None, step=None, spl=None, pl=None):
         self.dataset = dataset
         self.kind = kind
+        self.step = step
+        self.spl = spl
+        self.pl = pl
+        self.suffix = self.get_suffix()
         if dataset == 'wikispeedia':
-            fpath = 'data/clickmodels/wikispeedia_' + kind + '.obj'
+            fpath = 'data/clickmodels/wikispeedia_' + kind + self.suffix +\
+                    '.obj'
         elif dataset == 'wikipedia':
             fpath = 'data/clickmodels/wikipedia_all.obj'
         else:
@@ -30,7 +37,12 @@ class ClickModel(object):
             raise NotImplemented
         self.df = pd.read_pickle(fpath)
         with open('data/clickmodels/' + dataset + '_stats.obj', 'rb') as infile:
-            self.stats = pickle.load(infile)
+            stats_orig = pickle.load(infile)
+        self.stats = {}
+        for key, val in stats_orig.iteritems():
+            self.stats[key] = {k: v for k, v in val.iteritems()}
+            # self.stats[key] = {k: np.log(v+1) for k, v in val.iteritems()}
+            # self.stats[key] = {k: 1/(v+1) for k, v in val.iteritems()}
         self.sources = set(self.df['source'])
         self.targets = set(self.df['target'])
         self.keys = sorted(self.sources | self.targets)
@@ -41,6 +53,18 @@ class ClickModel(object):
         self.clicks = {key: self.df_source.get_group(key)['amount'].sum()
                        for key in self.sources}
         self.clicks = {k: v for k, v in self.clicks.items() if v > 0}
+        self.wg = None
+        self.linkpos_type = 'linkpos_first'
+
+    def get_suffix(self):
+        suffix = ''
+        if self.step is not None:
+            suffix += '_step_' + unicode(self.step)
+        if self.spl is not None:
+            suffix += '_spl_' + unicode(self.spl)
+        if self.pl is not None:
+            suffix += '_pl_' + unicode(self.pl)
+        return suffix
 
     def update_data(self, label, data2):
         for k, v in data2.iteritems():
@@ -54,7 +78,7 @@ class ClickModel(object):
     def compare(self, m2):
         m1 = 'Ground Truth'
         kl = np.abs(scipy.stats.entropy(self.data[m1], self.data[m2], base=2))
-        print('\t%.4f\t%s' % (kl, m2))
+        print('        %.3f\t%s' % (kl, m2))
         return kl
 
     def compare_all(self):
@@ -69,7 +93,7 @@ class ClickModel(object):
     def uniform(self):
         for key, clicks_total in self.clicks.items():
             df_sub = self.df_source.get_group(key)
-            lps = df_sub['linkpos_all'].apply(len)
+            lps = df_sub[self.linkpos_type].apply(len)
             lp_total = lps.sum()
             for k, v in zip(df_sub['target'], lps):
                 self.data['Uniform'][k] += clicks_total * v / lp_total
@@ -98,44 +122,72 @@ class ClickModel(object):
     def proportional(self, stat, stat_label):
         for key, clicks_total in self.clicks.items():
             df_sub = self.df_source.get_group(key)
-            lps = df_sub['linkpos_all'].apply(len)
+            lps = df_sub[self.linkpos_type].apply(len)
             prop = df_sub['target'].apply(lambda x: self.stats[stat][x])
             total = np.dot(lps, prop)
             for k, l, d in zip(df_sub['target'], lps, prop):
                 self.data[stat_label][k] += clicks_total * l * d / total
 
+    def tfidf(self):
+        assert self.dataset == 'wikispeedia'
+        from main import Wikispeedia
+        self.wg = Wikispeedia()
+        self.wg.load_data()
+        df = self.wg.data
+        df = df[~df['backtrack']]
+        df = df[df['successful'] == (self.kind == 'successful')]
+        if self.step is not None:
+            df = df[df['step'] == self.step]
+        if self.spl is not None:
+            df = df[df['spl'] == self.spl]
+        if self.pl is not None:
+            df = df[df['pl'] == self.pl]
+        df = df[['node', 'node_id', 'target', 'target_id']]
+
+        for idx, row in enumerate(df.iterrows()):
+            print(idx+1, '/', df.shape[0], end='\r')
+            row = row[1]
+            weights = self.get_tfidf_prob(row['node'], row['node_id'],
+                                          row['target_id'])
+            for k, v in weights.iteritems():
+                self.data['TF-IDF'][k] += v
+
+    def get_tfidf_prob(self, node, node_id, target_id):
+        df_sub = self.df_source.get_group(node)
+        lps = df_sub[self.linkpos_type].apply(len)
+        lmbd = lambda x: self.wg.get_tfidf_similarity(node_id, x)
+        prop = df_sub['target_id'].apply(lmbd)
+        total = np.dot(lps, prop)
+        dct = {}
+        for k, l, d in zip(df_sub['target'], lps, prop):
+            dct[k] = l * d / total
+        return dct
+
     def run(self):
+        # print('getting Ground Truth...')
         self.ground_truth()
+        # print('getting Uniform...')
         self.uniform()
-        self.proportional('ngram', 'N-Gram')
+        # print('getting degree...')
         self.proportional('deg_in', 'In-Degree')
-        self.proportional('view_count', 'View Count')
-
-        self.compare_all()
-
-    def run_all(self):
-        print('getting Ground Truth...')
-        self.ground_truth()
-        print('getting Uniform...')
-        self.uniform()
-        print('getting degree...')
-        self.proportional('deg_in', 'In-Degree')
-        print('getting N-Gram...')
+        # print('getting N-Gram...')
         self.proportional('ngram', 'N-Gram')
-        print('getting View Count...')
+        # print('getting View Count...')
         self.proportional('view_count', 'View Count')
-        print('getting areas...')
-        for area in [
-            'lead',
-            'ib',
-            # 'ib_lead',
-        ]:
-            print('    ', area)
-            for areap in np.arange(0, 1, 0.01):
-            # for areap in np.arange(0, 1, 0.25):
-                print('        ', areap)
-                self.area(area, areap)
-        print()
+        # print('getting TF-IDF...')
+        self.tfidf()
+        # print('getting areas...')
+        # for area in [
+        #     'lead',
+        #     'ib',
+        #     # 'ib_lead',
+        # ]:
+        #     print('    ', area, '\n')
+        #     for areap in np.arange(0, 1, 0.01):
+        #     # for areap in np.arange(0, 1, 0.25):
+        #         print('        ', areap, end='\r')
+        #         self.area(area, areap)
+        # print()
         self.normalize()
         columns = sorted(self.data)
         columns.remove('Ground Truth')
@@ -143,16 +195,26 @@ class ClickModel(object):
         se = pd.Series(data=data, index=columns)
         se.to_pickle(
             'data/clickmodels/' + self.dataset + '_results' +
-            ('_' + self.kind if self.kind is not None else '') + '.obj'
+            ('_' + self.kind if self.kind is not None else '') + self.suffix +
+            '.obj'
         )
 
 
-def plot_results(dataset, kind=None, other=True, normalized=False):
+def plot_results(dataset, kind=None, other=True, normalized=False,
+                 step=None, spl=None, pl=None):
+    suffix = ''
+    if step is not None:
+        suffix += '_step_' + unicode(step)
+    if spl is not None:
+        suffix += '_spl_' + unicode(spl)
+    if pl is not None:
+        suffix += '_pl_' + unicode(pl)
     se_full = pd.read_pickle(
         'data/clickmodels/' + dataset + '_results' +
-        ('_' + kind if kind is not None else '') + '.obj'
+        ('_' + kind if kind is not None else '') + suffix + '.obj'
     )
     se_filtered = se_full[[c for c in se_full.index if '.' not in c]]
+    pdb.set_trace()
     keys = [
         'ib',
         'lead',
@@ -187,7 +249,7 @@ def plot_results(dataset, kind=None, other=True, normalized=False):
         )
     ofname = 'plots/clickmodels_' + dataset +\
              ('_normalized' if normalized else '') +\
-             ('_' + kind if kind is not None else '')
+             ('_' + kind if kind is not None else '') + suffix
     plt.savefig(ofname + '.pdf')
     plt.savefig(ofname + '.png')
     plt.close()
@@ -206,12 +268,29 @@ if __name__ == '__main__':
     # get_area_importance()
 
     # cm = ClickModel('wikipedia'); cm.run_all()
-    plot_results('wikipedia', normalized=False)
+    # plot_results('wikipedia', normalized=False)
+    #
+    # for kind in [
+    #     # 'all',
+    #     # 'successful',
+    #     'unsuccessful'
+    # ]:
+    #     cm = ClickModel('wikispeedia', kind); cm.run()
+    #     # plot_results('wikispeedia', kind, normalized=False)
 
-    for kind in [
-        'all',
-        'successful',
-        'unsuccessful'
-    ]:
-    #     cm = ClickModel('wikispeedia', kind); cm.run_all()
-        plot_results('wikispeedia', kind, normalized=False)
+    print('SPL = 3')
+    for step in range(3):
+        print('    STEP =', step)
+        cm = ClickModel('wikispeedia', 'successful', step=step, spl=3, pl=4)
+        cm.run()
+        print('\n\n')
+
+    # print('SPL = 4')
+    # for step in range(4):
+    #     print('    STEP =', step)
+    #     cm = ClickModel('wikispeedia', 'successful', step=step, spl=3, pl=4)
+    #     cm.run()
+    #     print('\n\n')
+
+    # cm.run()
+    # plot_results('wikispeedia', 'successful', step=0, spl=3, pl=4)

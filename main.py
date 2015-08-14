@@ -633,11 +633,13 @@ class Wikigame(object):
 
     def compare_models_stepwise(self):
         self.load_data()
+        self.data = self.data[~self.data['backtrack']]  # TODO
+        self.data = self.data[self.data['spl'] == 3]  # TODO
         self.load_link_positions()
         df_result = pd.DataFrame(columns=['df', 'pl', 'step', 'model', 'kld'])
         for label, df_full in [
             ('all', self.data),
-            ('usa', self.data[self.data['usa']]),
+            # ('usa', self.data[self.data['usa']]),
             ('no usa', self.data[~self.data['usa']]),
         ]:
             print('+++++++++++++++++', label, '+++++++++++++++++')
@@ -724,12 +726,18 @@ class Wikigame(object):
         pdb.set_trace()
 
     # @decorators.Cached
-    def get_source2target(self, kind='all'):
+    def get_source2target(self, kind='all', step=None, spl=None, pl=None):
         self.load_data(force=True)
         if kind == 'successful':
             self.data = self.data[self.data['successful']]
         elif kind == 'unsuccessful':
             self.data = self.data[~self.data['successful']]
+        if step is not None:
+            self.data = self.data[self.data['step'] == step]
+        if spl is not None:
+            self.data = self.data[self.data['spl'] == spl]
+        if pl is not None:
+            self.data = self.data[self.data['pl'] == pl]
         df = self.data[['node', 'node_id', 'backtrack', 'linkpos_first']]
         df['target'] = df['node'].shift(-1)
         df['target_id'] = df['node_id'].shift(-1)
@@ -747,8 +755,8 @@ class Wikigame(object):
         return source2target
 
     # @decorators.Cached
-    def get_model_df(self, kind='all'):
-        source2target = self.get_source2target(kind)
+    def get_model_df(self, kind='all', step=None, spl=None, pl=None):
+        source2target = self.get_source2target(kind, step, spl, pl)
         self.load_link_positions()
         results = []
         for idx, key in enumerate(sorted(self.length.keys())):
@@ -771,8 +779,8 @@ class Wikigame(object):
                 continue
             source = [key] * len(link2pos)
             source_id = [self.name2id[key]] * len(link2pos)
-            linkpos_first = [link2pos[t][0] for t in targets]
-            linkpos_last = [link2pos[t][-1] for t in targets]
+            linkpos_first = [[link2pos[t][0]] for t in targets]
+            linkpos_last = [[link2pos[t][-1]] for t in targets]
             linkpos_ib = [
                 [l for l in link2pos[t] if l < ib_length] for t in targets
             ]
@@ -814,7 +822,14 @@ class Wikigame(object):
             )
             results.append(df)
         df = pd.concat(results)
-        df.to_pickle('data/clickmodels/wikispeedia_' + kind + '.obj')
+        suffix = ''
+        if step is not None:
+            suffix += '_step_' + unicode(step)
+        if spl is not None:
+            suffix += '_spl_' + unicode(spl)
+        if pl is not None:
+            suffix += '_pl_' + unicode(pl)
+        df.to_pickle('data/clickmodels/wikispeedia_' + kind + suffix + '.obj')
 
     def get_stats(self):
         stats = {
@@ -1314,13 +1329,12 @@ if __name__ == '__main__':
     # get_wikipedia_ngrams(350000, 400000)
     # get_wikipedia_view_counts(500000, None)
     # combine_stats()
-    get_stats_wikipedia()
+    # get_stats_wikipedia()
 
-
-    # for wg in [
+    for wg in [
         # WIKTI(successful=True),
-        # Wikispeedia()
-    # ]:
+        Wikispeedia()
+    ]:
         # wg.compute_link_positions()
         # wg.create_correlation_data()
         # wg.create_dataframe(limit=None)
@@ -1328,11 +1342,17 @@ if __name__ == '__main__':
         # wg.add_means()
 
         # wg.compare_models_lead()
-        # wg.compare_models_stepwise()
+        wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
 
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
         # wg.get_model_df('unsuccessful')
+        # for step in range(3):
+        #     wg.get_model_df('successful', step=step, spl=3, pl=4)
+        # for step in range(4):
+        #     wg.get_model_df('successful', step=step, spl=4, pl=5)
+
+        # wg.get_model_df('unsuccessful', step=0, spl=3, pl=4)
         # wg.get_stats()
