@@ -89,17 +89,20 @@ class GroundTruthModel(NavigationModel):
         for k, v in zip(vc.index, vc.values):
             self.node2weight[k] += v
         self.set_data()
+        # hugo = {self.wikigame.id2title[k]: v for k, v in self.node2weight.items()}
+        # pdb.set_trace()
 
 
-class RandomModel(NavigationModel):
+class UniformModel(NavigationModel):
     def __init__(self, start, pos, wikigame):
-        super(RandomModel, self).__init__(start, pos, wikigame, 'Random')
+        super(UniformModel, self).__init__(start, pos, wikigame, 'Uniform')
 
     def compute(self):
         for node, pos in zip(self.start, self.pos):
             neighbors = self.get_neighbors(node, pos, window=self.window)
             for n in neighbors:
                 self.node2weight[n] += 1
+        pdb.set_trace()
         self.set_data()
 
 

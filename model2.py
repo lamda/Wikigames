@@ -5,18 +5,17 @@ from __future__ import division, print_function, unicode_literals
 import collections
 import cPickle as pickle
 import matplotlib.pyplot as plt
-plt.style.use('ggplot')  # TODO
 import numpy as np
 import os
 import pandas as pd
 import pdb
 import scipy.stats
-# import seaborn as sns
 
 import decorators
 
 pd.options.mode.chained_assignment = None
 pd.set_option('display.width', 400)
+plt.style.use('ggplot')  # TODO
 
 
 class ClickModel(object):
@@ -36,6 +35,7 @@ class ClickModel(object):
             print('unrecognized parameter')
             raise NotImplemented
         self.df = pd.read_pickle(fpath)
+        # self.df = self.df[self.df['source'] == 'Africa']
         with open('data/clickmodels/' + dataset + '_stats.obj', 'rb') as infile:
             stats_orig = pickle.load(infile)
         self.stats = {}
@@ -46,7 +46,7 @@ class ClickModel(object):
         self.sources = set(self.df['source'])
         self.targets = set(self.df['target'])
         self.keys = sorted(self.sources | self.targets)
-        func_dict = lambda: {k: 0.01 for k in self.keys}
+        func_dict = lambda: {k: 0.0001 for k in self.keys}
         self.data = collections.defaultdict(func_dict)
         self.df_source = self.df.groupby('source')
         self.df_target = self.df.groupby('target')
@@ -54,7 +54,7 @@ class ClickModel(object):
                        for key in self.sources}
         self.clicks = {k: v for k, v in self.clicks.items() if v > 0}
         self.wg = None
-        self.linkpos_type = 'linkpos_first'
+        self.linkpos_type = 'linkpos_all'  # TODO
 
     def get_suffix(self):
         suffix = ''
@@ -78,7 +78,7 @@ class ClickModel(object):
     def compare(self, m2):
         m1 = 'Ground Truth'
         kl = np.abs(scipy.stats.entropy(self.data[m1], self.data[m2], base=2))
-        print('        %.3f\t%s' % (kl, m2))
+        # print('        %.3f\t%s' % (kl, m2))
         return kl
 
     def compare_all(self):
@@ -89,6 +89,7 @@ class ClickModel(object):
     def ground_truth(self):
         iterable = self.df_target['amount'].sum().iteritems()
         self.update_data('Ground Truth', {k: v for k, v in iterable})
+        # pdb.set_trace()
 
     def uniform(self):
         for key, clicks_total in self.clicks.items():
@@ -164,40 +165,71 @@ class ClickModel(object):
         return dct
 
     def run(self):
-        # print('getting Ground Truth...')
+        print('getting Ground Truth...')
         self.ground_truth()
         # print('getting Uniform...')
         self.uniform()
-        # print('getting degree...')
+        print('getting degree...')
         self.proportional('deg_in', 'In-Degree')
         # print('getting N-Gram...')
         self.proportional('ngram', 'N-Gram')
         # print('getting View Count...')
         self.proportional('view_count', 'View Count')
         # print('getting TF-IDF...')
-        self.tfidf()
-        # print('getting areas...')
-        # for area in [
-        #     'lead',
-        #     'ib',
-        #     # 'ib_lead',
-        # ]:
-        #     print('    ', area, '\n')
-        #     for areap in np.arange(0, 1, 0.01):
-        #     # for areap in np.arange(0, 1, 0.25):
-        #         print('        ', areap, end='\r')
-        #         self.area(area, areap)
-        # print()
+        # self.tfidf()
+        print('getting areas...')
+        for area in [
+            'lead',
+            'ib',
+            'ib_lead',
+        ]:
+            print('    ', area, '\n')
+            # for areap in np.arange(0, 1, 0.01):
+            for areap in np.arange(0, 1, 0.1):
+                print('        ', areap, end='\r')
+                self.area(area, areap)
+        print()
         self.normalize()
         columns = sorted(self.data)
         columns.remove('Ground Truth')
         data = [self.compare(key) for key in columns]
+        columns, data = self.max_area(columns, data)
         se = pd.Series(data=data, index=columns)
+        se.sort()
+        for key, val in se.iteritems():
+            print('%.2f\t%s' % (val, key))
         se.to_pickle(
             'data/clickmodels/' + self.dataset + '_results' +
             ('_' + self.kind if self.kind is not None else '') + self.suffix +
             '.obj'
         )
+
+
+    def max_area(self, columns, data):
+        keys, vals = [], []
+        ib_key, ib_val = '', 100
+        lead_key, lead_val = '', 100
+        ib_lead_key, ib_lead_val = '', 100
+        for c, d in zip(columns, data):
+            if c.startswith('ib_lead_') and d < ib_lead_val:
+                ib_lead_key, ib_lead_val = c, d
+            if c.startswith('ib_') and not c.startswith('ib_lead') and d < ib_val:
+                ib_key, ib_val = c, d
+            elif c.startswith('lead_') and d < lead_val:
+                lead_key, lead_val = c, d
+            if not c.startswith('ib_') and not c.startswith('lead_'):
+                keys.append(c)
+                vals.append(d)
+        if ib_val < 100:
+            keys.append(ib_key)
+            vals.append(ib_val)
+        if ib_lead_val < 100:
+            keys.append(ib_lead_key)
+            vals.append(ib_lead_val)
+        if lead_val < 100:
+            keys.append(lead_key)
+            vals.append(lead_val)
+        return keys, vals
 
 
 def plot_results(dataset, kind=None, other=True, normalized=False,
@@ -267,23 +299,24 @@ def get_area_importance():
 if __name__ == '__main__':
     # get_area_importance()
 
-    # cm = ClickModel('wikipedia'); cm.run_all()
+    cm = ClickModel('wikipedia'); cm.run()
     # plot_results('wikipedia', normalized=False)
     #
     # for kind in [
-    #     # 'all',
-    #     # 'successful',
-    #     'unsuccessful'
+    #     'all',
+        # 'successful',
+        # 'unsuccessful'
     # ]:
+    #     print(kind)
     #     cm = ClickModel('wikispeedia', kind); cm.run()
-    #     # plot_results('wikispeedia', kind, normalized=False)
+    #     plot_results('wikispeedia', kind, normalized=False)
 
-    print('SPL = 3')
-    for step in range(3):
-        print('    STEP =', step)
-        cm = ClickModel('wikispeedia', 'successful', step=step, spl=3, pl=4)
-        cm.run()
-        print('\n\n')
+    # print('---------------- PATH LENGTH', 4, '----------------\n')
+    # for step in range(3):
+    #     print('--------', step, '--------')
+    #     cm = ClickModel('wikispeedia', 'successful', step=step, spl=3, pl=4)
+    #     cm.run()
+    #     print()
 
     # print('SPL = 4')
     # for step in range(4):

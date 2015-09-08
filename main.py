@@ -633,8 +633,9 @@ class Wikigame(object):
 
     def compare_models_stepwise(self):
         self.load_data()
-        self.data = self.data[~self.data['backtrack']]  # TODO
+        self.data = self.data[~self.data['backtrack']]
         self.data = self.data[self.data['spl'] == 3]  # TODO
+        self.data = self.data[self.data['successful']]
         self.load_link_positions()
         df_result = pd.DataFrame(columns=['df', 'pl', 'step', 'model', 'kld'])
         for label, df_full in [
@@ -653,23 +654,24 @@ class Wikigame(object):
                 print('----------------PATH LENGTH', pl, '----------------')
                 for step in range(pl-1):
                     print('\n--------', step, '--------')
+                    # df = df[df['node'] == 'Africa']
                     first = df[df['step'] == step]['node_id']
                     pos = df[df['step'] == step]['linkpos_first']
-                    second = df[df['step'] == step+1]['node_id']
+                    second = df[df['step'] == step]['node_next_id']
                     gm = model.GroundTruthModel(first, pos, second, self)
                     gm.compute()
                     mdls = []
                     for mdl in [
-                        model.RandomModel,
+                        model.UniformModel,
                         model.DegreeModel,
                         model.ViewCountModel,
                         model.NgramModel,
-                        # model.CategoryModel,
+                        model.CategoryModel,
                         model.TfidfModel,
                         model.LinkPosModel,
-                        # model.LinkPosDegreeModel,
-                        # model.LinkPosNgramModel,
-                        # model.LinkPosViewCountModel,
+                        ## model.LinkPosDegreeModel,
+                        ## model.LinkPosNgramModel,
+                        ## model.LinkPosViewCountModel,
                     ]:
                         mdls.append(mdl(first, pos, self))
 
@@ -728,24 +730,25 @@ class Wikigame(object):
     # @decorators.Cached
     def get_source2target(self, kind='all', step=None, spl=None, pl=None):
         self.load_data(force=True)
-        if kind == 'successful':
-            self.data = self.data[self.data['successful']]
-        elif kind == 'unsuccessful':
-            self.data = self.data[~self.data['successful']]
-        if step is not None:
-            self.data = self.data[self.data['step'] == step]
-        if spl is not None:
-            self.data = self.data[self.data['spl'] == spl]
-        if pl is not None:
-            self.data = self.data[self.data['pl'] == pl]
-        df = self.data[['node', 'node_id', 'backtrack', 'linkpos_first']]
+        df = self.data
         df['target'] = df['node'].shift(-1)
         df['target_id'] = df['node_id'].shift(-1)
-        df.columns = ['source', 'source_id'] + df.columns[2:].tolist()
         df = df[~df['backtrack']]
         df = df.dropna()
-        df = df[['source', 'source_id', 'target', 'target_id']]
-        df['amount'] = df.groupby(['source', 'target']).transform('count')['source_id']
+        if kind == 'successful':
+            df = df[df['successful']]
+        elif kind == 'unsuccessful':
+            df = df[~df['successful']]
+        if step is not None:
+            df = df[df['step'] == step]
+        if spl is not None:
+            df = df[df['spl'] == spl]
+        if pl is not None:
+            df = df[df['pl'] == pl]
+        df = df[['node', 'node_id', 'node_next', 'node_next_id']]
+        df.columns = ['source', 'source_id', 'target', 'target_id']
+        df['amount'] = df.groupby(['source', 'target']) \
+            .transform('count')['source_id']
         df = df.drop_duplicates(subset=['source', 'target'])
         source2target = {}
         for source in set(df['source']):
@@ -1342,13 +1345,13 @@ if __name__ == '__main__':
         # wg.add_means()
 
         # wg.compare_models_lead()
-        wg.compare_models_stepwise()
+        # wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
 
-        # wg.get_model_df('all')
-        # wg.get_model_df('successful')
-        # wg.get_model_df('unsuccessful')
+        wg.get_model_df('all')
+        wg.get_model_df('successful')
+        wg.get_model_df('unsuccessful')
         # for step in range(3):
         #     wg.get_model_df('successful', step=step, spl=3, pl=4)
         # for step in range(4):
