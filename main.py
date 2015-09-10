@@ -728,9 +728,12 @@ class Wikigame(object):
         pdb.set_trace()
 
     # @decorators.Cached
-    def get_source2target(self, kind='all', step=None, spl=None, pl=None):
+    def get_source2target(self, kind, step=None, spl=None, pl=None,
+                          no_usa=False):
         self.load_data(force=True)
         df = self.data
+        if no_usa:
+            self.data = self.data[~self.data['usa']]
         df['target'] = df['node'].shift(-1)
         df['target_id'] = df['node_id'].shift(-1)
         df = df[~df['backtrack']]
@@ -758,8 +761,8 @@ class Wikigame(object):
         return source2target
 
     # @decorators.Cached
-    def get_model_df(self, kind='all', step=None, spl=None, pl=None):
-        source2target = self.get_source2target(kind, step, spl, pl)
+    def get_model_df(self, kind, step=None, spl=None, pl=None, no_usa=False):
+        source2target = self.get_source2target(kind, step, spl, pl, no_usa)
         self.load_link_positions()
         results = []
         for idx, key in enumerate(sorted(self.length.keys())):
@@ -832,7 +835,9 @@ class Wikigame(object):
             suffix += '_spl_' + unicode(spl)
         if pl is not None:
             suffix += '_pl_' + unicode(pl)
-        df.to_pickle('data/clickmodels/wikispeedia_' + kind + suffix + '.obj')
+        usa_suffix = '_no_usa' if no_usa else ''
+        df.to_pickle('data/clickmodels/wikispeedia_' + kind + usa_suffix +
+                     suffix + '.obj')
 
     def get_stats(self):
         stats = {
@@ -1349,13 +1354,21 @@ if __name__ == '__main__':
         # wg.compare_models_first()
         # wg.compare_mi()
 
-        wg.get_model_df('all')
-        wg.get_model_df('successful')
-        wg.get_model_df('unsuccessful')
-        # for step in range(3):
-        #     wg.get_model_df('successful', step=step, spl=3, pl=4)
-        # for step in range(4):
-        #     wg.get_model_df('successful', step=step, spl=4, pl=5)
+        # wg.get_model_df('all')
+        # wg.get_model_df('successful')
+        # wg.get_model_df('unsuccessful')
+        for no_usa in [
+            False,
+            # True,
+        ]:
+            for step in range(3):
+                wg.get_model_df('successful', step=step, spl=3, pl=4, no_usa=no_usa)
+            for step in range(5):
+                wg.get_model_df('successful', step=step, spl=3, pl=5, no_usa=no_usa)
+            for step in range(6):
+                wg.get_model_df('successful', step=step, spl=3, pl=6, no_usa=no_usa)
+            for step in range(7):
+                wg.get_model_df('successful', step=step, spl=3, pl=7, no_usa=no_usa)
 
         # wg.get_model_df('unsuccessful', step=0, spl=3, pl=4)
         # wg.get_stats()

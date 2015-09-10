@@ -464,6 +464,7 @@ def plot_models():
     ]
     path = os.path.join('data', 'Wikispeedia', 'models.obj')
     df_full = pd.read_pickle(path)
+    pdb.set_trace()
     df_full['model'] = df_full['model'].apply(lambda x: x.replace(' 0.40', ''))
     df_full['model'] = df_full['model'].apply(lambda x: x.replace('Ngram', 'N-gram'))
     df_full['distance-to-go'] = df_full['pl'] - 1 - df_full['step']
@@ -574,7 +575,7 @@ class Plot(object):
 
     def set_xlim(self, xlim):
         for ax in self.axes:
-            ax.set_ylim(xlim[0], xlim[1])
+            ax.set_xlim(xlim[0], xlim[1])
 
     def set_ylim(self, ylim):
         for ax in self.axes:
@@ -696,8 +697,12 @@ class Plot(object):
 
         # sns.despine(fig=self.fig)
 
-        legend_grayscales = kwargs.pop('legend_grayscales', False)
-        self.plot_legend(self.figs[0], fname, grayscales=legend_grayscales)
+        legend_type = kwargs.pop('legend', 'all')
+        if legend_type == 'external':
+            legend_grayscales = kwargs.pop('legend_grayscales', False)
+            self.plot_legend(self.figs[0], fname, grayscales=legend_grayscales)
+        else:
+            self.add_legend(legend_type)
         # self.set_only_integer_xticks()
         # self.set_only_integer_yticks()
         # if kwargs.pop('ylabeltok', False):
@@ -706,20 +711,21 @@ class Plot(object):
         for fig, label in zip(self.figs, self.labels):
             fig.subplots_adjust(**self.adjust)
             fig.savefig(fname + '_' + label + self.filextension)
-            # plt.show()
+            if kwargs.pop('show', False):
+                plt.show()
             plt.close(fig)
 
 
 if __name__ == '__main__':
-    for pt in [
-        Plotter(['Wikispeedia']),
+    # for pt in [
+    #     Plotter(['Wikispeedia']),
     #     # Plotter(['Wikispeedia'], 4),
     #     # Plotter(['WIKTI']),
     #     # Plotter(['WIKTI', 'Wikispeedia']),
     #     # Plotter(['WIKTI', 'WIKTI2']),
     #     # Plotter(['WIKTI', 'WIKTI2', 'WIKTI3']),
-    ]:
-        pt.plot_linkpos_fill_between()
+    # ]:
+        # pt.plot_linkpos_fill_between()
         # pt.plot_split()
 
         # pt.plot_comparison()
@@ -732,5 +738,5 @@ if __name__ == '__main__':
         # pt.correlation_max()
         # pt.mutual_information()
 
-    # plot_models()
+    plot_models()
     # print_models()

@@ -102,7 +102,6 @@ class UniformModel(NavigationModel):
             neighbors = self.get_neighbors(node, pos, window=self.window)
             for n in neighbors:
                 self.node2weight[n] += 1
-        pdb.set_trace()
         self.set_data()
 
 
