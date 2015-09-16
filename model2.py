@@ -89,7 +89,6 @@ class ClickModel(object):
     def ground_truth(self):
         iterable = self.df_target['amount'].sum().iteritems()
         self.update_data('Ground Truth', {k: v for k, v in iterable})
-        # pdb.set_trace()
 
     def uniform(self):
         for key, clicks_total in self.clicks.items():
@@ -280,6 +279,10 @@ def plot_results(dataset, kind=None, other=True, normalized=False,
         # via http://math.stackexchange.com/questions/51482
         se = se.apply(lambda x: 1 - np.exp(-x))
 
+        # alternative approach - divide by max in series
+        # se /= max(se)
+
+
     print('\n\n', dataset, kind, '\n', se)
     ax = plt.subplot(111)
     b = se.plot(ax=ax, kind='bar', legend=False, width=0.6, rot=70, fontsize=18)
@@ -287,7 +290,6 @@ def plot_results(dataset, kind=None, other=True, normalized=False,
                   b.get_children())
     for bar, c in zip(bars, colors):
         bar.set_color(c)
-    plt.tight_layout()
     if normalized:
         plt.ylim(0, 1.075)
     else:
@@ -301,6 +303,8 @@ def plot_results(dataset, kind=None, other=True, normalized=False,
             ha='center',
             fontsize=14,
         )
+    plt.ylabel('KL divergence (bits)')
+    plt.tight_layout()
     ofname = 'plots/clickmodels_' + dataset +\
              ('_normalized' if normalized else '') +\
              ('_' + kind if kind is not None else '') + suffix
@@ -317,6 +321,22 @@ def get_area_importance():
         lp_lead = df['linkpos_lead'].apply(len).sum()
         lp_all = df['linkpos_all'].apply(len).sum()
         print('    %.2f (IB) %.2f (LEAD)' % (lp_ib/lp_all, lp_lead/lp_all))
+
+
+def get_distribution_stats():
+    cm = ClickModel('wikispeedia', 'all')
+    cm.ground_truth()
+    cm.normalize()
+    ws = sorted(cm.data['Ground Truth'])
+
+    cm = ClickModel('wikipedia')
+    cm.ground_truth()
+    cm.normalize()
+    wp = sorted(cm.data['Ground Truth'])
+
+    plt.plot(ws, label='wikispeedia')
+    plt.plot(wp, label='wikipedia')
+    pdb.set_trace()
 
 
 def compare_models_stepwise():
@@ -381,16 +401,17 @@ def plot_models():
         '6',
         '7',
     ]
+    models = {'Uniform', 'Lead', 'In-Degree', 'TF-IDF'}
     plot_labels = ['gl_' + unicode(int(gl)) for gl in pls]
     for label in [
             'all',
             # 'usa',
-            'no_usa',
+            # 'no_usa',
     ]:
-        print(label)
-        p = Plot(plot_labels, len(pls), filextension='.png')
+        print('+++++++++++++++++', label, '+++++++++++++++++')
+        p = Plot(plot_labels, len(pls), filextension='.pdf')
         for col_idx, pl in enumerate(pls):
-            print('    ', pl)
+            print('\n----------------PATH LENGTH', pl, '----------------')
             df = pd.read_pickle(
                 'data/clickmodels/models_stepwise_' + label + '_pl_' + pl +
                 '.obj'
@@ -398,31 +419,38 @@ def plot_models():
             df['model'] = df['model'].apply(convert_label)
             df['distance-to-go'] = df['pl'] - 1 - df['step']
 
+            # print to console
+            for step in range(int(pl)-1):
+                print('    --------', step, '--------')
+                for ridx, row in enumerate(df[df['step'] == step].sort('kld').iterrows()):
+                    # if row[1]['model'] not in models:
+                    #     continue
+                    print('        %.2f %s' % (row[1]['kld'], row[1]['model']))
+                    # if ridx > 1:
+                    #     break
+            print()
+
             for mdl, c, m in plot_settings:
+                if mdl not in models:
+                    continue
                 data = df[df['model'] == mdl]['kld'].tolist()
                 x = df[df['model'] == mdl]['distance-to-go'].tolist()
                 ls = '--' if mdl == 'Random' else '-'
                 p.add_plot(x, data, col=col_idx, label=mdl, marker=m, color=c,
                            ls=ls)
         fpath = os.path.join('plots', 'models_' + label.replace(' ', '_'))
-        p.finish(fpath, suptitle=label2title[label], xlim=(0, 6),
+        p.finish(fpath, suptitle=label2title[label], xlim=(0.5, 6),
                  legend='external', xlabel='Distance to-go to target',
                  ylabel='KL divergence (bits)', invert_xaxis=True,
                  show=False)
 
 
 if __name__ == '__main__':
-    get_area_importance()
+    # --------------------------------------------------------------------------
+    # get_area_importance()
+    # get_distribution_stats()
 
     # --------------------------------------------------------------------------
-    # compute stepwise
-    # compare_models_stepwise()
-
-    # plot stepwise
-    # plot_models()
-
-    # --------------------------------------------------------------------------
-    # compute aggregated
     # cm = ClickModel('wikipedia'); cm.run(areas=True)
 
     # for kind in [
@@ -437,7 +465,7 @@ if __name__ == '__main__':
     # plot aggregated
     # plot_results('wikipedia', normalized=False)
     # plot_results('wikipedia', normalized=True)
-
+    #
     # for kind in [
     #     'all',
     #     'successful',
@@ -446,3 +474,9 @@ if __name__ == '__main__':
     #     print('Wikispeedia (', kind, ')')
     #     plot_results('wikispeedia', kind, normalized=False)
     #     plot_results('wikispeedia', kind, normalized=True)
+
+    # --------------------------------------------------------------------------
+    # compare_models_stepwise()
+
+    # plot stepwise
+    plot_models()
