@@ -22,7 +22,8 @@ plt.style.use('ggplot')  # TODO
 
 
 class ClickModel(object):
-    def __init__(self, dataset, kind=None, step=None, spl=None, pl=None):
+    def __init__(self, dataset, kind=None, step=None, spl=None, pl=None,
+                 linkpos='linkpos_all'):
         self.dataset = dataset
         self.kind = kind
         self.step = step
@@ -57,7 +58,8 @@ class ClickModel(object):
                        for key in self.sources}
         self.clicks = {k: v for k, v in self.clicks.items() if v > 0}
         self.wg = None
-        self.linkpos_type = 'linkpos_all'
+        self.linkpos_type = linkpos
+        print(self.linkpos_type)
 
     def get_suffix(self):
         suffix = ''
@@ -202,10 +204,9 @@ class ClickModel(object):
         se.to_pickle(
             'data/clickmodels/' + self.dataset + '_results' +
             ('_' + self.kind if self.kind is not None else '') + self.suffix +
-            '.obj'
+            '_' + self.linkpos_type + '.obj'
         )
         return columns, data
-
 
     def max_area(self, columns, data):
         keys, vals = [], []
@@ -234,8 +235,8 @@ class ClickModel(object):
         return keys, vals
 
 
-def plot_results(dataset, kind=None, other=True, normalized=False,
-                 step=None, spl=None, pl=None):
+def plot_results(dataset, kind=None, normalized=False,
+                 step=None, spl=None, pl=None, , suffix_end='_linkpos_all'):
     suffix = ''
     if step is not None:
         suffix += '_step_' + unicode(step)
@@ -243,6 +244,7 @@ def plot_results(dataset, kind=None, other=True, normalized=False,
         suffix += '_spl_' + unicode(spl)
     if pl is not None:
         suffix += '_pl_' + unicode(pl)
+    suffix += suffix_end
     se = pd.read_pickle(
         'data/clickmodels/' + dataset + '_results' +
         ('_' + kind if kind is not None else '') + suffix + '.obj'
@@ -453,30 +455,31 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # cm = ClickModel('wikipedia'); cm.run(areas=True)
 
-    # for kind in [
-    #     'all',
-    #     'successful',
-    #     'unsuccessful'
-    # ]:
-    #     print(kind)
-    #     cm = ClickModel('wikispeedia', kind); cm.run(areas=True)
-
+    for kind in [
+        # 'all',
+        # 'successful',
+        'unsuccessful'
+    ]:
+        # print(kind)
+        cm_last = ClickModel('wikispeedia', kind=kind); cm_last.run(areas=True)
 
     # plot aggregated
     # plot_results('wikipedia', normalized=False)
     # plot_results('wikipedia', normalized=True)
     #
     # for kind in [
-    #     'all',
+    # #     'all',
     #     'successful',
     #     'unsuccessful'
     # ]:
     #     print('Wikispeedia (', kind, ')')
-    #     plot_results('wikispeedia', kind, normalized=False)
-    #     plot_results('wikispeedia', kind, normalized=True)
+    #     plot_results('wikispeedia', kind=kind, normalized=False)
+    #
+    # #     plot_results('wikispeedia', kind=kind, normalized=False)
+    # #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
     # compare_models_stepwise()
 
     # plot stepwise
-    plot_models()
+    # plot_models()
