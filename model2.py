@@ -30,11 +30,12 @@ class ClickModel(object):
         self.spl = spl
         self.pl = pl
         self.suffix = self.get_suffix()
+        stepwise = 'stepwise/' if step is not None else ''
         if dataset == 'wikispeedia':
-            fpath = 'data/clickmodels/wikispeedia_' + kind + self.suffix +\
-                    '.obj'
+            fpath = 'data/clickmodels/' + stepwise + 'wikispeedia_' + kind +\
+                     self.suffix + '.obj'
         elif dataset == 'wikipedia':
-            fpath = 'data/clickmodels/wikipedia_all.obj'
+            fpath = 'data/clickmodels/' + stepwise + 'wikipedia_all.obj'
         else:
             print('unrecognized parameter')
             raise NotImplemented
@@ -236,7 +237,7 @@ class ClickModel(object):
 
 
 def plot_results(dataset, kind=None, normalized=False,
-                 step=None, spl=None, pl=None, , suffix_end='_linkpos_all'):
+                 step=None, spl=None, pl=None, suffix_end='_linkpos_all'):
     suffix = ''
     if step is not None:
         suffix += '_step_' + unicode(step)
@@ -344,32 +345,35 @@ def get_distribution_stats():
 def compare_models_stepwise():
     df_result = pd.DataFrame(columns=['df', 'pl', 'step', 'model', 'kld'])
     for label in [
-        # 'all'
-        # 'usa',
-        'no_usa',
+        ''
+        # '_usa',
+        # '_no_usa',
     ]:
         print('+++++++++++++++++', label, '+++++++++++++++++')
-        for pl in [
-            4,
-            5,
-            6,
-            7
+        for spl in [
+            # 3,
+            # 4,
+            # 5,
         ]:
-            print('----------------PATH LENGTH', pl, '----------------')
-            for step in range(pl-1):
-                print('\n--------', step, '--------')
-                cm = ClickModel('wikispeedia', kind='successful_' + label,
-                                step=step, spl=3, pl=pl)
-                keys, klds = cm.run(tfidf=True, areas=True)
-                results = {}
-                for key, kld in zip(keys, klds):
-                    results[key] = kld
-                    idx = df_result.index.shape[0]
-                    df_result.loc[idx] = [label, pl, step, key, kld]
-                for r in sorted(results.items(), key=operator.itemgetter(1)):
-                    print('%.2f\t%s' % (r[1], r[0]))
-            df_result.to_pickle('data/clickmodels/models_stepwise_' + label +
-                                '_pl_' + unicode(pl) + '.obj')
+            print('----------------SPL', spl, '----------------')
+            for pl in range(spl+1, 11):
+                print('    ------------PATH LENGTH', pl, '------------    ')
+                for step in range(pl-1):
+                    print('\n        --------', step, '--------        ')
+                    cm = ClickModel('wikispeedia', kind='successful' + label,
+                                    step=step, spl=spl, pl=pl)
+                    keys, klds = cm.run(tfidf=True, areas=True)
+                    results = {}
+                    for key, kld in zip(keys, klds):
+                        results[key] = kld
+                        idx = df_result.index.shape[0]
+                        df_result.loc[idx] = [label, pl, step, key, kld]
+                    for r in sorted(results.items(),
+                                    key=operator.itemgetter(1)):
+                        print('%.2f\t%s' % (r[1], r[0]))
+                df_result.to_pickle('data/clickmodels/models_stepwise' +
+                                    label + '_spl_' + unicode(spl) +
+                                    '_pl_' + unicode(pl) + '.obj')
 
 
 def plot_models():
@@ -455,31 +459,31 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # cm = ClickModel('wikipedia'); cm.run(areas=True)
 
-    for kind in [
-        # 'all',
-        # 'successful',
-        'unsuccessful'
-    ]:
-        # print(kind)
-        cm_last = ClickModel('wikispeedia', kind=kind); cm_last.run(areas=True)
+    # for kind in [
+    #     # 'all',
+    #     # 'successful',
+    #     'successful_middle',
+    #     # 'unsuccessful'
+    # ]:
+    #     # print(kind)
+    #     cm_last = ClickModel('wikispeedia', kind=kind); cm_last.run(areas=True)
 
     # plot aggregated
     # plot_results('wikipedia', normalized=False)
     # plot_results('wikipedia', normalized=True)
     #
     # for kind in [
-    # #     'all',
-    #     'successful',
-    #     'unsuccessful'
+    # # #     'all',
+    # #     'successful',
+    #     'successful_middle',
+    # #     'unsuccessful'
     # ]:
     #     print('Wikispeedia (', kind, ')')
     #     plot_results('wikispeedia', kind=kind, normalized=False)
-    #
-    # #     plot_results('wikispeedia', kind=kind, normalized=False)
     # #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
-    # compare_models_stepwise()
+    compare_models_stepwise()
 
     # plot stepwise
     # plot_models()

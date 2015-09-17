@@ -742,6 +742,8 @@ class Wikigame(object):
             df = df[df['successful']]
         elif kind == 'unsuccessful':
             df = df[~df['successful']]
+        elif kind == 'successful_middle':
+            df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1)]
         if step is not None:
             df = df[df['step'] == step]
         if spl is not None:
@@ -836,8 +838,9 @@ class Wikigame(object):
         if pl is not None:
             suffix += '_pl_' + unicode(pl)
         usa_suffix = '_no_usa' if no_usa else ''
-        df.to_pickle('data/clickmodels/wikispeedia_' + kind + usa_suffix +
-                     suffix + '.obj')
+        stepwise = 'stepwise/' if step is not None else ''
+        df.to_pickle('data/clickmodels/' + stepwise + 'wikispeedia_' + kind +
+                      usa_suffix + suffix + '.obj')
 
     def get_stats(self):
         stats = {
@@ -1353,22 +1356,21 @@ if __name__ == '__main__':
         # wg.compare_models_stepwise()
         # wg.compare_models_first()
         # wg.compare_mi()
+        # wg.get_stats()
+        # wg.lead_links()
 
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
+        # wg.get_model_df('successful_middle')
         # wg.get_model_df('unsuccessful')
-        for no_usa in [
-            False,
-            # True,
+        for spl in [
+        #     3,
+            4,
+        #     5,
         ]:
-            for step in range(3):
-                wg.get_model_df('successful', step=step, spl=3, pl=4, no_usa=no_usa)
-            for step in range(5):
-                wg.get_model_df('successful', step=step, spl=3, pl=5, no_usa=no_usa)
-            for step in range(6):
-                wg.get_model_df('successful', step=step, spl=3, pl=6, no_usa=no_usa)
-            for step in range(7):
-                wg.get_model_df('successful', step=step, spl=3, pl=7, no_usa=no_usa)
-
-        # wg.get_model_df('unsuccessful', step=0, spl=3, pl=4)
-        # wg.get_stats()
+            print('spl=%d' % spl)
+            for pl in range(spl+1, 11):
+                print('    pl=%d' % pl)
+                for step in range(pl):
+                    print('        step=%d' % step)
+                    wg.get_model_df('successful', step=step, spl=spl, pl=pl)
