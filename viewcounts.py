@@ -27,13 +27,14 @@ class WikipediaViewCounts(object):
         views, trials = 0, 0
         data = ''
         for month in months:
-            url = self.url + month + '/' + urllib2.quote(title)
+            url = self.url + month + '/' + urllib2.quote(title.encode('utf-8'))
             while not data:
                 try:
                     data = urllib2.urlopen(url).read()
                 except urllib2.HTTPError, e:
                     if trials > 5:
                         print(title, e)
+
             views += int(re.findall(r'has been viewed (\d+)', data)[0])
         return views
 

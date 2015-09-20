@@ -353,7 +353,7 @@ def compare_models_stepwise():
         for spl in [
             # 3,
             # 4,
-            # 5,
+            5,
         ]:
             print('----------------SPL', spl, '----------------')
             for pl in range(spl+1, 11):
@@ -368,12 +368,13 @@ def compare_models_stepwise():
                         results[key] = kld
                         idx = df_result.index.shape[0]
                         df_result.loc[idx] = [label, pl, step, key, kld]
-                    for r in sorted(results.items(),
-                                    key=operator.itemgetter(1)):
-                        print('%.2f\t%s' % (r[1], r[0]))
-                df_result.to_pickle('data/clickmodels/models_stepwise' +
-                                    label + '_spl_' + unicode(spl) +
-                                    '_pl_' + unicode(pl) + '.obj')
+                    # for r in sorted(results.items(),
+                    #                 key=operator.itemgetter(1)):
+                    #     print('%.2f\t%s' % (r[1], r[0]))
+                df_result.to_pickle(
+                    'data/clickmodels/stepwise/models_stepwise' + label +
+                    '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
+                )
 
 
 def plot_models():

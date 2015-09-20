@@ -25,7 +25,16 @@ class NgramFrequency(object):
 
     def retrieve_frequency(self, title):
         title = title.replace(' ', '+').replace('_', '+')
+        title = urllib2.quote(title.encode('utf-8'))
         url = self.url + title
-        return float(urllib2.urlopen(url).read())
+        trials = 0
+        data = None
+        while not data:
+            try:
+                data = float(urllib2.urlopen(url).read())
+            except urllib2.HTTPError, e:
+                if trials > 5:
+                    print(title, e)
+        return data
 
 ngram_frequency = NgramFrequency()
