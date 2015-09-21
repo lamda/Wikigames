@@ -452,6 +452,58 @@ def plot_models():
                  show=False)
 
 
+def percentage_models():
+    def convert_label(label):
+        if 'ib_lead_' in label:
+            return 'IB & Lead'
+        if 'ib_' in label:
+            return 'IB'
+        if 'lead_' in label:
+            return 'Lead'
+        return label
+
+    plot_settings = [
+        ('Uniform', '#000000', 'o'),
+        ('In-Degree', '#4daf4a', '*'),
+        ('TF-IDF', '#ff7f00', 'd'),
+        ('N-Gram', '#a65628', 'v'),
+        ('View Count', '#f781bf', '^'),
+        ('IB', '#e41a1c', 's'),
+        ('Lead', '#377eb8', 'h'),
+        ('IB & Lead', '#984ea3', '8'),
+    ]
+    stats = {l: 0 for l in [p[0] for p in plot_settings]}
+    stats_first = {l: 0 for l in [p[0] for p in plot_settings]}
+    stats_last = {l: 0 for l in [p[0] for p in plot_settings]}
+    stats_middle = {l: 0 for l in [p[0] for p in plot_settings]}
+    for spl in [3, 4, 5]:
+        for pl in range(spl+1, 11):
+            df = pd.read_pickle(
+                'data/clickmodels/stepwise/models_stepwise' +
+                '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
+            )
+            df['model'] = df['model'].apply(convert_label)
+            for step in df['step'].unique():
+                idx = df[df['step'] == step]['kld'].idxmin()
+                stats[df[df['step'] == step].loc[idx]['model']] += 1
+                if step == 0:
+                    stats_first[df[df['step'] == step].loc[idx]['model']] += 1
+                elif step == pl-2:
+                    stats_last[df[df['step'] == step].loc[idx]['model']] += 1
+                else:
+                    stats_middle[df[df['step'] == step].loc[idx]['model']] += 1
+
+    for d, label in [
+        (stats, 'all'),
+        (stats_first, 'first'),
+        (stats_middle, 'middle'),
+        (stats_last, 'last'),
+    ]:
+        print(label)
+        for k, v in d.items():
+            print('    ', k, v)
+        print()
+
 if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
@@ -484,7 +536,8 @@ if __name__ == '__main__':
     # #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
-    compare_models_stepwise()
+    # compare_models_stepwise()
 
     # plot stepwise
     # plot_models()
+    percentage_models()
