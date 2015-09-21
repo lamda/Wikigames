@@ -211,7 +211,7 @@ class ClickModel(object):
         se.to_pickle(
             'data/clickmodels/' + self.dataset + '_results' +
             ('_' + self.kind if self.kind is not None else '') + self.suffix +
-            '_' + self.linkpos_type + '.obj'
+            '.obj'
         )
         return columns, data
 
@@ -586,7 +586,7 @@ def percentage_models():
 if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
-    plot_area_importance()
+    # plot_area_importance()
     # get_distribution_stats()
 
     # --------------------------------------------------------------------------
@@ -620,5 +620,5 @@ if __name__ == '__main__':
     # compare_models_stepwise()
 
     # plot stepwise
-    # plot_models()
+    plot_models()
     # percentage_models()
