@@ -32,9 +32,10 @@ class NgramFrequency(object):
         while not data:
             try:
                 data = float(urllib2.urlopen(url).read())
-            except urllib2.HTTPError, e:
+            except (urllib2.HTTPError, urllib2.URLError) as e:
                 if trials > 5:
                     print(title, e)
+
         return data
 
 ngram_frequency = NgramFrequency()

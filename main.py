@@ -1357,20 +1357,20 @@ if __name__ == '__main__':
         # wg.compare_models_first()
         # wg.compare_mi()
         # wg.get_stats()
-        # wg.lead_links()
+        wg.lead_links()
 
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
         # wg.get_model_df('successful_middle')
         # wg.get_model_df('unsuccessful')
-        for spl in [
-        #     3,
-            4,
-        #     5,
-        ]:
-            print('spl=%d' % spl)
-            for pl in range(spl+1, 11):
-                print('    pl=%d' % pl)
-                for step in range(pl):
-                    print('        step=%d' % step)
-                    wg.get_model_df('successful', step=step, spl=spl, pl=pl)
+        # for spl in [
+        # #     3,
+        #     4,
+        # #     5,
+        # ]:
+        #     print('spl=%d' % spl)
+        #     for pl in range(spl+1, 11):
+        #         print('    pl=%d' % pl)
+        #         for step in range(pl):
+        #             print('        step=%d' % step)
+        #             wg.get_model_df('successful', step=step, spl=spl, pl=pl)

@@ -3,8 +3,9 @@
 from __future__ import division, print_function
 
 import pdb
+import random
 import re
-import urllib
+import time
 import urllib2
 
 from decorators import Cached
@@ -31,9 +32,10 @@ class WikipediaViewCounts(object):
             while not data:
                 try:
                     data = urllib2.urlopen(url).read()
-                except urllib2.HTTPError, e:
+                except (urllib2.HTTPError, urllib2.URLError) as e:
                     if trials > 5:
                         print(title, e)
+                    time.sleep(int(random.random() * 5))
 
             views += int(re.findall(r'has been viewed (\d+)', data)[0])
         return views

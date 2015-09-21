@@ -138,13 +138,19 @@ class ClickModel(object):
         self.wg.load_data()
         df = self.wg.data
         df = df[~df['backtrack']]
-        df = df[df['successful'] == (self.kind == 'successful')]
+        if self.kind == 'successful':
+            df = df[df['successful']]
+        elif self.kind == 'successful_middle':
+            df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1)]
+        elif self.kind == 'unsuccessful':
+            df = df[~df['successful']]
         if self.step is not None:
             df = df[df['step'] == self.step]
         if self.spl is not None:
             df = df[df['spl'] == self.spl]
         if self.pl is not None:
             df = df[df['pl'] == self.pl]
+        df = df.dropna(subset=['node_next']) # for unsuccessful games
         df = df[['node', 'node_id', 'target', 'target_id']]
 
         for idx, row in enumerate(df.iterrows()):
@@ -185,7 +191,7 @@ class ClickModel(object):
             for area in [
                 'lead',
                 'ib',
-                'ib_lead',
+                # 'ib_lead',
             ]:
                 print('    ', area, '\n')
                 for areap in np.arange(0, 1, 0.01):
@@ -250,6 +256,7 @@ def plot_results(dataset, kind=None, normalized=False,
         'data/clickmodels/' + dataset + '_results' +
         ('_' + kind if kind is not None else '') + suffix + '.obj'
     )
+    se = se[se.index.map(lambda x: 'ib_lead' not in x)]
     plot_settings = [
         ('Uniform', '#000000', 'o'),
         ('In-Degree', '#4daf4a', '*'),
@@ -268,6 +275,7 @@ def plot_results(dataset, kind=None, normalized=False,
             keys.append('IB & LEAD (%d%%)' %
                         (100 * float(k.rsplit('_', 1)[-1])))
             colors.append(plot_settings_dict['IB & Lead'][0])
+            pass
         elif 'ib_' in k:
                 keys.append('IB (%d%%)' % (100 * float(k.rsplit('_', 1)[-1])))
                 colors.append(plot_settings_dict['IB'][0])
@@ -285,7 +293,6 @@ def plot_results(dataset, kind=None, normalized=False,
         # alternative approach - divide by max in series
         # se /= max(se)
 
-
     print('\n\n', dataset, kind, '\n', se)
     ax = plt.subplot(111)
     b = se.plot(ax=ax, kind='bar', legend=False, width=0.6, rot=70, fontsize=18)
@@ -293,11 +300,13 @@ def plot_results(dataset, kind=None, normalized=False,
                   b.get_children())
     for bar, c in zip(bars, colors):
         bar.set_color(c)
-    if normalized:
-        plt.ylim(0, 1.075)
-    else:
-        # plt.ylim(0, max(se) * 1.075)
-        plt.ylim(0, 6.5)
+    # if normalized:
+    #     plt.ylim(0, 1.075)
+    # else:
+    #     # plt.ylim(0, max(se) * 1.075)
+    #     plt.ylim(0, 6.5)
+    if dataset == 'wikispeedia':
+        plt.ylim(0, 1.2)
     label_offset = max(se) * 0.01
     for p in ax.patches:
         ax.annotate(
@@ -324,6 +333,46 @@ def get_area_importance():
         lp_lead = df['linkpos_lead'].apply(len).sum()
         lp_all = df['linkpos_all'].apply(len).sum()
         print('    %.2f (IB) %.2f (LEAD)' % (lp_ib/lp_all, lp_lead/lp_all))
+
+
+def plot_area_importance():
+    label2short = {
+        'Indegree': 'indegree',
+        'N-Gram Frequency (log)': 'ngram',
+        'View Count': 'view_count'
+    }
+    for dataset, label, data, color in [
+        ('Wikipedia', 'Indegree', [12232.5049, 15510.2125], '#4daf4a'),
+        ('Wikispeedia', 'Indegree', [220.5697, 177.8769], '#4daf4a'),
+        ('Wikipedia', 'N-Gram Frequency (log)', [0, 0], '#a65628'),
+        ('Wikispeedia', 'N-Gram Frequency (log)', [-4.8640, -4.9284], '#a65628'),
+        ('Wikipedia', 'View Count', [0, 0], '#f781bf'),
+        ('Wikispeedia', 'View Count', [125453.1222, 132233.6598], '#f781bf'),
+    ]:
+        ax = plt.subplot(111)
+        ax.bar([0, 1], data, width=0.5, color=color, align='center')
+        #  rot=70, fontsize=18,
+        label_offset = max(data) * 0.01
+        for p in ax.patches:
+            ax.annotate(
+                '%.2f' % p.get_height(),
+                (p.get_x() + p.get_width() / 2., p.get_height() + label_offset),
+                ha='center',
+                fontsize=14,
+            )
+        plt.ylabel(label)
+        plt.ylim(0, max(data) * 1.1)
+        ax.set_xticks([0, 1])
+        ax.set_xticklabels(('IB & Lead', 'Remainder'), rotation=70)
+
+        plt.tight_layout()
+        plt.show()
+        ofname = 'plots/ib_lead_rest_links_' +\
+                 dataset + '_' + label2short[label]
+        plt.savefig(ofname + '.pdf')
+        plt.savefig(ofname + '.png')
+        plt.close()
+
 
 
 def get_distribution_stats():
@@ -397,11 +446,6 @@ def plot_models():
         ('Lead', '#377eb8', 'h'),
         ('Infobox & Lead', '#984ea3', '8'),
     ]
-    label2title = {
-        'all': 'All Games',
-        'usa': 'Games passing through to the U.S. article',
-        'no_usa': 'Games not passing through to the U.S. article',
-    }
     pls = [
         '4',
         '5',
@@ -410,46 +454,41 @@ def plot_models():
     ]
     models = {'Uniform', 'Lead', 'In-Degree', 'TF-IDF'}
     plot_labels = ['gl_' + unicode(int(gl)) for gl in pls]
-    for label in [
-            'all',
-            # 'usa',
-            # 'no_usa',
-    ]:
-        print('+++++++++++++++++', label, '+++++++++++++++++')
-        p = Plot(plot_labels, len(pls), filextension='.pdf')
-        for col_idx, pl in enumerate(pls):
-            print('\n----------------PATH LENGTH', pl, '----------------')
-            df = pd.read_pickle(
-                'data/clickmodels/models_stepwise_' + label + '_pl_' + pl +
-                '.obj'
-            )
-            df['model'] = df['model'].apply(convert_label)
-            df['distance-to-go'] = df['pl'] - 1 - df['step']
+    p = Plot(plot_labels, len(pls), fileextension=['.pdf', '.png'])
+    for col_idx, pl in enumerate(pls):
+        print('\n----------------PATH LENGTH', pl, '----------------')
+        df = pd.read_pickle(
+            'data/clickmodels/stepwise/models_stepwise' +
+            '_spl_3_pl_' + pl + '.obj'
+        )
+        df['model'] = df['model'].apply(convert_label)
+        df['distance-to-go'] = df['pl'] - 1 - df['step']
+        df = df[df['model'] != 'IB & Lead']
 
-            # print to console
-            for step in range(int(pl)-1):
-                print('    --------', step, '--------')
-                for ridx, row in enumerate(df[df['step'] == step].sort('kld').iterrows()):
-                    # if row[1]['model'] not in models:
-                    #     continue
-                    print('        %.2f %s' % (row[1]['kld'], row[1]['model']))
-                    # if ridx > 1:
-                    #     break
-            print()
+        # print to console
+        for step in range(int(pl)-1):
+            print('    --------', step, '--------')
+            for ridx, row in enumerate(df[df['step'] == step].sort('kld').iterrows()):
+                # if row[1]['model'] not in models:
+                #     continue
+                print('        %.2f %s' % (row[1]['kld'], row[1]['model']))
+                # if ridx > 1:
+                #     break
+        print()
 
-            for mdl, c, m in plot_settings:
-                if mdl not in models:
-                    continue
-                data = df[df['model'] == mdl]['kld'].tolist()
-                x = df[df['model'] == mdl]['distance-to-go'].tolist()
-                ls = '--' if mdl == 'Random' else '-'
-                p.add_plot(x, data, col=col_idx, label=mdl, marker=m, color=c,
-                           ls=ls)
-        fpath = os.path.join('plots', 'models_' + label.replace(' ', '_'))
-        p.finish(fpath, suptitle=label2title[label], xlim=(0.5, 6),
-                 legend='external', xlabel='Distance to-go to target',
-                 ylabel='KL divergence (bits)', invert_xaxis=True,
-                 show=False)
+        for mdl, c, m in plot_settings:
+            if mdl not in models:
+                continue
+            data = df[df['model'] == mdl]['kld'].tolist()
+            x = df[df['model'] == mdl]['distance-to-go'].tolist()
+            ls = '--' if mdl == 'Random' else '-'
+            p.add_plot(x, data, col=col_idx, label=mdl, marker=m, color=c,
+                       ls=ls)
+    fpath = os.path.join('plots', 'models')
+    p.finish(fpath, xlim=(0.5, 6),
+             legend='external', xlabel='Distance to-go to target',
+             ylabel='KL divergence (bits)', invert_xaxis=True,
+             show=False)
 
 
 def percentage_models():
@@ -470,7 +509,7 @@ def percentage_models():
         ('View Count', '#f781bf', '^'),
         ('IB', '#e41a1c', 's'),
         ('Lead', '#377eb8', 'h'),
-        ('IB & Lead', '#984ea3', '8'),
+        # ('IB & Lead', '#984ea3', '8'),
     ]
     stats = {l: 0 for l in [p[0] for p in plot_settings]}
     stats_first = {l: 0 for l in [p[0] for p in plot_settings]}
@@ -483,6 +522,7 @@ def percentage_models():
                 '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
             )
             df['model'] = df['model'].apply(convert_label)
+            df = df[df['model'] != 'IB & Lead']
             for step in df['step'].unique():
                 idx = df[df['step'] == step]['kld'].idxmin()
                 stats[df[df['step'] == step].loc[idx]['model']] += 1
@@ -504,32 +544,73 @@ def percentage_models():
             print('    ', k, v)
         print()
 
+    idx = ['Lead', 'IB', 'Uniform', 'TF-IDF',
+           'N-Gram', 'View Count', 'In-Degree']
+    colors = ['#377eb8', '#e41a1c', '#000000', '#ff7f00',
+              '#a65628', '#f781bf', '#4daf4a']
+    stats = pd.Series(data=[stats[i] for i in idx], index=idx)
+    stats_first = pd.Series(data=[stats_first[i] for i in idx], index=idx)
+    stats_middle = pd.Series(data=[stats_middle[i] for i in idx], index=idx)
+    stats_last = pd.Series(data=[stats_last[i] for i in idx], index=idx)
+    for se, label in [
+        (stats, 'all'),
+        (stats_first, 'first'),
+        (stats_middle, 'middle'),
+        (stats_last, 'last'),
+    ]:
+        se = 100 * se/sum(se)
+        ax = plt.subplot(111)
+        b = se.plot(ax=ax, kind='bar', legend=False, width=0.6, rot=70,
+                    fontsize=18)
+        bars = filter(lambda x: isinstance(x, matplotlib.patches.Rectangle),
+                      b.get_children())
+        for bar, c in zip(bars, colors):
+            bar.set_color(c)
+        label_offset = max(se) * 0.01
+        for p in ax.patches:
+            ax.annotate(
+                '%.2f%%' % p.get_height(),
+                (p.get_x() + p.get_width() / 2., p.get_height() + label_offset),
+                ha='center',
+                fontsize=14,
+            )
+        plt.ylabel('Percent of best fits')
+        plt.ylim(0, 110)
+        plt.tight_layout()
+        ofname = 'plots/wikispeedia_stepwise_best_fits_' + label
+        # plt.savefig(ofname + '.pdf')
+        plt.savefig(ofname + '.png')
+        plt.close()
+
+
 if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
+    plot_area_importance()
     # get_distribution_stats()
 
     # --------------------------------------------------------------------------
     # cm = ClickModel('wikipedia'); cm.run(areas=True)
 
     # for kind in [
-    #     # 'all',
-    #     # 'successful',
-    #     'successful_middle',
-    #     # 'unsuccessful'
+        # 'all',
+        # 'successful',
+        # 'successful_middle',
+        # 'unsuccessful'
     # ]:
-    #     # print(kind)
-    #     cm_last = ClickModel('wikispeedia', kind=kind); cm_last.run(areas=True)
+    #     print(kind)
+    #     cm = ClickModel('wikispeedia', kind=kind)
+    #     cm.run(areas=True, tfidf=True)
 
     # plot aggregated
     # plot_results('wikipedia', normalized=False)
     # plot_results('wikipedia', normalized=True)
     #
     # for kind in [
-    # # #     'all',
-    # #     'successful',
+    #     'all',
+    #     'successful',
     #     'successful_middle',
-    # #     'unsuccessful'
+    #     'unsuccessful'
     # ]:
     #     print('Wikispeedia (', kind, ')')
     #     plot_results('wikispeedia', kind=kind, normalized=False)
@@ -540,4 +621,4 @@ if __name__ == '__main__':
 
     # plot stepwise
     # plot_models()
-    percentage_models()
+    # percentage_models()

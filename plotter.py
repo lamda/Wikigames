@@ -536,9 +536,13 @@ def print_models():
 
 
 class Plot(object):
-    def __init__(self, labels, ncols=1, filextension='.pdf'):
+    def __init__(self, labels, ncols=1, fileextension='.pdf'):
         """create the plot"""
-        self.filextension = filextension
+        if not isinstance(fileextension, list):
+            self.fileextension = [fileextension]
+        else:
+            self.fileextension = fileextension
+        self.fileextension = fileextension
         self.figsize = (5, 3)
         self.adjust = {'left': 0.15, 'bottom': 0.2, 'right': 0.97, 'top': 0.90}
         self.figs = [plt.figure(figsize=self.figsize) for n in range(ncols)]
@@ -647,14 +651,18 @@ class Plot(object):
             bbi = lgd.get_window_extent()  # legend bounding box in display units
             bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
             bbit_exp = bbit.expanded(1.0, 1.0)  # expanded
-            fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
+            for fileextension in self.fileextension:
+                fig.savefig(fname + '_legend' + fileextension,
+                            bbox_inches=bbit_exp)
         else:
             lgd = plt.figlegend(*data, loc=10)
             fig.canvas.draw()
             bbi = lgd.get_window_extent()  # legend bounding box in display units
             bbit = bbi.transformed(fig.dpi_scale_trans.inverted())  # inches
             bbit_exp = bbit.expanded(1.1, 1.1)  # expanded
-            fig.savefig(fname + '_legend' + self.filextension, bbox_inches=bbit_exp)
+            for fileextension in self.fileextension:
+                fig.savefig(fname + '_legend' + fileextension,
+                            bbox_inches=bbit_exp)
         plt.close(fig)
 
     def finish(self, fname, **kwargs):
@@ -710,7 +718,8 @@ class Plot(object):
 
         for fig, label in zip(self.figs, self.labels):
             fig.subplots_adjust(**self.adjust)
-            fig.savefig(fname + '_' + label + self.filextension)
+            for fileextension in self.fileextension:
+                fig.savefig(fname + '_' + label + fileextension)
             if kwargs.pop('show', False):
                 plt.show()
             plt.close(fig)
