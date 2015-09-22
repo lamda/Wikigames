@@ -243,7 +243,7 @@ class ClickModel(object):
 
 
 def plot_results(dataset, kind=None, normalized=False,
-                 step=None, spl=None, pl=None, suffix_end='_linkpos_all'):
+                 step=None, spl=None, pl=None):
     suffix = ''
     if step is not None:
         suffix += '_step_' + unicode(step)
@@ -251,7 +251,6 @@ def plot_results(dataset, kind=None, normalized=False,
         suffix += '_spl_' + unicode(spl)
     if pl is not None:
         suffix += '_pl_' + unicode(pl)
-    suffix += suffix_end
     se = pd.read_pickle(
         'data/clickmodels/' + dataset + '_results' +
         ('_' + kind if kind is not None else '') + suffix + '.obj'
@@ -374,7 +373,6 @@ def plot_area_importance():
         plt.close()
 
 
-
 def get_distribution_stats():
     cm = ClickModel('wikispeedia', 'all')
     cm.ground_truth()
@@ -392,7 +390,6 @@ def get_distribution_stats():
 
 
 def compare_models_stepwise():
-    df_result = pd.DataFrame(columns=['df', 'pl', 'step', 'model', 'kld'])
     for label in [
         ''
         # '_usa',
@@ -400,12 +397,23 @@ def compare_models_stepwise():
     ]:
         print('+++++++++++++++++', label, '+++++++++++++++++')
         for spl in [
-            # 3,
+            3,
             # 4,
-            5,
+            # 5,
         ]:
             print('----------------SPL', spl, '----------------')
+            # for pl in [
+            #     # 4,
+            #     # 5,
+            #     # 6,
+            #     # 7,
+            #     # 8,
+            #     # 9,
+            #     10
+            # ]:
             for pl in range(spl+1, 11):
+                df_result = pd.DataFrame(columns=['df', 'pl', 'step',
+                                                  'model', 'kld'])
                 print('    ------------PATH LENGTH', pl, '------------    ')
                 for step in range(pl-1):
                     print('\n        --------', step, '--------        ')
@@ -464,17 +472,17 @@ def plot_models():
         df['model'] = df['model'].apply(convert_label)
         df['distance-to-go'] = df['pl'] - 1 - df['step']
         df = df[df['model'] != 'IB & Lead']
-
+        # pdb.set_trace()
         # print to console
-        for step in range(int(pl)-1):
-            print('    --------', step, '--------')
-            for ridx, row in enumerate(df[df['step'] == step].sort('kld').iterrows()):
-                # if row[1]['model'] not in models:
-                #     continue
-                print('        %.2f %s' % (row[1]['kld'], row[1]['model']))
-                # if ridx > 1:
-                #     break
-        print()
+        # for step in range(int(pl)-1):
+        #     print('    --------', step, '--------')
+        #     for ridx, row in enumerate(df[df['step'] == step].sort('kld').iterrows()):
+        #         # if row[1]['model'] not in models:
+        #         #     continue
+        #         print('        %.2f %s' % (row[1]['kld'], row[1]['model']))
+        #         # if ridx > 1:
+        #         #     break
+        # print()
 
         for mdl, c, m in plot_settings:
             if mdl not in models:
@@ -484,6 +492,7 @@ def plot_models():
             ls = '--' if mdl == 'Random' else '-'
             p.add_plot(x, data, col=col_idx, label=mdl, marker=m, color=c,
                        ls=ls)
+
     fpath = os.path.join('plots', 'models')
     p.finish(fpath, xlim=(0.5, 6),
              legend='external', xlabel='Distance to-go to target',
@@ -515,7 +524,11 @@ def percentage_models():
     stats_first = {l: 0 for l in [p[0] for p in plot_settings]}
     stats_last = {l: 0 for l in [p[0] for p in plot_settings]}
     stats_middle = {l: 0 for l in [p[0] for p in plot_settings]}
-    for spl in [3, 4, 5]:
+    for spl in [
+        3,
+        4,
+        5
+    ]:
         for pl in range(spl+1, 11):
             df = pd.read_pickle(
                 'data/clickmodels/stepwise/models_stepwise' +
@@ -578,7 +591,7 @@ def percentage_models():
         plt.ylim(0, 110)
         plt.tight_layout()
         ofname = 'plots/wikispeedia_stepwise_best_fits_' + label
-        # plt.savefig(ofname + '.pdf')
+        plt.savefig(ofname + '.pdf')
         plt.savefig(ofname + '.png')
         plt.close()
 
@@ -614,11 +627,11 @@ if __name__ == '__main__':
     # ]:
     #     print('Wikispeedia (', kind, ')')
     #     plot_results('wikispeedia', kind=kind, normalized=False)
-    # #     plot_results('wikispeedia', kind=kind, normalized=True)
+    #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
     # compare_models_stepwise()
-
+    #
     # plot stepwise
-    plot_models()
-    # percentage_models()
+    # plot_models()
+    percentage_models()

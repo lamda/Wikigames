@@ -618,10 +618,10 @@ class Wikigame(object):
                     lead_ib_links.append(link)
                 else:
                     rest_links.append(link)
-
+        pdb.set_trace()
         for label, func in [
-            ('degree_in', lambda x: self.id2deg_in[x]),
-            ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
+            # ('degree_in', lambda x: self.id2deg_in[x]),
+            # ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
             ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
         ]:
             lead_ib = np.mean([func(l) for l in lead_ib_links])
