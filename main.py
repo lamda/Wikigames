@@ -606,30 +606,41 @@ class Wikigame(object):
 
     def lead_links(self):
         self.load_link_positions()
-        lead_ib_links, rest_links = [], []
+        ib_links, lead_links, ib_lead_links, rest_links = [], [], [], []
         for i, node in enumerate(self.name2id.keys()):
             print(i+1, '/', len(self.name2id), end='\r')
             try:
-                limit = self.lead_length[node]
+                ib_limit = self.ib_length[node]
+                lead_limit = self.lead_length[node]
             except KeyError:
                 continue
             for pos, link in self.pos2link[node].items():
-                if pos < limit:
-                    lead_ib_links.append(link)
+                if pos < ib_limit:
+                    ib_links.append(link)
+                    ib_lead_links.append(link)
+                elif ib_limit < pos < lead_limit:
+                    lead_links.append(link)
+                    ib_lead_links.append(link)
                 else:
                     rest_links.append(link)
-        pdb.set_trace()
+
         for label, func in [
-            # ('degree_in', lambda x: self.id2deg_in[x]),
-            # ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
+            ('degree_in', lambda x: self.id2deg_in[x]),
+            ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
             ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
         ]:
-            lead_ib = np.mean([func(l) for l in lead_ib_links])
+            ib = np.mean([func(l) for l in ib_links])
+            lead = np.mean([func(l) for l in lead_links])
+            ib_lead = np.mean([func(l) for l in ib_lead_links])
             rest = np.mean([func(l) for l in rest_links])
             if label == 'ngram':
-                lead_ib, rest = np.log(lead_ib), np.log(rest)
-            print(label)
-            print('    Lead & IB:\t%.4f\n    Rest:\t\t%.4f\n' % (lead_ib, rest))
+                ib, lead, ib_lead, rest = np.log(ib), np.log(lead), np.log(ib_lead), np.log(rest)
+
+            print('%s:' % label)
+            print('    %.4f IB' % ib)
+            print('    %.4f Lead' % lead)
+            print('    %.4f IB & Lead' % ib_lead)
+            print('    %.4f Rest' % rest)
 
     def compare_models_stepwise(self):
         self.load_data()

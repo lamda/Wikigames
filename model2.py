@@ -341,12 +341,15 @@ def plot_area_importance():
         'View Count': 'view_count'
     }
     for dataset, label, data, color in [
-        ('Wikipedia', 'Indegree', [12232.5049, 15510.2125], '#4daf4a'),
-        ('Wikispeedia', 'Indegree', [220.5697, 177.8769], '#4daf4a'),
-        ('Wikipedia', 'N-Gram Frequency (log)', [0, 0], '#a65628'),
-        ('Wikispeedia', 'N-Gram Frequency (log)', [-4.8640, -4.9284], '#a65628'),
-        ('Wikipedia', 'View Count', [0, 0], '#f781bf'),
-        ('Wikispeedia', 'View Count', [125453.1222, 132233.6598], '#f781bf'),
+        # ib, lead, ib & lead, rest
+        ('Wikipedia', 'Indegree', [16997.5278, 9994.6628, 12232.5049, 15510.2125], '#4daf4a'),
+        ('Wikispeedia', 'Indegree', [247.5816, 213.5608, 220.5697, 177.8769], '#4daf4a'),
+
+        ('Wikipedia', 'N-Gram Frequency (log)', [-6.0379, -5.9888, -6.0042,  -6.4606], '#a65628'),
+        ('Wikispeedia', 'N-Gram Frequency (log)', [-4.9233, -4.8421, -4.8640, -4.9284], '#a65628'),
+
+        ('Wikipedia', 'View Count', [34115.3295, 41092.9816, 38863.1966, 27211.8253], '#f781bf'),
+        ('Wikispeedia', 'View Count', [111909.0179, 129656.7252, 125453.1222, 132233.6598], '#f781bf'),
     ]:
         ax = plt.subplot(111)
         ax.bar([0, 1], data, width=0.5, color=color, align='center')
@@ -599,7 +602,7 @@ def percentage_models():
 if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
-    # plot_area_importance()
+    plot_area_importance()
     # get_distribution_stats()
 
     # --------------------------------------------------------------------------
@@ -634,4 +637,4 @@ if __name__ == '__main__':
     #
     # plot stepwise
     # plot_models()
-    percentage_models()
+    # percentage_models()
