@@ -341,18 +341,30 @@ def plot_area_importance():
         'View Count': 'view_count'
     }
     for dataset, label, data, color in [
-        # ib, lead, ib & lead, rest
-        ('Wikipedia', 'Indegree', [16997.5278, 9994.6628, 12232.5049, 15510.2125], '#4daf4a'),
-        ('Wikispeedia', 'Indegree', [247.5816, 213.5608, 220.5697, 177.8769], '#4daf4a'),
+        # mean for ib, lead, rest
+        # ('Wikipedia', 'Indegree', [16997.5278, 9994.6628, 15510.2125], '#4daf4a'),
+        # ('Wikispeedia', 'Indegree', [247.5816, 213.5608, 177.8769], '#4daf4a'),
+        #
+        # ('Wikipedia', 'N-Gram Frequency (log)', [-6.0379, -5.9888,  -6.4606], '#a65628'),
+        # ('Wikispeedia', 'N-Gram Frequency (log)', [-4.9233, -4.8421, -4.9284], '#a65628'),
+        #
+        # ('Wikipedia', 'View Count', [34115.3295, 41092.9816, 27211.8253], '#f781bf'),
+        # ('Wikispeedia', 'View Count', [111909.0179, 129656.7252, 132233.6598], '#f781bf'),
 
-        ('Wikipedia', 'N-Gram Frequency (log)', [-6.0379, -5.9888, -6.0042,  -6.4606], '#a65628'),
-        ('Wikispeedia', 'N-Gram Frequency (log)', [-4.9233, -4.8421, -4.8640, -4.9284], '#a65628'),
+        # median for ib, lead and rest
+        ('Wikipedia', 'Indegree', [910, 845, 445], '#4daf4a'),
+        ('Wikispeedia', 'Indegree', [110, 99, 76], '#4daf4a'),
 
-        ('Wikipedia', 'View Count', [34115.3295, 41092.9816, 38863.1966, 27211.8253], '#f781bf'),
-        ('Wikispeedia', 'View Count', [111909.0179, 129656.7252, 125453.1222, 132233.6598], '#f781bf'),
+        ('Wikipedia', 'N-Gram Frequency (log)', [-7.459, -7.485, -8.225], '#a65628'),
+        ('Wikispeedia', 'N-Gram Frequency (log)', [-5.588, -5.261, -5.355], '#a65628'),
+
+        ('Wikipedia', 'View Count', [11761, 13283, 4690], '#f781bf'),
+        ('Wikispeedia', 'View Count', [58347, 67845, 76762], '#f781bf'),
     ]:
         ax = plt.subplot(111)
-        ax.bar([0, 1], data, width=0.5, color=color, align='center')
+        if 'gram' in label.lower():
+            data = map(np.exp, data)
+        ax.bar(np.arange(len(data)), data, width=0.5, color=color, align='center')
         #  rot=70, fontsize=18,
         label_offset = max(data) * 0.01
         for p in ax.patches:
@@ -364,11 +376,10 @@ def plot_area_importance():
             )
         plt.ylabel(label)
         plt.ylim(0, max(data) * 1.1)
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels(('IB & Lead', 'Remainder'), rotation=70)
+        ax.set_xticks(np.arange(len(data)))
+        ax.set_xticklabels(('Lead', 'IB', 'Remainder'), rotation=70)
 
         plt.tight_layout()
-        plt.show()
         ofname = 'plots/ib_lead_rest_links_' +\
                  dataset + '_' + label2short[label]
         plt.savefig(ofname + '.pdf')

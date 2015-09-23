@@ -624,23 +624,29 @@ class Wikigame(object):
                 else:
                     rest_links.append(link)
 
-        for label, func in [
-            ('degree_in', lambda x: self.id2deg_in[x]),
-            ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
-            ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
+        for stat_label, stat_func in [
+            ('mean', np.mean),
+            ('median', np.median)
         ]:
-            ib = np.mean([func(l) for l in ib_links])
-            lead = np.mean([func(l) for l in lead_links])
-            ib_lead = np.mean([func(l) for l in ib_lead_links])
-            rest = np.mean([func(l) for l in rest_links])
-            if label == 'ngram':
-                ib, lead, ib_lead, rest = np.log(ib), np.log(lead), np.log(ib_lead), np.log(rest)
+            print(stat_label)
+            for label, func in [
+                ('degree_in', lambda x: self.id2deg_in[x]),
+                ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
+                ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
+            ]:
+                ib = stat_func([func(l) for l in ib_links])
+                lead = stat_func([func(l) for l in lead_links])
+                ib_lead = stat_func([func(l) for l in ib_lead_links])
+                rest = stat_func([func(l) for l in rest_links])
+                if label == 'ngram':
+                    ib, lead = np.log(ib), np.log(lead)
+                    ib_lead, rest =  np.log(ib_lead), np.log(rest)
 
-            print('%s:' % label)
-            print('    %.4f IB' % ib)
-            print('    %.4f Lead' % lead)
-            print('    %.4f IB & Lead' % ib_lead)
-            print('    %.4f Rest' % rest)
+                print('    %s:' % label)
+                print('        %.4f IB' % ib)
+                print('        %.4f Lead' % lead)
+                print('        %.4f IB & Lead' % ib_lead)
+                print('        %.4f Rest' % rest)
 
     def compare_models_stepwise(self):
         self.load_data()
