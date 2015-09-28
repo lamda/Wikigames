@@ -12,6 +12,7 @@ import os
 import pandas as pd
 import pdb
 import scipy.stats
+import seaborn as sns
 
 import decorators
 from plotter import Plot
@@ -305,7 +306,8 @@ def plot_results(dataset, kind=None, normalized=False,
     #     # plt.ylim(0, max(se) * 1.075)
     #     plt.ylim(0, 6.5)
     if dataset == 'wikispeedia':
-        plt.ylim(0, 1.2)
+        # plt.ylim(0, 1.2)
+        plt.ylim(0, 3.5)
     label_offset = max(se) * 0.01
     for p in ax.patches:
         ax.annotate(
@@ -340,6 +342,7 @@ def plot_area_importance():
         'N-Gram Frequency (log)': 'ngram',
         'View Count': 'view_count'
     }
+    fontsize = 22
     for dataset, label, data, color in [
         # mean for ib, lead, rest
         # ('Wikipedia', 'Indegree', [16997.5278, 9994.6628, 15510.2125], '#4daf4a'),
@@ -358,27 +361,45 @@ def plot_area_importance():
         ('Wikipedia', 'N-Gram Frequency (log)', [-7.459, -7.485, -8.225], '#a65628'),
         ('Wikispeedia', 'N-Gram Frequency (log)', [-5.588, -5.261, -5.355], '#a65628'),
 
-        ('Wikipedia', 'View Count', [11761, 13283, 4690], '#f781bf'),
-        ('Wikispeedia', 'View Count', [58347, 67845, 76762], '#f781bf'),
+        ('Wikiped', 'View Count', [11761, 13283, 4690], '#f781bf'),
+        ('Wikispeediaia', 'View Count', [58347, 67845, 76762], '#f781bf'),
     ]:
-        ax = plt.subplot(111)
-        if 'gram' in label.lower():
-            data = map(np.exp, data)
-        ax.bar(np.arange(len(data)), data, width=0.5, color=color, align='center')
-        #  rot=70, fontsize=18,
-        label_offset = max(data) * 0.01
-        for p in ax.patches:
-            ax.annotate(
-                '%.2f' % p.get_height(),
-                (p.get_x() + p.get_width() / 2., p.get_height() + label_offset),
-                ha='center',
-                fontsize=14,
-            )
-        plt.ylabel(label)
-        plt.ylim(0, max(data) * 1.1)
-        ax.set_xticks(np.arange(len(data)))
-        ax.set_xticklabels(('Lead', 'IB', 'Remainder'), rotation=70)
 
+        # bar plots ------------------------------------------------------------
+        # ax = plt.subplot(111)
+        # ax.bar(np.arange(len(data)), data, width=0.5, color=color,
+        #        align='center')
+        # label_offset = max(data) * 0.01
+        # for p in ax.patches:
+        #     if 'gram' in label.lower():
+        #         ax.annotate(
+        #             '-%.2f' % p.get_height(),
+        #             (p.get_x() + p.get_width() / 2., -p.get_height() + label_offset),
+        #             ha='center',
+        #             fontsize=fontsize,
+        #         )
+        #     else:
+        #         ax.annotate(
+        #             '%d' % p.get_height(),
+        #             (p.get_x() + p.get_width() / 2., p.get_height() + label_offset),
+        #             ha='center',
+        #             fontsize=fontsize,
+        #         )
+        # plt.ylabel(label, fontsize=fontsize)
+        # if 'gram' in label.lower():
+        #     plt.ylim(0, min(data) * 1.1)
+        # else:
+        #     plt.ylim(0, max(data) * 1.1)
+        # ax.set_xticks(np.arange(len(data)))
+        # ax.set_xticklabels(('Lead', 'IB', 'Remainder'), fontsize=fontsize)
+        # for tick in ax.yaxis.get_major_ticks():
+        #     tick.label.set_fontsize(fontsize)
+
+        # box plots ------------------------------------------------------------
+        ax = sns.boxplot(data)
+        plt.show()
+
+        # finish the plot ------------------------------------------------------
         plt.tight_layout()
         ofname = 'plots/ib_lead_rest_links_' +\
                  dataset + '_' + label2short[label]
@@ -471,8 +492,8 @@ def plot_models():
     pls = [
         '4',
         '5',
-        '6',
-        '7',
+        # '6',
+        # '7',
     ]
     models = {'Uniform', 'Lead', 'In-Degree', 'TF-IDF'}
     plot_labels = ['gl_' + unicode(int(gl)) for gl in pls]
@@ -508,10 +529,10 @@ def plot_models():
                        ls=ls)
 
     fpath = os.path.join('plots', 'models')
-    p.finish(fpath, xlim=(0.5, 6),
+    p.finish(fpath, xlim=(0.5, 4),
              legend='external', xlabel='Distance to-go to target',
              ylabel='KL divergence (bits)', invert_xaxis=True,
-             show=False)
+             show=False, xticks_integer_only=True)
 
 
 def percentage_models():
@@ -610,20 +631,122 @@ def percentage_models():
         plt.close()
 
 
+def added_models():
+    def convert_label(label):
+        if 'ib_lead_' in label:
+            return 'IB & Lead'
+        if 'ib_' in label:
+            return 'IB'
+        if 'lead_' in label:
+            return 'Lead'
+        return label
+
+    plot_settings = [
+        ('Uniform', '#000000', 'o'),
+        ('In-Degree', '#4daf4a', '*'),
+        ('TF-IDF', '#ff7f00', 'd'),
+        ('N-Gram', '#a65628', 'v'),
+        ('View Count', '#f781bf', '^'),
+        ('IB', '#e41a1c', 's'),
+        ('Lead', '#377eb8', 'h'),
+        # ('IB & Lead', '#984ea3', '8'),
+    ]
+    stats = {l: 0 for l in [p[0] for p in plot_settings]}
+    stats_first = {l: 0 for l in [p[0] for p in plot_settings]}
+    stats_last = {l: 0 for l in [p[0] for p in plot_settings]}
+    stats_middle = {l: 0 for l in [p[0] for p in plot_settings]}
+    for spl in [
+        3,
+        4,
+        5
+    ]:
+        for pl in range(spl+1, 11):
+            df = pd.read_pickle(
+                'data/clickmodels/stepwise/models_stepwise' +
+                '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
+            )
+            df['model'] = df['model'].apply(convert_label)
+            df = df[df['model'] != 'IB & Lead']
+            for ridx, row in df.iterrows():
+                if row['step'] == 0:
+                    stats_first[row['model']] += row['kld']
+                elif row['step'] == row['pl'] - 2:
+                    stats_last[row['model']] += row['kld']
+                else:
+                    stats_middle[row['model']] += row['kld']
+                stats[row['model']] += row['kld']
+
+    for d, label in [
+        (stats, 'all'),
+        (stats_first, 'first'),
+        (stats_middle, 'middle'),
+        (stats_last, 'last'),
+    ]:
+        print(label)
+        for k, v in d.items():
+            print('    ', k, v)
+        print()
+
+    idx = ['Lead', 'IB', 'Uniform', 'TF-IDF',
+           'N-Gram', 'View Count', 'In-Degree']
+    colors = ['#377eb8', '#e41a1c', '#000000', '#ff7f00',
+              '#a65628', '#f781bf', '#4daf4a']
+    stats = pd.Series(data=[stats[i] for i in idx], index=idx)
+    stats_first = pd.Series(data=[stats_first[i] for i in idx], index=idx)
+    stats_middle = pd.Series(data=[stats_middle[i] for i in idx], index=idx)
+    stats_last = pd.Series(data=[stats_last[i] for i in idx], index=idx)
+    for se, label in [
+        (stats, 'all'),
+        (stats_first, 'first'),
+        (stats_middle, 'middle'),
+        (stats_last, 'last'),
+    ]:
+        se = 100 * se/sum(se)
+        ax = plt.subplot(111)
+        b = se.plot(ax=ax, kind='bar', legend=False, width=0.6, rot=70,
+                    fontsize=18)
+        bars = filter(lambda x: isinstance(x, matplotlib.patches.Rectangle),
+                      b.get_children())
+        for bar, c in zip(bars, colors):
+            bar.set_color(c)
+        label_offset = max(se) * 0.01
+        for p in ax.patches:
+            ax.annotate(
+                '%.2f' % p.get_height(),
+                (p.get_x() + p.get_width() / 2., p.get_height() + label_offset),
+                ha='center',
+                fontsize=14,
+            )
+        plt.ylabel('Sum of KL divergences for stepwise models')
+        plt.ylim(0, 25)
+        plt.tight_layout()
+        ofname = 'plots/wikispeedia_stepwise_best_fits_added_' + label
+        plt.savefig(ofname + '.pdf')
+        plt.savefig(ofname + '.png')
+        plt.close()
+
 if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
-    plot_area_importance()
+    # plot_area_importance()
     # get_distribution_stats()
 
     # --------------------------------------------------------------------------
     # cm = ClickModel('wikipedia'); cm.run(areas=True)
 
     # for kind in [
-        # 'all',
-        # 'successful',
-        # 'successful_middle',
-        # 'unsuccessful'
+    #     # 'all',
+    #     # 'successful',
+    #     # 'successful_first',
+    #     # 'successful_middle',
+    #     # 'successful_last',
+    #     # 'successful_first_limited',
+    #     # 'successful_middle_limited',
+    #     # 'successful_last_limited',
+    #     # 'successful_first_limited_pl',
+    #     # 'successful_middle_limited_pl',
+    #     'successful_last_limited_pl',
+    #     # 'unsuccessful'
     # ]:
     #     print(kind)
     #     cm = ClickModel('wikispeedia', kind=kind)
@@ -636,16 +759,25 @@ if __name__ == '__main__':
     # for kind in [
     #     'all',
     #     'successful',
+    #     'successful_first',
     #     'successful_middle',
+    #     'successful_last',
+    #     'successful_first_limited',
+    #     'successful_middle_limited',
+    #     'successful_last_limited',
+    #     'successful_first_limited_pl',
+    #     'successful_middle_limited_pl',
+    #     'successful_last_limited_pl',
     #     'unsuccessful'
     # ]:
     #     print('Wikispeedia (', kind, ')')
     #     plot_results('wikispeedia', kind=kind, normalized=False)
-    #     plot_results('wikispeedia', kind=kind, normalized=True)
+    # #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
     # compare_models_stepwise()
     #
     # plot stepwise
-    # plot_models()
+    plot_models()
     # percentage_models()
+    # added_models()

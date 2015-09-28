@@ -648,6 +648,52 @@ class Wikigame(object):
                 print('        %.4f IB & Lead' % ib_lead)
                 print('        %.4f Rest' % rest)
 
+    def debug(self):
+        self.load_link_positions()
+        for i, node in enumerate(self.name2id.keys()):
+            ib_links, lead_links, ib_lead_links, rest_links = [], [], [], []
+            print(node)
+            try:
+                ib_limit = self.ib_length[node]
+                lead_limit = self.lead_length[node]
+            except KeyError:
+                print('KeyError')
+                continue
+            for pos, link in self.pos2link[node].items():
+                if pos < ib_limit:
+                    ib_links.append(link)
+                    ib_lead_links.append(link)
+                elif ib_limit < pos < lead_limit:
+                    lead_links.append(link)
+                    ib_lead_links.append(link)
+                else:
+                    rest_links.append(link)
+
+            for stat_label, stat_func in [
+                ('mean', np.mean),
+                ('median', np.median)
+            ]:
+                print(stat_label)
+                for label, func in [
+                    ('degree_in', lambda x: self.id2deg_in[x]),
+                    ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
+                    ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
+                ]:
+                    ib = stat_func([func(l) for l in ib_links])
+                    lead = stat_func([func(l) for l in lead_links])
+                    ib_lead = stat_func([func(l) for l in ib_lead_links])
+                    rest = stat_func([func(l) for l in rest_links])
+                    if label == 'ngram':
+                        ib, lead = np.log(ib), np.log(lead)
+                        ib_lead, rest =  np.log(ib_lead), np.log(rest)
+
+                    print('    %s:' % label)
+                    print('        %.4f IB' % ib)
+                    print('        %.4f Lead' % lead)
+                    # print('        %.4f IB & Lead' % ib_lead)
+                    print('        %.4f Rest' % rest)
+            pdb.set_trace()
+
     def compare_models_stepwise(self):
         self.load_data()
         self.data = self.data[~self.data['backtrack']]
@@ -759,8 +805,26 @@ class Wikigame(object):
             df = df[df['successful']]
         elif kind == 'unsuccessful':
             df = df[~df['successful']]
+        elif kind == 'successful_first':
+            df = df[(df['successful']) & (df['step'] == 0)]
         elif kind == 'successful_middle':
-            df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1)]
+            df = df[(df['successful']) & (df['step'] != 0) &
+                    (df['distance-to-go'] != 1)]
+        elif kind == 'successful_last':
+            df = df[(df['successful']) & (df['distance-to-go'] == 1)]
+        elif kind == 'successful_first_limited':
+            df = df[(df['successful']) & (df['step'] == 0) & (df['spl'] <= 5)]
+        elif kind == 'successful_middle_limited':
+            df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1) & (df['spl'] <= 5)]
+        elif kind == 'successful_last_limited':
+            df = df[(df['successful']) & (df['distance-to-go'] == 1) & (df['spl'] <= 5)]
+        elif kind == 'successful_first_limited_pl':
+            df = df[(df['successful']) & (df['step'] == 0) & (df['spl'] <= 5) & (df['pl'] <= 10)]
+        elif kind == 'successful_middle_limited_pl':
+            df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1) & (df['spl'] <= 5) & (df['pl'] <= 10)]
+        elif kind == 'successful_last_limited_pl':
+            df = df[(df['successful']) & (df['distance-to-go'] == 1) & (df['spl'] <= 5) & (df['pl'] <= 10)]
+
         if step is not None:
             df = df[df['step'] == step]
         if spl is not None:
@@ -1363,6 +1427,7 @@ if __name__ == '__main__':
         # WIKTI(successful=True),
         Wikispeedia()
     ]:
+        # pdb.set_trace()
         # wg.compute_link_positions()
         # wg.create_correlation_data()
         # wg.create_dataframe(limit=None)
@@ -1374,11 +1439,20 @@ if __name__ == '__main__':
         # wg.compare_models_first()
         # wg.compare_mi()
         # wg.get_stats()
-        wg.lead_links()
+        # wg.lead_links()
+        # wg.debug()
 
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
+        # wg.get_model_df('successful_first')
         # wg.get_model_df('successful_middle')
+        # wg.get_model_df('successful_last')
+        # wg.get_model_df('successful_first_limited')
+        # wg.get_model_df('successful_middle_limited')
+        # wg.get_model_df('successful_last_limited')
+        # wg.get_model_df('successful_first_limited_pl')
+        # wg.get_model_df('successful_middle_limited_pl')
+        wg.get_model_df('successful_last_limited_pl')
         # wg.get_model_df('unsuccessful')
         # for spl in [
         # #     3,

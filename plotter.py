@@ -688,6 +688,9 @@ class Plot(object):
         else:
             self.match_ylim()
 
+        if kwargs.pop('xticks_integer_only', False):
+            self.set_only_integer_xticks()
+
         self.add_margin()
         for ax in self.axes:
             if invert_xaxis:
