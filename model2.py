@@ -23,10 +23,11 @@ plt.style.use('ggplot')  # TODO
 
 
 class ClickModel(object):
-    def __init__(self, dataset, kind=None, step=None, spl=None, pl=None,
-                 linkpos='linkpos_all'):
+    def __init__(self, dataset, kind=None, save=True,
+                  step=None, spl=None, pl=None, linkpos='linkpos_all'):
         self.dataset = dataset
         self.kind = kind
+        self.save = save
         self.step = step
         self.spl = spl
         self.pl = pl
@@ -209,11 +210,12 @@ class ClickModel(object):
         se.sort()
         for key, val in se.iteritems():
             print('%.2f\t%s' % (val, key))
-        se.to_pickle(
-            'data/clickmodels/' + self.dataset + '_results' +
-            ('_' + self.kind if self.kind is not None else '') + self.suffix +
-            '.obj'
-        )
+        if self.save:
+            se.to_pickle(
+                'data/clickmodels/' + self.dataset + '_results' +
+                ('_' + self.kind if self.kind is not None else '') + self.suffix +
+                '.obj'
+            )
         return columns, data
 
     def max_area(self, columns, data):
@@ -424,52 +426,33 @@ def get_distribution_stats():
     pdb.set_trace()
 
 
-def compare_models_stepwise():
-    for label in [
-        ''
-        # '_usa',
-        # '_no_usa',
+def compare_models_stepwise(kind):
+    for spl in [
+        3,
+        4,
+        5,
     ]:
-        print('+++++++++++++++++', label, '+++++++++++++++++')
-        for spl in [
-            3,
-            # 4,
-            # 5,
-        ]:
-            print('----------------SPL', spl, '----------------')
-            # for pl in [
-            #     # 4,
-            #     # 5,
-            #     # 6,
-            #     # 7,
-            #     # 8,
-            #     # 9,
-            #     10
-            # ]:
-            for pl in range(spl+1, 11):
-                df_result = pd.DataFrame(columns=['df', 'pl', 'step',
-                                                  'model', 'kld'])
-                print('    ------------PATH LENGTH', pl, '------------    ')
-                for step in range(pl-1):
-                    print('\n        --------', step, '--------        ')
-                    cm = ClickModel('wikispeedia', kind='successful' + label,
-                                    step=step, spl=spl, pl=pl)
-                    keys, klds = cm.run(tfidf=True, areas=True)
-                    results = {}
-                    for key, kld in zip(keys, klds):
-                        results[key] = kld
-                        idx = df_result.index.shape[0]
-                        df_result.loc[idx] = [label, pl, step, key, kld]
-                    # for r in sorted(results.items(),
-                    #                 key=operator.itemgetter(1)):
-                    #     print('%.2f\t%s' % (r[1], r[0]))
-                df_result.to_pickle(
-                    'data/clickmodels/stepwise/models_stepwise' + label +
-                    '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
-                )
+        print('----------------SPL', spl, '----------------')
+        for pl in range(spl+1, 11):
+            df_result = pd.DataFrame(columns=['pl', 'step', 'model', 'kld'])
+            print('    ------------PATH LENGTH', pl, '------------    ')
+            for step in range(pl-1):
+                print('\n        --------', step, '--------        ')
+                cm = ClickModel('wikispeedia', kind=kind, save=False,
+                                step=step, spl=spl, pl=pl)
+                keys, klds = cm.run(tfidf=True, areas=True)
+                results = {}
+                for key, kld in zip(keys, klds):
+                    results[key] = kld
+                    idx = df_result.index.shape[0]
+                    df_result.loc[idx] = [pl, step, key, kld]
+            df_result.to_pickle(
+                'data/clickmodels/stepwise/models_stepwise_' + kind +
+                '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
+            )
 
 
-def plot_models():
+def plot_models(kind=''):
     def convert_label(label):
         if 'ib_lead_' in label:
             return 'IB & Lead'
@@ -477,11 +460,13 @@ def plot_models():
             return 'IB'
         if 'lead_' in label:
             return 'Lead'
+        if 'In-Degree' in label:
+            return 'Indegree'
         return label
 
     plot_settings = [
         ('Uniform', '#000000', 'o'),
-        ('In-Degree', '#4daf4a', '*'),
+        ('Indegree', '#4daf4a', '*'),
         ('TF-IDF', '#ff7f00', 'd'),
         ('N-Gram', '#a65628', 'v'),
         ('View Count', '#f781bf', '^'),
@@ -495,13 +480,15 @@ def plot_models():
         # '6',
         # '7',
     ]
-    models = {'Uniform', 'Lead', 'In-Degree', 'TF-IDF'}
-    plot_labels = ['gl_' + unicode(int(gl)) for gl in pls]
+    if kind != '':
+        kind = '_' + kind + '_'
+    models = {'Uniform', 'Lead', 'Indegree', 'TF-IDF'}
+    plot_labels = [kind + 'gl_' + unicode(int(gl)) for gl in pls]
     p = Plot(plot_labels, len(pls), fileextension=['.pdf', '.png'])
     for col_idx, pl in enumerate(pls):
         print('\n----------------PATH LENGTH', pl, '----------------')
         df = pd.read_pickle(
-            'data/clickmodels/stepwise/models_stepwise' +
+            'data/clickmodels/stepwise/models_stepwise' + kind +
             '_spl_3_pl_' + pl + '.obj'
         )
         df['model'] = df['model'].apply(convert_label)
@@ -775,9 +762,10 @@ if __name__ == '__main__':
     # #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
-    # compare_models_stepwise()
+    # compare_models_stepwise(kind='successful')
+    compare_models_stepwise(kind='successful_high_deg_targets')
     #
     # plot stepwise
-    plot_models()
+    # plot_models()
     # percentage_models()
     # added_models()

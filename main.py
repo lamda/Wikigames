@@ -824,6 +824,11 @@ class Wikigame(object):
             df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1) & (df['spl'] <= 5) & (df['pl'] <= 10)]
         elif kind == 'successful_last_limited_pl':
             df = df[(df['successful']) & (df['distance-to-go'] == 1) & (df['spl'] <= 5) & (df['pl'] <= 10)]
+        elif kind == 'successful_high_deg_targets':
+            df2 = df[(df['successful']) & (df['step'] == 0)]
+            df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
+            targets = set(df2[df2['target_deg_in'] >= 100]['target'])
+            df = df[(df['successful']) & (df['target'].isin(targets))]
 
         if step is not None:
             df = df[df['step'] == step]
@@ -1452,16 +1457,18 @@ if __name__ == '__main__':
         # wg.get_model_df('successful_last_limited')
         # wg.get_model_df('successful_first_limited_pl')
         # wg.get_model_df('successful_middle_limited_pl')
-        wg.get_model_df('successful_last_limited_pl')
+        # wg.get_model_df('successful_last_limited_pl')
         # wg.get_model_df('unsuccessful')
-        # for spl in [
-        # #     3,
+
+        for spl in [
+            3,
         #     4,
         # #     5,
-        # ]:
-        #     print('spl=%d' % spl)
-        #     for pl in range(spl+1, 11):
-        #         print('    pl=%d' % pl)
-        #         for step in range(pl):
-        #             print('        step=%d' % step)
+        ]:
+            print('spl=%d' % spl)
+            for pl in range(spl+1, 11):
+                print('    pl=%d' % pl)
+                for step in range(pl):
+                    print('        step=%d' % step)
         #             wg.get_model_df('successful', step=step, spl=spl, pl=pl)
+                    wg.get_model_df('successful_high_deg_targets', step=step, spl=spl, pl=pl)
