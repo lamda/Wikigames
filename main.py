@@ -829,6 +829,11 @@ class Wikigame(object):
             df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
             targets = set(df2[df2['target_deg_in'] >= 100]['target'])
             df = df[(df['successful']) & (df['target'].isin(targets))]
+        elif kind == 'successful_high_deg_targets_median':
+            df2 = df[(df['successful']) & (df['step'] == 0)]
+            df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
+            targets = set(df2[df2['target_deg_in'] > 28]['target'])
+            df = df[(df['successful']) & (df['target'].isin(targets))]
 
         if step is not None:
             df = df[df['step'] == step]
@@ -927,6 +932,29 @@ class Wikigame(object):
         stepwise = 'stepwise/' if step is not None else ''
         df.to_pickle('data/clickmodels/' + stepwise + 'wikispeedia_' + kind +
                       usa_suffix + suffix + '.obj')
+
+    def get_model_df_stats(self):
+        def print_stats(data, label):
+            print('max: %.2f, mean: %.2f, median: %.2f, (%s)' % (max(data), np.mean(data), np.median(data), label))
+
+        # get statistics for all nodes
+        print_stats(self.id2deg_in.values(), 'all nodes')
+
+        self.load_data(force=True)
+        df_full = self.data
+        df_successful = df_full[df_full['successful']]
+        df_unsuccessful = df_full[~df_full['successful']]
+        for df, label in [
+            (df_successful, 'successful games'),
+            (df_unsuccessful, 'unsuccessful games'),
+        ]:
+            targets = df[df['step'] == 0]['target_id']
+            target_indegs = [self.id2deg_in[t] for t in targets]
+            print_stats(target_indegs, label)
+
+        df2 = df_successful
+        df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
+        pdb.set_trace()
 
     def get_stats(self):
         stats = {
@@ -1446,7 +1474,7 @@ if __name__ == '__main__':
         # wg.get_stats()
         # wg.lead_links()
         # wg.debug()
-
+        # wg.get_model_df_stats()
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
         # wg.get_model_df('successful_first')
@@ -1461,14 +1489,14 @@ if __name__ == '__main__':
         # wg.get_model_df('unsuccessful')
 
         for spl in [
-            3,
-        #     4,
-        # #     5,
+            # 3,
+            4,
+            # 5,
         ]:
             print('spl=%d' % spl)
             for pl in range(spl+1, 11):
                 print('    pl=%d' % pl)
                 for step in range(pl):
                     print('        step=%d' % step)
-        #             wg.get_model_df('successful', step=step, spl=spl, pl=pl)
-                    wg.get_model_df('successful_high_deg_targets', step=step, spl=spl, pl=pl)
+                    # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
+                    wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)

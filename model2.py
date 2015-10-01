@@ -428,8 +428,8 @@ def get_distribution_stats():
 
 def compare_models_stepwise(kind):
     for spl in [
-        3,
-        4,
+        # 3,
+        # 4,
         5,
     ]:
         print('----------------SPL', spl, '----------------')
@@ -522,7 +522,7 @@ def plot_models(kind=''):
              show=False, xticks_integer_only=True)
 
 
-def percentage_models():
+def percentage_models(kind):
     def convert_label(label):
         if 'ib_lead_' in label:
             return 'IB & Lead'
@@ -553,7 +553,7 @@ def percentage_models():
     ]:
         for pl in range(spl+1, 11):
             df = pd.read_pickle(
-                'data/clickmodels/stepwise/models_stepwise' +
+                'data/clickmodels/stepwise/models_stepwise_' + kind +
                 '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
             )
             df['model'] = df['model'].apply(convert_label)
@@ -612,13 +612,13 @@ def percentage_models():
         plt.ylabel('Percent of best fits')
         plt.ylim(0, 110)
         plt.tight_layout()
-        ofname = 'plots/wikispeedia_stepwise_best_fits_' + label
+        ofname = 'plots/wikispeedia_stepwise_best_fits_' + kind + '_' + label
         plt.savefig(ofname + '.pdf')
         plt.savefig(ofname + '.png')
         plt.close()
 
 
-def added_models():
+def added_models(kind):
     def convert_label(label):
         if 'ib_lead_' in label:
             return 'IB & Lead'
@@ -649,7 +649,7 @@ def added_models():
     ]:
         for pl in range(spl+1, 11):
             df = pd.read_pickle(
-                'data/clickmodels/stepwise/models_stepwise' +
+                'data/clickmodels/stepwise/models_stepwise_' + kind +
                 '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
             )
             df['model'] = df['model'].apply(convert_label)
@@ -707,10 +707,11 @@ def added_models():
         plt.ylabel('Sum of KL divergences for stepwise models')
         plt.ylim(0, 25)
         plt.tight_layout()
-        ofname = 'plots/wikispeedia_stepwise_best_fits_added_' + label
+        ofname = 'plots/wikispeedia_stepwise_best_fits_added_' + kind + '_' + label
         plt.savefig(ofname + '.pdf')
         plt.savefig(ofname + '.png')
         plt.close()
+
 
 if __name__ == '__main__':
     # --------------------------------------------------------------------------
@@ -763,9 +764,9 @@ if __name__ == '__main__':
 
     # --------------------------------------------------------------------------
     # compare_models_stepwise(kind='successful')
-    compare_models_stepwise(kind='successful_high_deg_targets')
+    compare_models_stepwise(kind='successful_high_deg_targets_median')
     #
     # plot stepwise
     # plot_models()
-    # percentage_models()
-    # added_models()
+    # percentage_models(kind='successful_high_deg_targets')
+    # added_models(kind='successful_high_deg_targets')
