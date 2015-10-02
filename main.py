@@ -834,6 +834,11 @@ class Wikigame(object):
             df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
             targets = set(df2[df2['target_deg_in'] > 28]['target'])
             df = df[(df['successful']) & (df['target'].isin(targets))]
+        elif kind == 'successful_high_deg_targets_median_lower':
+            df2 = df[(df['successful']) & (df['step'] == 0)]
+            df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
+            targets = set(df2[df2['target_deg_in'] <= 28]['target'])
+            df = df[(df['successful']) & (df['target'].isin(targets))]
 
         if step is not None:
             df = df[df['step'] == step]
@@ -1490,8 +1495,8 @@ if __name__ == '__main__':
 
         for spl in [
             # 3,
-            4,
-            # 5,
+            # 4,
+            5,
         ]:
             print('spl=%d' % spl)
             for pl in range(spl+1, 11):
@@ -1499,4 +1504,5 @@ if __name__ == '__main__':
                 for step in range(pl):
                     print('        step=%d' % step)
                     # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
-                    wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)
+                    # wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)
+                    wg.get_model_df('successful_high_deg_targets_median_lower', step=step, spl=spl, pl=pl)

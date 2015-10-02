@@ -764,9 +764,10 @@ if __name__ == '__main__':
 
     # --------------------------------------------------------------------------
     # compare_models_stepwise(kind='successful')
-    compare_models_stepwise(kind='successful_high_deg_targets_median')
+    # compare_models_stepwise(kind='successful_high_deg_targets_median')
+    compare_models_stepwise(kind='successful_high_deg_targets_median_lower')
     #
     # plot stepwise
     # plot_models()
-    # percentage_models(kind='successful_high_deg_targets')
-    # added_models(kind='successful_high_deg_targets')
+    # percentage_models(kind='successful_high_deg_targets_median')
+    # added_models(kind='successful_high_deg_targets_median')
