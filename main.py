@@ -640,13 +640,42 @@ class Wikigame(object):
                 rest = stat_func([func(l) for l in rest_links])
                 if label == 'ngram':
                     ib, lead = np.log(ib), np.log(lead)
-                    ib_lead, rest =  np.log(ib_lead), np.log(rest)
+                    ib_lead, rest = np.log(ib_lead), np.log(rest)
 
                 print('    %s:' % label)
                 print('        %.4f IB' % ib)
                 print('        %.4f Lead' % lead)
                 print('        %.4f IB & Lead' % ib_lead)
                 print('        %.4f Rest' % rest)
+
+    def lead_links_all(self):
+        self.load_link_positions()
+        links, ibs, leads = [], [], []
+        for i, node in enumerate(self.name2id.keys()):
+            print(i+1, '/', len(self.name2id), end='\r')
+            try:
+                ib_limit = self.ib_length[node]
+                lead_limit = self.lead_length[node]
+            except KeyError:
+                continue
+            for pos, link in self.pos2link[node].items():
+                links.append(link)
+                ibs.append(0)
+                leads.append(0)
+                if pos < ib_limit:
+                    ibs[-1] = 1
+                elif ib_limit < pos < lead_limit:
+                    leads[-1] = 1
+
+        df = pd.DataFrame(data=zip(links, ibs, leads), columns=['target', 'ib', 'lead'])
+        for label, func in [
+            ('degree_in', lambda x: self.id2deg_in[x]),
+            ('ngram', lambda x: np.exp(ngram.ngram_frequency.get_frequency(self.id2name[x]))),
+            ('view_count', lambda x: viewcounts.viewcount.get_frequency(self.id2name[x])),
+        ]:
+            print(label)
+            df[label] = df['target'].apply(func)
+        df.to_pickle('data/data_ib_lead_rest_wikispeedia.obj')
 
     def debug(self):
         self.load_link_positions()
@@ -1465,7 +1494,6 @@ if __name__ == '__main__':
         # WIKTI(successful=True),
         Wikispeedia()
     ]:
-        # pdb.set_trace()
         # wg.compute_link_positions()
         # wg.create_correlation_data()
         # wg.create_dataframe(limit=None)
@@ -1478,7 +1506,9 @@ if __name__ == '__main__':
         # wg.compare_mi()
         # wg.get_stats()
         # wg.lead_links()
+        wg.lead_links_all()
         # wg.debug()
+
         # wg.get_model_df_stats()
         # wg.get_model_df('all')
         # wg.get_model_df('successful')
@@ -1493,16 +1523,16 @@ if __name__ == '__main__':
         # wg.get_model_df('successful_last_limited_pl')
         # wg.get_model_df('unsuccessful')
 
-        for spl in [
-            # 3,
-            # 4,
-            5,
-        ]:
-            print('spl=%d' % spl)
-            for pl in range(spl+1, 11):
-                print('    pl=%d' % pl)
-                for step in range(pl):
-                    print('        step=%d' % step)
-                    # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
-                    # wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)
-                    wg.get_model_df('successful_high_deg_targets_median_lower', step=step, spl=spl, pl=pl)
+        # for spl in [
+        #     # 3,
+        #     # 4,
+        #     5,
+        # ]:
+        #     print('spl=%d' % spl)
+        #     for pl in range(spl+1, 11):
+        #         print('    pl=%d' % pl)
+        #         for step in range(pl):
+        #             print('        step=%d' % step)
+        #             # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
+        #             # wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)
+        #             wg.get_model_df('successful_high_deg_targets_median_lower', step=step, spl=spl, pl=pl)

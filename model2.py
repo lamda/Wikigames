@@ -410,6 +410,10 @@ def plot_area_importance():
         plt.close()
 
 
+def plot_area_importance_all():
+    # TODO: np.log of sum of ngram frequencies
+
+
 def get_distribution_stats():
     cm = ClickModel('wikispeedia', 'all')
     cm.ground_truth()
@@ -717,6 +721,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
     # plot_area_importance()
+    plot_area_importance_all()
     # get_distribution_stats()
 
     # --------------------------------------------------------------------------
@@ -765,7 +770,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # compare_models_stepwise(kind='successful')
     # compare_models_stepwise(kind='successful_high_deg_targets_median')
-    compare_models_stepwise(kind='successful_high_deg_targets_median_lower')
+    # compare_models_stepwise(kind='successful_high_deg_targets_median_lower')
     #
     # plot stepwise
     # plot_models()
