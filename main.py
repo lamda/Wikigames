@@ -864,12 +864,12 @@ class Wikigame(object):
             pdb.set_trace()
             targets = set(df2[df2['target_deg_in'] < 100]['target'])
             df = df[(df['successful']) & (df['target'].isin(targets))]
-        elif kind == 'successful_high_deg_targets_median':
+        elif kind == 'successful_deg_above_median':
             df2 = df[(df['successful']) & (df['step'] == 0)]
             df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
             targets = set(df2[df2['target_deg_in'] > 28]['target'])
             df = df[(df['successful']) & (df['target'].isin(targets))]
-        elif kind == 'successful_high_deg_targets_median_lower':
+        elif kind == 'successful_deg_below_median':
             df2 = df[(df['successful']) & (df['step'] == 0)]
             df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
             targets = set(df2[df2['target_deg_in'] <= 28]['target'])
@@ -1531,8 +1531,8 @@ if __name__ == '__main__':
         # wg.get_model_df('unsuccessful')
 
         for spl in [
-        #     # 3,
-        #     # 4,
+            # 3,
+            # 4,
             5,
         ]:
             print('spl=%d' % spl)
@@ -1540,7 +1540,6 @@ if __name__ == '__main__':
                 print('    pl=%d' % pl)
                 for step in range(pl):
                     print('        step=%d' % step)
-        #             # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
-        #             # wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)
-        #             # wg.get_model_df('successful_high_deg_targets_median_lower', step=step, spl=spl, pl=pl)
-                    wg.get_model_df('successful_low_deg_targets', step=step, spl=spl, pl=pl)
+                    # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
+                    # wg.get_model_df('successful_deg_above_median', step=step, spl=spl, pl=pl)
+                    wg.get_model_df('successful_deg_below_median', step=step, spl=spl, pl=pl)

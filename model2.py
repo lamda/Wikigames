@@ -24,7 +24,7 @@ plt.style.use('ggplot')  # TODO
 
 class ClickModel(object):
     def __init__(self, dataset, kind=None, save=True,
-                  step=None, spl=None, pl=None, linkpos='linkpos_all'):
+                 step=None, spl=None, pl=None, linkpos='linkpos_all'):
         self.dataset = dataset
         self.kind = kind
         self.save = save
@@ -42,7 +42,6 @@ class ClickModel(object):
             print('unrecognized parameter')
             raise NotImplemented
         self.df = pd.read_pickle(fpath)
-        # self.df = self.df[self.df['source'] == 'Africa']
         with open('data/clickmodels/' + dataset + '_stats.obj', 'rb') as infile:
             stats_orig = pickle.load(infile)
         self.stats = {}
@@ -85,8 +84,6 @@ class ClickModel(object):
 
     def compare(self, m2):
         m1 = 'Ground Truth'
-        # why use np.abs?
-        # kl = np.abs(scipy.stats.entropy(self.data[m1], self.data[m2], base=2))
         kl = scipy.stats.entropy(self.data[m1], self.data[m2], base=2)
         # print('        %.3f\t%s' % (kl, m2))
         return kl
@@ -146,6 +143,19 @@ class ClickModel(object):
             df = df[(df['successful']) & (df['step'] != 0) & (df['distance-to-go'] != 1)]
         elif self.kind == 'unsuccessful':
             df = df[~df['successful']]
+        elif self.kind == 'successful_deg_above_median':
+            df2 = df[(df['successful']) & (df['step'] == 0)]
+            df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.wg.id2deg_in[x])
+            targets = set(df2[df2['target_deg_in'] > 28]['target'])
+            df = df[(df['successful']) & (df['target'].isin(targets))]
+        elif self.kind == 'successful_deg_below_median':
+            df2 = df[(df['successful']) & (df['step'] == 0)]
+            df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.wg.id2deg_in[x])
+            targets = set(df2[df2['target_deg_in'] <= 28]['target'])
+            df = df[(df['successful']) & (df['target'].isin(targets))]
+        else:
+            print('kind not implemented for TF-IDF')
+            pdb.set_trace()
         if self.step is not None:
             df = df[df['step'] == self.step]
         if self.spl is not None:
@@ -485,30 +495,25 @@ def get_distribution_stats():
     pdb.set_trace()
 
 
-def compare_models_stepwise(kind):
-    for spl in [
-        # 3,
-        # 4,
-        5,
-    ]:
-        print('----------------SPL', spl, '----------------')
-        for pl in range(spl+1, 11):
-            df_result = pd.DataFrame(columns=['pl', 'step', 'model', 'kld'])
-            print('    ------------PATH LENGTH', pl, '------------    ')
-            for step in range(pl-1):
-                print('\n        --------', step, '--------        ')
-                cm = ClickModel('wikispeedia', kind=kind, save=False,
-                                step=step, spl=spl, pl=pl)
-                keys, klds = cm.run(tfidf=True, areas=True)
-                results = {}
-                for key, kld in zip(keys, klds):
-                    results[key] = kld
-                    idx = df_result.index.shape[0]
-                    df_result.loc[idx] = [pl, step, key, kld]
-            df_result.to_pickle(
-                'data/clickmodels/stepwise/models_stepwise_' + kind +
-                '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
-            )
+def compare_models_stepwise(kind, spl):
+    print('----------------SPL', spl, '----------------')
+    for pl in range(spl+1, 11):
+        df_result = pd.DataFrame(columns=['pl', 'step', 'model', 'kld'])
+        print('    ------------PATH LENGTH', pl, '------------    ')
+        for step in range(pl-1):
+            print('\n        --------', step, '--------        ')
+            cm = ClickModel('wikispeedia', kind=kind, save=False,
+                            step=step, spl=spl, pl=pl)
+            keys, klds = cm.run(tfidf=True, areas=True)
+            results = {}
+            for key, kld in zip(keys, klds):
+                results[key] = kld
+                idx = df_result.index.shape[0]
+                df_result.loc[idx] = [pl, step, key, kld]
+        df_result.to_pickle(
+            'data/clickmodels/stepwise/models_stepwise_' + kind +
+            '_spl_' + unicode(spl) + '_pl_' + unicode(pl) + '.obj'
+        )
 
 
 def plot_models(kind=''):
@@ -823,16 +828,25 @@ if __name__ == '__main__':
     # #     plot_results('wikispeedia', kind=kind, normalized=True)
 
     # --------------------------------------------------------------------------
-    # compare_models_stepwise(kind='successful')
-    # compare_models_stepwise(kind='successful_high_deg_targets_median')
-    # compare_models_stepwise(kind='successful_high_deg_targets_median_lower')
-    compare_models_stepwise(kind='successful_low_deg_targets')
-    #
+    for spl in [
+        3,
+        # 4,
+        # 5,
+    ]:
+        for kind in [
+            # 'successful',
+            'successful_deg_below_median',
+            # 'successful_deg_above_median',
+        ]:
+            print(kind)
+            compare_models_stepwise(kind, spl)
+
     # plot stepwise
     # plot_models()
     # for kind in [
-    #     'successful',
-    #     # 'successful_high_deg_targets_median_lower',
+        # 'successful',
+        # 'successful_deg_below_median',
+        # 'successful_deg_above_median',
     # ]:
-    #     percentage_models(kind=kind)
-    #     added_models(kind=kind)
+        # percentage_models(kind=kind)
+        # added_models(kind=kind)
