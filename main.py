@@ -858,6 +858,12 @@ class Wikigame(object):
             df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
             targets = set(df2[df2['target_deg_in'] >= 100]['target'])
             df = df[(df['successful']) & (df['target'].isin(targets))]
+        elif kind == 'successful_low_deg_targets':
+            df2 = df[(df['successful']) & (df['step'] == 0)]
+            df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
+            pdb.set_trace()
+            targets = set(df2[df2['target_deg_in'] < 100]['target'])
+            df = df[(df['successful']) & (df['target'].isin(targets))]
         elif kind == 'successful_high_deg_targets_median':
             df2 = df[(df['successful']) & (df['step'] == 0)]
             df2['target_deg_in'] = df2['target_id'].apply(lambda x: self.id2deg_in[x])
@@ -1499,6 +1505,7 @@ if __name__ == '__main__':
         # wg.create_dataframe(limit=None)
         # wg.complete_dataframe()
         # wg.add_means()
+        # pdb.set_trace()
 
         # wg.compare_models_lead()
         # wg.compare_models_stepwise()
@@ -1506,7 +1513,7 @@ if __name__ == '__main__':
         # wg.compare_mi()
         # wg.get_stats()
         # wg.lead_links()
-        wg.lead_links_all()
+        # wg.lead_links_all()
         # wg.debug()
 
         # wg.get_model_df_stats()
@@ -1523,16 +1530,17 @@ if __name__ == '__main__':
         # wg.get_model_df('successful_last_limited_pl')
         # wg.get_model_df('unsuccessful')
 
-        # for spl in [
+        for spl in [
         #     # 3,
         #     # 4,
-        #     5,
-        # ]:
-        #     print('spl=%d' % spl)
-        #     for pl in range(spl+1, 11):
-        #         print('    pl=%d' % pl)
-        #         for step in range(pl):
-        #             print('        step=%d' % step)
+            5,
+        ]:
+            print('spl=%d' % spl)
+            for pl in range(spl+1, 11):
+                print('    pl=%d' % pl)
+                for step in range(pl):
+                    print('        step=%d' % step)
         #             # wg.get_model_df('successful', step=step, spl=spl, pl=pl)
         #             # wg.get_model_df('successful_high_deg_targets_median', step=step, spl=spl, pl=pl)
-        #             wg.get_model_df('successful_high_deg_targets_median_lower', step=step, spl=spl, pl=pl)
+        #             # wg.get_model_df('successful_high_deg_targets_median_lower', step=step, spl=spl, pl=pl)
+                    wg.get_model_df('successful_low_deg_targets', step=step, spl=spl, pl=pl)

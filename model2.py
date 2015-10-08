@@ -363,8 +363,8 @@ def plot_area_importance():
         ('Wikipedia', 'N-Gram Frequency (log)', [-7.459, -7.485, -8.225], '#a65628'),
         ('Wikispeedia', 'N-Gram Frequency (log)', [-5.588, -5.261, -5.355], '#a65628'),
 
-        ('Wikiped', 'View Count', [11761, 13283, 4690], '#f781bf'),
-        ('Wikispeediaia', 'View Count', [58347, 67845, 76762], '#f781bf'),
+        ('Wikipedia', 'View Count', [11761, 13283, 4690], '#f781bf'),
+        ('Wikispeedia', 'View Count', [58347, 67845, 76762], '#f781bf'),
     ]:
 
         # bar plots ------------------------------------------------------------
@@ -411,7 +411,62 @@ def plot_area_importance():
 
 
 def plot_area_importance_all():
-    # TODO: np.log of sum of ngram frequencies
+    label2short = {
+        'Indegree': 'degree_in',
+        'N-Gram Frequency (log)': 'ngram',
+        'View Count': 'view_count'
+    }
+    short2label = {v: k for k, v in label2short.items()}
+    short2color = {
+        'degree_in': '#4daf4a',
+        'ngram': '#a65628',
+        'view_count': '#f781bf',
+    }
+    hatches = ['\\', '/', '']
+    fontsize = 22
+    for dataset in [
+        # 'wikispeedia',
+        'wikipedia',
+    ]:
+        print(dataset)
+        df = pd.read_pickle('data/data_ib_lead_rest_' + dataset + '.obj')
+        if dataset == 'wikipedia':
+            df.columns = ['target', 'pos', 'ib', 'lead', 'nav_template',
+                          'see_also', 'degree_in', 'ngram', 'view_count']
+        list_type = []
+        for ridx, row in df.iterrows():
+            if row['ib']:
+                list_type.append('IB')
+            elif row['lead']:
+                list_type.append('Lead')
+            else:
+                list_type.append('Remainder')
+        df['type'] = list_type
+
+        for label in ['degree_in', 'ngram', 'view_count']:
+            print('    ', label)
+            ax = sns.boxplot(x='type', y=label, data=df, sym='',
+                             color=short2color[label],
+                             order=['IB', 'Lead', 'Remainder'])
+            ax.set_ylabel(short2label[label], fontsize=fontsize)
+            ax.set_xlabel('')
+            ax.set_ylabel(short2label[label])
+            plt.tick_params(axis='both', which='major', labelsize=fontsize)
+            plt.tick_params(axis='both', which='minor', labelsize=fontsize)
+            # bars = [c for c in ax.get_children()
+            #         if isinstance(c, matplotlib.patches.PathPatch)]
+            # for bidx, b in enumerate(bars):
+            #     b.set_hatch(hatches[bidx])
+            #     b.set_facecolor('white')
+            #     # b.set_linewidth(10)
+            #     # pdb.set_trace()
+            # plt.show()
+            plt.tight_layout()
+            ofname = 'plots/ib_lead_rest_links_' +\
+                     dataset + '_' + label
+            plt.savefig(ofname + '.pdf')
+            plt.savefig(ofname + '.png')
+            plt.close()
 
 
 def get_distribution_stats():
@@ -721,7 +776,7 @@ if __name__ == '__main__':
     # --------------------------------------------------------------------------
     # get_area_importance()
     # plot_area_importance()
-    plot_area_importance_all()
+    # plot_area_importance_all()
     # get_distribution_stats()
 
     # --------------------------------------------------------------------------
@@ -771,8 +826,13 @@ if __name__ == '__main__':
     # compare_models_stepwise(kind='successful')
     # compare_models_stepwise(kind='successful_high_deg_targets_median')
     # compare_models_stepwise(kind='successful_high_deg_targets_median_lower')
+    compare_models_stepwise(kind='successful_low_deg_targets')
     #
     # plot stepwise
     # plot_models()
-    # percentage_models(kind='successful_high_deg_targets_median')
-    # added_models(kind='successful_high_deg_targets_median')
+    # for kind in [
+    #     'successful',
+    #     # 'successful_high_deg_targets_median_lower',
+    # ]:
+    #     percentage_models(kind=kind)
+    #     added_models(kind=kind)
